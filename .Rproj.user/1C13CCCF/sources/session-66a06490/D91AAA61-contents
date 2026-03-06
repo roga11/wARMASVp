@@ -1,0 +1,167 @@
+#' Simulation-Based Standard Errors for SV(p) with Leverage
+#'
+#' Computes standard errors and confidence intervals for estimated parameters
+#' by simulating from the fitted model and re-estimating.
+#'
+#' @param object An \code{"svp"} object from \code{\link{svp}}.
+#' @param n_sim Integer. Number of Monte Carlo replications. Default 199.
+#' @param alpha Numeric. Significance level for confidence intervals. Default 0.05.
+#' @param burnin Integer. Burn-in period for simulation. Default 500.
+#'
+#' @return A list with:
+#' \describe{
+#'   \item{CI}{2 x k matrix of confidence intervals (lower, upper).}
+#'   \item{SEsim0}{Standard errors relative to true parameter values.}
+#'   \item{SEsim}{Standard errors relative to sample mean.}
+#'   \item{ISEconservative}{Conservative interval-based standard errors.}
+#'   \item{ISEliberal}{Liberal interval-based standard errors.}
+#'   \item{thetamat}{Matrix of parameter estimates from simulations.}
+#' }
+#'
+#' @examples
+#' \donttest{
+#' y <- sim_svp(1000, phi = 0.95, sigy = 1, sigv = 0.2, leverage = TRUE, rho = -0.5)$y
+#' fit <- svp(y, p = 1)
+#' se <- svpSE(fit, n_sim = 49)
+#' se$CI
+#' }
+#'
+#' @export
+svpSE <- function(object, n_sim = 199, alpha = 0.05, burnin = 500) {
+  if (!inherits(object, "svp")) stop("object must be of class 'svp'.")
+  if (n_sim < 1) stop("n_sim must be >= 1.")
+  p <- object$p
+  Tsize <- length(object$y)
+  has_lev <- isTRUE(object$leverage) && !is.na(object$rho)
+  n_params <- if (has_lev) p + 3 else p + 2
+  betamat <- matrix(0, n_sim, n_params)
+  if (has_lev) {
+    betasim <- c(object$phi, object$sigy, object$sigv, object$rho)
+    rho_type <- if (is.null(object$rho_type)) "pearson" else object$rho_type
+    if (rho_type == "both") rho_type <- "pearson"
+  } else {
+    betasim <- c(object$phi, object$sigy, object$sigv)
+    rho_type <- "pearson"
+  }
+  xn <- 1
+  while (xn <= n_sim) {
+    if (has_lev) {
+      u_out <- sim_svp(Tsize, phi = object$phi, sigy = object$sigy,
+                       sigv = object$sigv, leverage = TRUE,
+                       rho = object$rho, burnin = burnin)
+      u <- u_out$y
+    } else {
+      u <- sim_svp(Tsize, phi = object$phi, sigy = object$sigy,
+                   sigv = object$sigv, burnin = burnin)
+    }
+    out_tmp <- tryCatch(
+      svp(u, p = p, J = object$J, leverage = has_lev,
+          rho_type = rho_type, del = object$del, trunc_lev = TRUE),
+      error = function(e) NULL
+    )
+    if (!is.null(out_tmp) && !isTRUE(out_tmp$nonstationary_ind)) {
+      if (has_lev) {
+        betamat[xn, ] <- c(out_tmp$phi, out_tmp$sigy, out_tmp$sigv, out_tmp$rho)
+      } else {
+        betamat[xn, ] <- c(out_tmp$phi, out_tmp$sigy, out_tmp$sigv)
+      }
+      xn <- xn + 1
+    }
+  }
+  .compute_se_ci(betamat, betasim, n_sim, n_params, alpha)
+}
+
+#' Simulation-Based Standard Errors for SV(1) with Student-t Errors
+#'
+#' @param object An \code{"svp_t"} object from \code{\link{svp}}.
+#' @param n_sim Integer. Number of Monte Carlo replications. Default 199.
+#' @param alpha Numeric. Significance level. Default 0.05.
+#' @param burnin Integer. Burn-in for simulation. Default 500.
+#' @param logNu Logical. Use log-space for nu estimation. Default \code{FALSE}.
+#'
+#' @return Same structure as \code{\link{svpSE}}.
+#'
+#' @export
+svpSE_t <- function(object, n_sim = 199, alpha = 0.05, burnin = 500, logNu = FALSE) {
+  if (!inherits(object, "svp_t")) stop("object must be of class 'svp_t'.")
+  p <- length(object$phi)
+  Tsize <- length(object$y)
+  n_params <- p + 3
+  betamat <- matrix(0, n_sim, n_params)
+  betasim <- c(object$phi, object$sigy, object$sigv, object$v)
+  xn <- 1
+  while (xn <= n_sim) {
+    u_out <- sim_svp(Tsize, phi = object$phi, sigy = object$sigy,
+                     sigv = object$sigv, errorType = "Student-t",
+                     nu = object$v, burnin = burnin)
+    out_tmp <- tryCatch(
+      svp(as.numeric(u_out), p = 1, J = object$J, errorType = "Student-t", del = 1e-10, logNu = logNu),
+      error = function(e) NULL
+    )
+    if (!is.null(out_tmp)) {
+      betamat[xn, ] <- c(out_tmp$phi, out_tmp$sigy, out_tmp$sigv, out_tmp$v)
+      xn <- xn + 1
+    }
+  }
+  .compute_se_ci(betamat, betasim, n_sim, n_params, alpha)
+}
+
+#' Simulation-Based Standard Errors for SV(1) with GED Errors
+#'
+#' @param object An \code{"svp_ged"} object from \code{\link{svp}}.
+#' @param n_sim Integer. Number of Monte Carlo replications. Default 199.
+#' @param alpha Numeric. Significance level. Default 0.05.
+#' @param burnin Integer. Burn-in for simulation. Default 500.
+#'
+#' @return Same structure as \code{\link{svpSE}}.
+#'
+#' @export
+svpSE_ged <- function(object, n_sim = 199, alpha = 0.05, burnin = 500) {
+  if (!inherits(object, "svp_ged")) stop("object must be of class 'svp_ged'.")
+  p <- length(object$phi)
+  Tsize <- length(object$y)
+  n_params <- p + 3
+  betamat <- matrix(0, n_sim, n_params)
+  betasim <- c(object$phi, object$sigy, object$sigv, object$v)
+  xn <- 1
+  while (xn <= n_sim) {
+    u_out <- sim_svp(Tsize, phi = object$phi, sigy = object$sigy,
+                     sigv = object$sigv, errorType = "GED",
+                     nu = object$v, burnin = burnin)
+    out_tmp <- tryCatch(
+      svp(as.numeric(u_out), p = 1, J = object$J, errorType = "GED", del = 1e-10),
+      error = function(e) NULL
+    )
+    if (!is.null(out_tmp)) {
+      betamat[xn, ] <- c(out_tmp$phi, out_tmp$sigy, out_tmp$sigv, out_tmp$v)
+      xn <- xn + 1
+    }
+  }
+  .compute_se_ci(betamat, betasim, n_sim, n_params, alpha)
+}
+
+
+# Internal helper for SE/CI computation
+.compute_se_ci <- function(betamat, betasim, n_sim, n_params, alpha) {
+  betasim_mat <- matrix(betasim, nrow = n_sim, ncol = n_params, byrow = TRUE)
+  SEsim0 <- sqrt(colSums((betamat - betasim_mat)^2) / (n_sim - n_params))
+  SEsim <- sqrt(colSums((betamat - matrix(colMeans(betamat), n_sim, n_params, byrow = TRUE))^2) / (n_sim - n_params))
+  ISEconservative <- numeric(n_params)
+  ISEliberal <- numeric(n_params)
+  CI <- matrix(0, n_params, 2)
+  for (xp in seq_len(n_params)) {
+    sorted <- sort(betamat[, xp])
+    cl <- sorted[max(1, round(n_sim * (alpha / 2)))]
+    ch <- sorted[round(n_sim * (1 - alpha / 2))]
+    z_alpha <- stats::qnorm(1 - alpha / 2)
+    sig_L <- (betasim[xp] - cl) / z_alpha
+    sig_H <- (ch - betasim[xp]) / z_alpha
+    ISEconservative[xp] <- min(abs(sig_L), abs(sig_H))
+    ISEliberal[xp] <- max(abs(sig_L), abs(sig_H))
+    CI[xp, 1] <- cl
+    CI[xp, 2] <- ch
+  }
+  list(CI = t(CI), SEsim0 = SEsim0, SEsim = SEsim,
+       ISEconservative = ISEconservative, ISEliberal = ISEliberal,
+       thetamat = betamat)
+}

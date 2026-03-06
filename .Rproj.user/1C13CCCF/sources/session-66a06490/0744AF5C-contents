@@ -1,0 +1,214 @@
+#' LMC Test for AR Order in SV(p) Models
+#'
+#' Performs a Local Monte Carlo (LMC) test of the null hypothesis
+#' \eqn{H_0: \phi_{p_0+1} = \cdots = \phi_p = 0} (i.e., that an SV(\eqn{p_0})
+#' model is sufficient against an SV(\eqn{p}) alternative).
+#'
+#' @param y Numeric vector. Observed returns.
+#' @param p_null Integer. Order under the null hypothesis.
+#' @param p_alt Integer. Order under the alternative (\code{p_alt > p_null}).
+#' @param J Integer. Winsorizing parameter. Default 10.
+#' @param N Integer. Number of Monte Carlo replications. Default 99.
+#' @param burnin Integer. Burn-in for simulation. Default 500.
+#' @param del Numeric. Small constant for log transformation. Default \code{1e-10}.
+#' @param wDecay Logical. Use decaying weights. Default \code{FALSE}.
+#' @param Bartlett Logical. If \code{TRUE}, use Bartlett kernel HAC weighting
+#'   matrix for a GMM-LRT-type test statistic. If \code{FALSE} (default), use
+#'   the sum of squared extra AR coefficients.
+#'
+#' @return An object of class \code{"svp_test"}, a list containing:
+#' \describe{
+#'   \item{s0}{Test statistic from observed data.}
+#'   \item{sN}{Simulated null distribution (vector of length N).}
+#'   \item{pval}{Monte Carlo p-value.}
+#'   \item{test_type}{Character string identifying the test.}
+#'   \item{null_param}{Name of the parameter(s) tested.}
+#'   \item{null_value}{Value(s) under the null hypothesis.}
+#'   \item{call}{The matched call.}
+#' }
+#'
+#' @details
+#' When \code{Bartlett = FALSE} (default), the test statistic is
+#' \eqn{T \sum_{j=p_0+1}^{p} \hat\phi_j^2}, i.e., the sum of squared extra
+#' AR coefficients scaled by sample size.
+#'
+#' When \code{Bartlett = TRUE}, the test statistic is based on the GMM-LRT
+#' approach with a Bartlett kernel HAC weighting matrix:
+#' \eqn{S = T \times (M_{H_0} - M_{H_1})}, where \eqn{M} denotes the
+#' GMM criterion evaluated at the null and alternative estimates. Simulations
+#' yielding negative test statistics are discarded and re-drawn.
+#'
+#' @examples
+#' \donttest{
+#' y <- sim_svp(1000, phi = 0.95, sigy = 1, sigv = 0.2)
+#' test <- lmc_ar(y, p_null = 1, p_alt = 2, J = 10, N = 49)
+#' print(test)
+#' }
+#'
+#' @export
+lmc_ar <- function(y, p_null, p_alt, J = 10, N = 99, burnin = 500,
+                   del = 1e-10, wDecay = FALSE, Bartlett = FALSE) {
+  cl <- match.call()
+  y_vec <- as.numeric(y)
+  Tsize <- length(y_vec)
+  if (p_null >= p_alt) stop("p_alt must be greater than p_null.")
+  if (p_null < 1) stop("p_null must be >= 1.")
+  # Estimate models
+  mdl_alt <- svp(y_vec, p = p_alt, J = J, leverage = FALSE, del = del, wDecay = wDecay)
+  mdl_null_est <- svp(y_vec, p = p_null, J = J, leverage = FALSE, del = del, wDecay = wDecay)
+  # Compute test statistic
+  if (isTRUE(Bartlett)) {
+    M_null <- LRT_moment_ar_Amat(y_vec, mdl_null_est, del = del, Bartlett = TRUE)
+    M_alt  <- LRT_moment_ar_Amat(y_vec, mdl_alt, del = del, Bartlett = TRUE)
+    s0 <- Tsize * (M_null - M_alt)
+  } else {
+    phi_extra <- mdl_alt$phi[(p_null + 1):p_alt]
+    s0 <- Tsize * sum(phi_extra^2)
+  }
+  # Simulate null distribution
+  betasim_null <- c(mdl_null_est$phi, mdl_null_est$sigy, mdl_null_est$sigv)
+  sN <- .simnull_ar(betasim_null, p_null, p_alt, J, Tsize, N, burnin,
+                    del, wDecay, Bartlett)
+  pval <- (N + 1 - sum(s0 >= sN)) / (N + 1)
+  test_label <- if (isTRUE(Bartlett)) {
+    sprintf("LMC AR Order Bartlett (p0=%d vs p=%d)", p_null, p_alt)
+  } else {
+    sprintf("LMC AR Order (p0=%d vs p=%d)", p_null, p_alt)
+  }
+  out <- list(s0 = s0, sN = as.numeric(sN), pval = pval,
+              test_type = test_label,
+              null_param = paste0("phi_", (p_null + 1):p_alt),
+              null_value = rep(0, p_alt - p_null),
+              call = cl)
+  class(out) <- "svp_test"
+  return(out)
+}
+
+
+#' MMC Test for AR Order in SV(p) Models
+#'
+#' Performs a Maximized Monte Carlo (MMC) test of
+#' \eqn{H_0: \phi_{p_0+1} = \cdots = \phi_p = 0}
+#' by maximizing the MC p-value over nuisance parameters
+#' (\eqn{\phi_1, \ldots, \phi_{p_0}, \sigma_y, \sigma_v}).
+#'
+#' @inheritParams lmc_ar
+#' @param eps Numeric vector. Half-width of search region around estimated
+#'   nuisance parameters. Default \code{rep(0.3, p_null+2)}.
+#' @param threshold Numeric. Target p-value. Default 1.
+#' @param method Character. Optimization method: \code{"pso"} or \code{"GenSA"}.
+#'   Default \code{"pso"}.
+#' @param maxit Integer. Maximum iterations/evaluations. Default depends on method.
+#'
+#' @return A list with optimization output including \code{value} (maximized p-value)
+#'   and \code{par} (nuisance parameters at the maximum).
+#'
+#' @examples
+#' \donttest{
+#' y <- sim_svp(1000, phi = 0.95, sigy = 1, sigv = 0.2)
+#' mmc <- mmc_ar(y, p_null = 1, p_alt = 2, J = 10, N = 19,
+#'               method = "pso", maxit = 10)
+#' mmc$value
+#' }
+#'
+#' @export
+mmc_ar <- function(y, p_null, p_alt, J = 10, N = 99, burnin = 500,
+                   eps = NULL, threshold = 1, method = "pso", maxit = NULL,
+                   del = 1e-10, wDecay = FALSE, Bartlett = FALSE) {
+  cl <- match.call()
+  y_vec <- as.numeric(y)
+  Tsize <- length(y_vec)
+  if (p_null >= p_alt) stop("p_alt must be greater than p_null.")
+  if (p_null < 1) stop("p_null must be >= 1.")
+  # Estimate under alternative for test statistic
+  mdl_alt <- svp(y_vec, p = p_alt, J = J, leverage = FALSE, del = del, wDecay = wDecay)
+  mdl_null_est <- svp(y_vec, p = p_null, J = J, leverage = FALSE, del = del, wDecay = wDecay)
+  theta_0 <- c(mdl_null_est$phi, mdl_null_est$sigy, mdl_null_est$sigv)
+  n_nuisance <- p_null + 2
+  if (is.null(eps)) eps <- rep(0.3, n_nuisance)
+  # Bounds for nuisance parameters
+  lower <- c(pmax(theta_0[1:p_null] - eps[1:p_null], rep(-0.999, p_null)),
+             max(theta_0[p_null + 1] - eps[p_null + 1], 0.01),
+             max(theta_0[p_null + 2] - eps[p_null + 2], 0.01))
+  upper <- c(pmin(theta_0[1:p_null] + eps[1:p_null], rep(0.999, p_null)),
+             theta_0[p_null + 1] + eps[p_null + 1],
+             theta_0[p_null + 2] + eps[p_null + 2])
+  # Test statistic
+  if (isTRUE(Bartlett)) {
+    M_null <- LRT_moment_ar_Amat(y_vec, mdl_null_est, del = del, Bartlett = TRUE)
+    M_alt  <- LRT_moment_ar_Amat(y_vec, mdl_alt, del = del, Bartlett = TRUE)
+    s0 <- Tsize * (M_null - M_alt)
+  } else {
+    phi_extra <- mdl_alt$phi[(p_null + 1):p_alt]
+    s0 <- Tsize * sum(phi_extra^2)
+  }
+  out <- .run_mmc_optimizer(method, theta_0, .mmc_pval_ar, lower, upper,
+                            threshold, maxit,
+                            y = y_vec, p_null = p_null, p_alt = p_alt,
+                            j = J, N = N, s0 = s0, ini = burnin,
+                            del = del, wDecay = wDecay, Bartlett = Bartlett)
+  out$value <- -out$value
+  out$s0 <- s0
+  out$call <- cl
+  return(out)
+}
+
+
+# =========================================================================== #
+# Internal helpers for AR tests
+# =========================================================================== #
+
+# Simulate null distribution for AR test
+.simnull_ar <- function(betasim_null, p_null, p_alt, j, Tsize, N, ini,
+                        del = 1e-10, wDecay = FALSE, Bartlett = FALSE) {
+  phi_sim <- betasim_null[seq_len(p_null)]
+  sigy_sim <- betasim_null[p_null + 1]
+  sigv_sim <- betasim_null[p_null + 2]
+  sN <- numeric(N)
+  xn <- 1
+  while (xn <= N) {
+    u <- sim_svp(Tsize, phi = phi_sim, sigy = sigy_sim,
+                 sigv = sigv_sim, burnin = ini)
+    mdl_alt_tmp <- tryCatch(
+      svp(u, p = p_alt, J = j, leverage = FALSE, del = del, wDecay = wDecay),
+      error = function(e) NULL
+    )
+    if (is.null(mdl_alt_tmp) || isTRUE(mdl_alt_tmp$nonstationary_ind)) next
+    if (isTRUE(Bartlett)) {
+      mdl_null_tmp <- tryCatch(
+        svp(u, p = p_null, J = j, leverage = FALSE, del = del, wDecay = wDecay),
+        error = function(e) NULL
+      )
+      if (is.null(mdl_null_tmp) || isTRUE(mdl_null_tmp$nonstationary_ind)) next
+      M_null <- LRT_moment_ar_Amat(u, mdl_null_tmp, del = del, Bartlett = TRUE)
+      M_alt  <- LRT_moment_ar_Amat(u, mdl_alt_tmp, del = del, Bartlett = TRUE)
+      stat <- Tsize * (M_null - M_alt)
+      if (stat < 0) next  # discard negative test stats
+      sN[xn] <- stat
+    } else {
+      phi_extra <- mdl_alt_tmp$phi[(p_null + 1):p_alt]
+      sN[xn] <- Tsize * sum(phi_extra^2)
+    }
+    xn <- xn + 1
+  }
+  return(sN)
+}
+
+# MMC p-value function for AR test (returns negative for minimization)
+.mmc_pval_ar <- function(theta, y, p_null, p_alt, j, N, s0, ini,
+                         del = 1e-10, wDecay = FALSE, Bartlett = FALSE) {
+  Tsize <- length(y)
+  phi_null <- theta[1:p_null]
+  sigy_null <- theta[p_null + 1]
+  sigv_null <- theta[p_null + 2]
+  # Check stationarity
+  stationary <- all(Mod(polyroot(c(1, -phi_null))) > 1)
+  if (!stationary || sigy_null <= 0 || sigv_null <= 0) {
+    return(9999999999999)
+  }
+  betasim_null <- c(phi_null, sigy_null, sigv_null)
+  sN <- .simnull_ar(betasim_null, p_null, p_alt, j, Tsize, N, ini,
+                    del, wDecay, Bartlett)
+  pval <- -((N + 1 - sum(s0 >= sN)) / (N + 1))
+  return(pval)
+}

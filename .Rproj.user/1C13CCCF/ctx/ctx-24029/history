@@ -1,0 +1,512 @@
+# ============================================================================ #
+cat("====== TABLE 2: Gaussian, with leverage ======\n")
+dgp_tab2 <- list(
+# SV(1): Medium then High
+list(label = "SV(1)", phi = 0.90, sigy = 0.10, sigv = 0.75, rho = -0.9,
+persist = "Medium"),
+list(label = "SV(1)", phi = 0.95, sigy = 0.10, sigv = 0.50, rho = -0.9,
+persist = "High"),
+# SV(2): Medium then High
+list(label = "SV(2)", phi = c(0.05, 0.70), sigy = 1.0, sigv = 1.0,
+rho = -0.9, persist = "Medium"),
+list(label = "SV(2)", phi = c(0.05, 0.85), sigy = 1.0, sigv = 1.0,
+rho = -0.9, persist = "High")
+)
+results_tab2 <- list()
+for (dgp in dgp_tab2) {
+p <- length(dgp$phi)
+true_theta <- c(dgp$phi, dgp$sigy, dgp$sigv, dgp$rho)
+n_par <- length(true_theta)
+for (Tsize in Tsize_ls) {
+cat(sprintf("  %s %s persistence, T=%d\n", dgp$label, dgp$persist, Tsize))
+estimsB <- matrix(NA, B, n_par)
+xb <- 1
+while (xb <= B) {
+sim <- sim_svp_lev(Tsize, phi = dgp$phi, sigy = dgp$sigy,
+sigv = dgp$sigv, rho = dgp$rho, burnin = burnin)
+mdl <- tryCatch(
+svp(sim$y, p = p, J = J, leverage = TRUE, rho_type = "pearson",
+del = del, trunc_lev = FALSE, wDecay = wDecay),
+error = function(e) NULL
+)
+if (!is.null(mdl) && all(!is.na(mdl$theta)) && !is.na(mdl$rho) &&
+is.finite(mdl$rho)) {
+rho_est <- max(-1, min(1, mdl$rho))
+estimsB[xb, ] <- c(mdl$phi, mdl$sigy, mdl$sigv, rho_est)
+xb <- xb + 1
+}
+}
+bias <- colMeans(estimsB) - true_theta
+rmse <- sqrt(colMeans((estimsB - matrix(true_theta, B, n_par, byrow = TRUE))^2))
+results_tab2[[length(results_tab2) + 1]] <- list(
+dgp = dgp, Tsize = Tsize, bias = bias, rmse = rmse)
+}
+}
+# Write table2.tex
+sink(file.path(paper_dir, "tables/table2.tex"))
+cat("\\begin{table}[htbp]\n\\centering\n")
+cat("\\caption{Monte Carlo estimation results: Gaussian SV(1) and SV(2) models with leverage, $\\delta_p = -0.9$ ($B=", B, "$, $J=", J, "$).}\n", sep = "")
+cat("\\label{tab:gaussian_lev}\n\\small\n")
+# Panel A: SV(1)
+cat("\\vspace{0.3cm}\n\\textit{Panel A: SV(1)}\n\\vspace{0.2cm}\n\n")
+cat("\\adjustbox{max width=\\textwidth}{%\n")
+cat("\\begin{tabular}{l l rrrr c rrrr}\n\\hline\\hline\n")
+cat(" & & \\multicolumn{4}{c}{Bias} & & \\multicolumn{4}{c}{RMSE} \\\\\n")
+cat("\\cline{3-6} \\cline{8-11}\n")
+cat("DGP & $T$ & $\\phi$ & $\\sigma_y$ & $\\sigma_v$ & $\\delta_p$ & & $\\phi$ & $\\sigma_y$ & $\\sigma_v$ & $\\delta_p$ \\\\\n\\hline\n")
+for (dgp in dgp_tab2[1:2]) {
+cat(sprintf("%s persistence & & \\multicolumn{9}{l}{True: $\\phi=%.2f,\\; \\sigma_y=%.2f,\\; \\sigma_v=%.2f,\\; \\delta_p=%.1f$} \\\\\n",
+dgp$persist, dgp$phi, dgp$sigy, dgp$sigv, dgp$rho))
+for (Tsize in Tsize_ls) {
+res <- find_res(results_tab2, dgp, Tsize)
+cat(sprintf(" & %d & %s & %s & %s & %s & & %s & %s & %s & %s \\\\\n", Tsize,
+fmt(res$bias[1]), fmt(res$bias[2]), fmt(res$bias[3]), fmt(res$bias[4]),
+fmt(res$rmse[1]), fmt(res$rmse[2]), fmt(res$rmse[3]), fmt(res$rmse[4])))
+}
+cat("\\hline\n")
+}
+cat("\\end{tabular}}\n\n")
+# Panel B: SV(2)
+cat("\\vspace{0.5cm}\n\\textit{Panel B: SV(2)}\n\\vspace{0.2cm}\n\n")
+cat("\\adjustbox{max width=\\textwidth}{%\n")
+cat("\\begin{tabular}{l l rrrrr c rrrrr}\n\\hline\\hline\n")
+cat(" & & \\multicolumn{5}{c}{Bias} & & \\multicolumn{5}{c}{RMSE} \\\\\n")
+cat("\\cline{3-7} \\cline{9-13}\n")
+cat("DGP & $T$ & $\\phi_1$ & $\\phi_2$ & $\\sigma_y$ & $\\sigma_v$ & $\\delta_p$ & & $\\phi_1$ & $\\phi_2$ & $\\sigma_y$ & $\\sigma_v$ & $\\delta_p$ \\\\\n\\hline\n")
+for (dgp in dgp_tab2[3:4]) {
+cat(sprintf("%s persistence & & \\multicolumn{11}{l}{True: $\\phi_1=%.2f,\\; \\phi_2=%.2f,\\; \\sigma_y=%.1f,\\; \\sigma_v=%.1f,\\; \\delta_p=%.1f$} \\\\\n",
+dgp$persist, dgp$phi[1], dgp$phi[2], dgp$sigy, dgp$sigv, dgp$rho))
+for (Tsize in Tsize_ls) {
+res <- find_res(results_tab2, dgp, Tsize)
+cat(sprintf(" & %d & %s & %s & %s & %s & %s & & %s & %s & %s & %s & %s \\\\\n", Tsize,
+fmt(res$bias[1]), fmt(res$bias[2]), fmt(res$bias[3]), fmt(res$bias[4]), fmt(res$bias[5]),
+fmt(res$rmse[1]), fmt(res$rmse[2]), fmt(res$rmse[3]), fmt(res$rmse[4]), fmt(res$rmse[5])))
+}
+cat("\\hline\n")
+}
+cat("\\end{tabular}}\n\\end{table}\n")
+sink()
+cat("  -> table2.tex written\n\n")
+# ============================================================================ #
+# TABLE 3: Student-t SV(1) — No Leverage                                 ----
+# ============================================================================ #
+cat("====== TABLE 3: Student-t SV(1) ======\n")
+dgp_tab3 <- list(
+list(phi = 0.90, sigy = 1.0, sigv = 1.5, nu = 5, persist = "Medium"),
+list(phi = 0.95, sigy = 1.0, sigv = 1.5, nu = 5, persist = "High"),
+list(phi = 0.90, sigy = 1.0, sigv = 1.5, nu = 10, persist = "Medium"),
+list(phi = 0.95, sigy = 1.0, sigv = 1.5, nu = 10, persist = "High")
+)
+results_tab3 <- list()
+for (dgp in dgp_tab3) {
+true_theta <- c(dgp$phi, dgp$sigy, dgp$sigv, dgp$nu)
+n_par <- 4
+for (Tsize in Tsize_ls) {
+cat(sprintf("  Student-t nu=%d, %s pers., T=%d\n", dgp$nu, dgp$persist, Tsize))
+estimsB <- matrix(NA, B, n_par)
+xb <- 1
+while (xb <= B) {
+y <- sim_sv_t(Tsize, phi = dgp$phi, sigy = dgp$sigy,
+sigv = dgp$sigv, nu = dgp$nu, burnin = burnin)
+mdl <- tryCatch(
+svp(y, p = 1, J = J, leverage = FALSE, errorType = "Student-t",
+del = del, wDecay = wDecay),
+error = function(e) NULL
+)
+if (!is.null(mdl) && all(!is.na(mdl$theta))) {
+estimsB[xb, ] <- c(mdl$phi, mdl$sigy, mdl$sigv, mdl$v)
+xb <- xb + 1
+}
+}
+bias <- colMeans(estimsB) - true_theta
+rmse <- sqrt(colMeans((estimsB - matrix(true_theta, B, n_par, byrow = TRUE))^2))
+results_tab3[[length(results_tab3) + 1]] <- list(
+dgp = dgp, Tsize = Tsize, bias = bias, rmse = rmse)
+}
+}
+# Write table3.tex
+find_res3 <- function(dgp, Tsize) {
+for (r in results_tab3) {
+if (r$dgp$phi == dgp$phi && r$dgp$nu == dgp$nu && r$Tsize == Tsize)
+return(r)
+}
+NULL
+}
+sink(file.path(paper_dir, "tables/table3.tex"))
+cat("\\begin{table}[htbp]\n\\centering\n")
+cat("\\caption{Monte Carlo estimation results: Student-$t$ SV(1) models ($B=", B, "$, $J=", J, "$).}\n", sep = "")
+cat("\\label{tab:student_t}\n\\small\n")
+cat("\\adjustbox{max width=\\textwidth}{%\n")
+cat("\\begin{tabular}{l l rrrr c rrrr}\n\\hline\\hline\n")
+cat(" & & \\multicolumn{4}{c}{Bias} & & \\multicolumn{4}{c}{RMSE} \\\\\n")
+cat("\\cline{3-6} \\cline{8-11}\n")
+cat("DGP & $T$ & $\\phi$ & $\\sigma_y$ & $\\sigma_v$ & $\\nu$ & & $\\phi$ & $\\sigma_y$ & $\\sigma_v$ & $\\nu$ \\\\\n\\hline\n")
+for (dgp in dgp_tab3) {
+nu_label <- if (dgp$nu == 5) "Heavy tails" else "Moderate tails"
+cat(sprintf("$\\nu=%d$ (%s), %s pers. & & \\multicolumn{9}{l}{True: $\\phi=%.2f,\\; \\sigma_y=%.1f,\\; \\sigma_v=%.1f,\\; \\nu=%d$} \\\\\n",
+dgp$nu, nu_label, dgp$persist, dgp$phi, dgp$sigy, dgp$sigv, dgp$nu))
+for (Tsize in Tsize_ls) {
+res <- find_res3(dgp, Tsize)
+cat(sprintf(" & %d & %s & %s & %s & %s & & %s & %s & %s & %s \\\\\n", Tsize,
+fmt(res$bias[1]), fmt(res$bias[2]), fmt(res$bias[3]), fmt(res$bias[4]),
+fmt(res$rmse[1]), fmt(res$rmse[2]), fmt(res$rmse[3]), fmt(res$rmse[4])))
+}
+cat("\\hline\n")
+}
+cat("\\end{tabular}}\n\\end{table}\n")
+sink()
+cat("  -> table3.tex written\n\n")
+# ============================================================================ #
+# TABLE 4: GED SV(1) — No Leverage                                       ----
+# ============================================================================ #
+cat("====== TABLE 4: GED SV(1) ======\n")
+dgp_tab4 <- list(
+list(phi = 0.90, sigy = 1.0, sigv = 1.5, nu = 1.5, persist = "Medium"),
+list(phi = 0.95, sigy = 1.0, sigv = 1.5, nu = 1.5, persist = "High"),
+list(phi = 0.90, sigy = 1.0, sigv = 1.5, nu = 1.0, persist = "Medium"),
+list(phi = 0.95, sigy = 1.0, sigv = 1.5, nu = 1.0, persist = "High")
+)
+results_tab4 <- list()
+for (dgp in dgp_tab4) {
+true_theta <- c(dgp$phi, dgp$sigy, dgp$sigv, dgp$nu)
+n_par <- 4
+for (Tsize in Tsize_ls) {
+cat(sprintf("  GED nu=%.1f, %s pers., T=%d\n", dgp$nu, dgp$persist, Tsize))
+estimsB <- matrix(NA, B, n_par)
+xb <- 1
+while (xb <= B) {
+y <- sim_sv_ged(Tsize, phi = dgp$phi, sigy = dgp$sigy,
+sigv = dgp$sigv, nu = dgp$nu, burnin = burnin)
+mdl <- tryCatch(
+svp(y, p = 1, J = J, leverage = FALSE, errorType = "GED",
+del = del, wDecay = wDecay),
+error = function(e) NULL
+)
+if (!is.null(mdl) && all(!is.na(mdl$theta))) {
+estimsB[xb, ] <- c(mdl$phi, mdl$sigy, mdl$sigv, mdl$v)
+xb <- xb + 1
+}
+}
+bias <- colMeans(estimsB) - true_theta
+rmse <- sqrt(colMeans((estimsB - matrix(true_theta, B, n_par, byrow = TRUE))^2))
+results_tab4[[length(results_tab4) + 1]] <- list(
+dgp = dgp, Tsize = Tsize, bias = bias, rmse = rmse)
+}
+}
+# Write table4.tex
+find_res4 <- function(dgp, Tsize) {
+for (r in results_tab4) {
+if (r$dgp$phi == dgp$phi && r$dgp$nu == dgp$nu && r$Tsize == Tsize)
+return(r)
+}
+NULL
+}
+sink(file.path(paper_dir, "tables/table4.tex"))
+cat("\\begin{table}[htbp]\n\\centering\n")
+cat("\\caption{Monte Carlo estimation results: GED SV(1) models ($B=", B, "$, $J=", J, "$).}\n", sep = "")
+cat("\\label{tab:ged}\n\\small\n")
+cat("\\adjustbox{max width=\\textwidth}{%\n")
+cat("\\begin{tabular}{l l rrrr c rrrr}\n\\hline\\hline\n")
+cat(" & & \\multicolumn{4}{c}{Bias} & & \\multicolumn{4}{c}{RMSE} \\\\\n")
+cat("\\cline{3-6} \\cline{8-11}\n")
+cat("DGP & $T$ & $\\phi$ & $\\sigma_y$ & $\\sigma_v$ & $\\nu$ & & $\\phi$ & $\\sigma_y$ & $\\sigma_v$ & $\\nu$ \\\\\n\\hline\n")
+for (dgp in dgp_tab4) {
+nu_label <- if (dgp$nu == 1.0) "Laplace" else "Heavy tails"
+cat(sprintf("$\\nu=%.1f$ (%s), %s pers. & & \\multicolumn{9}{l}{True: $\\phi=%.2f,\\; \\sigma_y=%.1f,\\; \\sigma_v=%.1f,\\; \\nu=%.1f$} \\\\\n",
+dgp$nu, nu_label, dgp$persist, dgp$phi, dgp$sigy, dgp$sigv, dgp$nu))
+for (Tsize in Tsize_ls) {
+res <- find_res4(dgp, Tsize)
+cat(sprintf(" & %d & %s & %s & %s & %s & & %s & %s & %s & %s \\\\\n", Tsize,
+fmt(res$bias[1]), fmt(res$bias[2]), fmt(res$bias[3]), fmt(res$bias[4]),
+fmt(res$rmse[1]), fmt(res$rmse[2]), fmt(res$rmse[3]), fmt(res$rmse[4])))
+}
+cat("\\hline\n")
+}
+cat("\\end{tabular}}\n\\end{table}\n")
+sink()
+cat("  -> table4.tex written\n\n")
+# ============================================================================ #
+# LEVERAGE SENSITIVITY: SV(1)                                             ----
+# (produces table_leverage_sensitivity.tex + data for Figure 1 panels a,b)
+# ============================================================================ #
+cat("====== LEVERAGE SENSITIVITY: SV(1) ======\n")
+phi_vals <- c(0.60, 0.75, 0.90, 0.95, 0.98)
+sigv_vals <- c(0.15, 0.25, 0.50, 0.75, 1.00, 1.25, 1.50)
+Tsize_sens <- 2000
+rho_true <- -0.9
+sens_sv1 <- data.frame(phi = numeric(), sigv = numeric(),
+gammatilde = numeric(), exp_factor = numeric(),
+bias = numeric(), rmse = numeric(),
+bias_phi = numeric(), rmse_phi = numeric(),
+bias_sigv = numeric(), rmse_sigv = numeric())
+for (phi in phi_vals) {
+for (sigv in sigv_vals) {
+gt <- sigv^2 / (1 - phi)
+if (gt > 60) next
+cat(sprintf("  phi=%.2f, sigv=%.2f (gt=%.1f)\n", phi, sigv, gt))
+rho_est <- phi_est <- sigv_est <- numeric(0)
+xb <- 0; attempts <- 0
+while (xb < B && attempts < B * 5) {
+attempts <- attempts + 1
+sim <- sim_svp_lev(Tsize_sens, phi = phi, sigy = 0.15, sigv = sigv,
+rho = rho_true, burnin = burnin)
+mdl <- tryCatch(
+svp(sim$y, p = 1, J = J, leverage = TRUE, rho_type = "pearson",
+del = del, trunc_lev = FALSE, wDecay = FALSE),
+error = function(e) NULL
+)
+if (!is.null(mdl) && !is.na(mdl$rho) && is.finite(mdl$rho) &&
+all(!is.na(mdl$theta))) {
+rho_est <- c(rho_est, max(-1, min(1, mdl$rho)))
+phi_est <- c(phi_est, mdl$phi)
+sigv_est <- c(sigv_est, mdl$sigv)
+xb <- xb + 1
+}
+}
+if (length(rho_est) >= B / 2) {
+sens_sv1 <- rbind(sens_sv1, data.frame(
+phi = phi, sigv = sigv, gammatilde = gt, exp_factor = exp(-gt / 4),
+bias = mean(rho_est) - rho_true,
+rmse = sqrt(mean((rho_est - rho_true)^2)),
+bias_phi = mean(phi_est) - phi,
+rmse_phi = sqrt(mean((phi_est - phi)^2)),
+bias_sigv = mean(sigv_est) - sigv,
+rmse_sigv = sqrt(mean((sigv_est - sigv)^2))
+))
+}
+}
+}
+# Also: sample size effect at sweet spot
+cat("\n  Sample size effect at phi=0.90, sigv=0.50\n")
+Tvals <- c(500, 1000, 2000, 5000, 10000)
+res_T_sv1 <- data.frame(Tsize = numeric(), bias = numeric(), rmse = numeric())
+for (T_i in Tvals) {
+rho_est <- numeric(0); xb <- 0
+while (xb < B) {
+sim <- sim_svp_lev(T_i, phi = 0.90, sigy = 0.15, sigv = 0.50,
+rho = rho_true, burnin = burnin)
+mdl <- tryCatch(
+svp(sim$y, p = 1, J = J, leverage = TRUE, rho_type = "pearson",
+del = del, trunc_lev = FALSE, wDecay = FALSE),
+error = function(e) NULL
+)
+if (!is.null(mdl) && !is.na(mdl$rho) && is.finite(mdl$rho)) {
+rho_est <- c(rho_est, max(-1, min(1, mdl$rho))); xb <- xb + 1
+}
+}
+res_T_sv1 <- rbind(res_T_sv1, data.frame(
+Tsize = T_i,
+bias = mean(rho_est) - rho_true,
+rmse = sqrt(mean((rho_est - rho_true)^2))))
+}
+print(res_T_sv1)
+# Write table_leverage_sensitivity.tex
+sink(file.path(paper_dir, "tables/table_leverage_sensitivity.tex"))
+cat("\\begin{table}[htbp]\n\\centering\n")
+cat("\\caption{Sensitivity of leverage estimation to $\\tilde{\\gamma}_p$ ($\\delta_p = -0.9$, $\\sigma_y = 0.15$, $T = 2{,}000$, $B =", B, "$, $J =", J, "$).}\n", sep = " ")
+cat("\\label{tab:leverage_sensitivity}\n\\small\n")
+cat("\\begin{tabular}{cccc c cc c cc c c}\n\\hline\\hline\n")
+cat(" & & & & & \\multicolumn{2}{c}{$\\hat{\\delta}_p$} & & \\multicolumn{2}{c}{$\\hat{\\phi}$} & & $\\hat{\\sigma}_v$ \\\\\n")
+cat("\\cline{6-7} \\cline{9-10}\n")
+cat("$\\phi$ & $\\sigma_v$ & $\\tilde{\\gamma}_p$ & $e^{-\\tilde{\\gamma}_p/4}$ & & Bias & RMSE & & Bias & RMSE & & RMSE \\\\\n\\hline\n")
+for (i in 1:nrow(sens_sv1)) {
+r <- sens_sv1[i, ]
+cat(sprintf("%.2f & %.2f & %.1f & %.3f & & %.3f & %.3f & & %.4f & %.4f & & %.4f \\\\\n",
+r$phi, r$sigv, r$gammatilde, r$exp_factor,
+r$bias, r$rmse, r$bias_phi, r$rmse_phi, r$rmse_sigv))
+if (i < nrow(sens_sv1) && sens_sv1$phi[i + 1] != r$phi) cat("\\hline\n")
+}
+cat("\\hline\n\\end{tabular}\n\\end{table}\n")
+sink()
+cat("  -> table_leverage_sensitivity.tex written\n\n")
+# ============================================================================ #
+# LEVERAGE SENSITIVITY: SV(2)                                             ----
+# (produces table_leverage_sensitivity_sv2.tex + data for Figure 1 panels c,d)
+# ============================================================================ #
+cat("====== LEVERAGE SENSITIVITY: SV(2) ======\n")
+# Match SV(1) spectral radii: for AR(2) with phi1=0.05, phi2 = lambda*(lambda - phi1)
+phi1_sv2 <- 0.05
+lambda_targets <- c(0.60, 0.75, 0.90, 0.95, 0.98)
+configs_sv2 <- lapply(lambda_targets, function(lam) {
+phi2 <- lam * (lam - phi1_sv2)
+list(phi1 = phi1_sv2, phi2 = phi2, sigv_vals = sigv_vals)
+})
+sens_sv2 <- data.frame(phi1 = numeric(), phi2 = numeric(), sigv = numeric(),
+largest_root = numeric(), gammatilde = numeric(),
+exp_factor = numeric(),
+bias_delta = numeric(), rmse_delta = numeric(),
+bias_phi1 = numeric(), rmse_phi1 = numeric(),
+bias_phi2 = numeric(), rmse_phi2 = numeric(),
+rmse_sigv = numeric())
+for (cfg in configs_sv2) {
+phi1 <- cfg$phi1; phi2 <- cfg$phi2
+for (sigv in cfg$sigv_vals) {
+gt <- sigv^2 / ((1 - phi1 - phi2) * (1 + phi2))
+if (gt > 60) next
+cat(sprintf("  phi1=%.2f, phi2=%.2f, sigv=%.2f (gt=%.1f)\n",
+phi1, phi2, sigv, gt))
+delta_est <- phi1_est <- phi2_est <- sigv_est <- numeric(0)
+xb <- 0; attempts <- 0
+while (xb < B && attempts < B * 5) {
+attempts <- attempts + 1
+sim <- sim_svp_lev(Tsize_sens, phi = c(phi1, phi2), sigy = 1.0,
+sigv = sigv, rho = rho_true, burnin = burnin)
+mdl <- tryCatch(
+svp(sim$y, p = 2, J = J, leverage = TRUE, rho_type = "pearson",
+del = del, trunc_lev = FALSE, wDecay = FALSE),
+error = function(e) NULL
+)
+if (!is.null(mdl) && !is.na(mdl$rho) && is.finite(mdl$rho) &&
+all(!is.na(mdl$theta))) {
+delta_est <- c(delta_est, max(-1, min(1, mdl$rho)))
+phi1_est <- c(phi1_est, mdl$phi[1])
+phi2_est <- c(phi2_est, mdl$phi[2])
+sigv_est <- c(sigv_est, mdl$sigv)
+xb <- xb + 1
+}
+}
+if (length(delta_est) >= B / 2) {
+lr <- max(abs(polyroot(c(-phi2, -phi1, 1))))
+sens_sv2 <- rbind(sens_sv2, data.frame(
+phi1 = phi1, phi2 = phi2, sigv = sigv, largest_root = lr,
+gammatilde = gt, exp_factor = exp(-gt / 4),
+bias_delta = mean(delta_est) - rho_true,
+rmse_delta = sqrt(mean((delta_est - rho_true)^2)),
+bias_phi1 = mean(phi1_est) - phi1,
+rmse_phi1 = sqrt(mean((phi1_est - phi1)^2)),
+bias_phi2 = mean(phi2_est) - phi2,
+rmse_phi2 = sqrt(mean((phi2_est - phi2)^2)),
+rmse_sigv = sqrt(mean((sigv_est - sigv)^2))
+))
+}
+}
+}
+# Write table_leverage_sensitivity_sv2.tex
+sink(file.path(paper_dir, "tables/table_leverage_sensitivity_sv2.tex"))
+cat("\\begin{table}[htbp]\n\\centering\n")
+cat("\\caption{Sensitivity of SV(2) leverage estimation to $\\tilde{\\gamma}_p$ ($\\delta_p = -0.9$, $\\sigma_y = 1.0$, $T = 2{,}000$, $B =", B, "$, $J =", J, "$).}\n", sep = " ")
+cat("\\label{tab:leverage_sensitivity_sv2}\n\\small\n")
+cat("\\adjustbox{max width=\\textwidth}{%\n")
+cat("\\begin{tabular}{cccccc c cc c cc c c}\n\\hline\\hline\n")
+cat(" & & & & & & & \\multicolumn{2}{c}{$\\hat{\\delta}_p$} & & \\multicolumn{2}{c}{$\\hat{\\phi}_2$} & & $\\hat{\\sigma}_v$ \\\\\n")
+cat("\\cline{8-9} \\cline{11-12}\n")
+cat("$\\phi_1$ & $\\phi_2$ & $\\lambda_{\\max}$ & $\\sigma_v$ & $\\tilde{\\gamma}_p$ & $e^{-\\tilde{\\gamma}_p/4}$ & & Bias & RMSE & & Bias & RMSE & & RMSE \\\\\n\\hline\n")
+prev_combo <- ""
+for (i in 1:nrow(sens_sv2)) {
+r <- sens_sv2[i, ]
+cur_combo <- paste(r$phi1, r$phi2)
+if (cur_combo != prev_combo && prev_combo != "") cat("\\hline\n")
+prev_combo <- cur_combo
+cat(sprintf("%.2f & %.2f & %.2f & %.2f & %.1f & %.3f & & %.3f & %.3f & & %.4f & %.4f & & %.4f \\\\\n",
+r$phi1, r$phi2, r$largest_root, r$sigv, r$gammatilde, r$exp_factor,
+r$bias_delta, r$rmse_delta, r$bias_phi2, r$rmse_phi2, r$rmse_sigv))
+}
+cat("\\hline\n\\end{tabular}}\n\\end{table}\n")
+sink()
+cat("  -> table_leverage_sensitivity_sv2.tex written\n\n")
+# ============================================================================ #
+# FIGURE 1: Leverage Sensitivity (combined SV(1) + SV(2))                 ----
+# (4 panels: SV(1) Bias, SV(1) RMSE, SV(2) Bias, SV(2) RMSE)
+# ============================================================================ #
+cat("====== FIGURE 1: Leverage sensitivity (combined) ======\n")
+# --- Compute spectral radius for each SV(2) row ---
+sens_sv2$lambda <- sapply(1:nrow(sens_sv2), function(i) {
+max(abs(polyroot(c(-sens_sv2$phi2[i], -sens_sv2$phi1[i], 1))))
+})
+# --- Common lambda labels (spectral radius) ---
+# For SV(1), lambda = phi; for SV(2), lambda = largest root
+lambda_fmt <- function(x) sprintf("%.2f", x)
+df_sv1 <- data.frame(
+gammatilde = sens_sv1$gammatilde,
+bias = sens_sv1$bias,
+rmse = sens_sv1$rmse,
+lambda = sens_sv1$phi,
+lambda_label = factor(paste0("lambda == ", lambda_fmt(sens_sv1$phi)))
+)
+df_sv2 <- data.frame(
+gammatilde = sens_sv2$gammatilde,
+bias = sens_sv2$bias_delta,
+rmse = sens_sv2$rmse_delta,
+lambda = sens_sv2$lambda,
+lambda_label = factor(paste0("lambda == ", lambda_fmt(sens_sv2$lambda)))
+)
+# Ensure same factor levels across both datasets for consistent colors
+all_levels <- paste0("lambda == ", lambda_fmt(lambda_targets))
+df_sv1$lambda_label <- factor(df_sv1$lambda_label, levels = all_levels)
+df_sv2$lambda_label <- factor(df_sv2$lambda_label, levels = all_levels)
+# Common ggplot theme
+theme_paper <- theme_bw(base_size = 12) +
+theme(panel.grid.major = element_line(colour = "grey90", linewidth = 0.3),
+panel.grid.minor = element_line(colour = "grey95", linewidth = 0.15),
+legend.background = element_rect(fill = alpha("white", 0.8)),
+plot.title = element_text(size = 12, face = "bold"))
+# Color and shape palettes (5 levels, consistent across all panels)
+col_pal5 <- c("#F8766D", "#A3A500", "#00BF7D", "#00B0F6", "#E76BF3")
+shp_pal5 <- c(16, 17, 15, 18, 8)
+# Legend labels using plotmath expressions for Greek letters in PDF
+# SV(1): just phi value, no extra lines
+sv1_legend <- setNames(
+lapply(lambda_targets, function(lam) {
+bquote(phi == .(sprintf("%.2f", lam)))
+}),
+all_levels
+)
+# SV(2): line 1 = phi, line 2 = lambda, line 3 = blank (spacing separator)
+sv2_legend <- setNames(
+lapply(lambda_targets, function(lam) {
+phi2 <- lam * (lam - phi1_sv2)
+bquote(atop(
+atop(
+phi == group("(", list(.(sprintf("%.2f", phi1_sv2)),
+.(sprintf("%.2f", phi2))), ")"),
+lambda == .(sprintf("%.2f", lam))
+), ""
+))
+}),
+all_levels
+)
+# Empirical range annotation (same for all panels)
+emp_range <- annotate("rect", xmin = 0.5, xmax = 3.0,
+ymin = -Inf, ymax = Inf,
+fill = "darkgreen", alpha = 0.08)
+# Helper to build a panel
+make_panel <- function(df, y_var, y_lab, title_str, legend_labels) {
+ggplot(df, aes(x = gammatilde, y = .data[[y_var]],
+colour = lambda_label, shape = lambda_label)) +
+emp_range +
+geom_hline(yintercept = 0, linetype = "dashed", colour = "gray50") +
+geom_line(linewidth = 0.8) + geom_point(size = 2.5) +
+scale_colour_manual(values = col_pal5, labels = legend_labels,
+drop = FALSE) +
+scale_shape_manual(values = shp_pal5, labels = legend_labels,
+drop = FALSE) +
+coord_cartesian(ylim = c(-0.05, 0.85)) +
+labs(x = expression(tilde(gamma)[p]), y = y_lab,
+title = title_str, colour = NULL, shape = NULL) +
+theme_paper
+}
+p_a <- make_panel(df_sv1, "bias",
+expression("Bias of " * hat(delta)[p]),
+"(a) SV(1): Bias", sv1_legend)
+p_b <- make_panel(df_sv1, "rmse",
+expression("RMSE of " * hat(delta)[p]),
+"(b) SV(1): RMSE", sv1_legend)
+p_c <- make_panel(df_sv2, "bias",
+expression("Bias of " * hat(delta)[p]),
+"(c) SV(2): Bias", sv2_legend)
+p_d <- make_panel(df_sv2, "rmse",
+expression("RMSE of " * hat(delta)[p]),
+"(d) SV(2): RMSE", sv2_legend)
+# Combine 4 panels
+library(gridExtra)
+fig1 <- arrangeGrob(p_a, p_b, p_c, p_d, ncol = 2)
+ggsave(file.path(paper_dir, "figures/figure_leverage_sensitivity.pdf"),
+fig1, width = 12, height = 10)
+cat("  -> figure_leverage_sensitivity.pdf written\n\n")
+# ============================================================================ #
+# Done                                                                    ----
+# ============================================================================ #
+cat("====== ALL DONE ======\n")
+cat("Tables: table1.tex, table2.tex, table3.tex, table4.tex\n")
+cat("        table_leverage_sensitivity.tex, table_leverage_sensitivity_sv2.tex\n")
+cat("Figures: figure_leverage_sensitivity.pdf\n")

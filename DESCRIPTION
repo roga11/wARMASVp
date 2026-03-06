@@ -1,0 +1,46 @@
+Package: wARMASVp
+Type: Package
+Title: Winsorized ARMA Estimation for Higher-Order Stochastic Volatility Models
+Version: 0.1.0
+Authors@R: c(
+    person("Gabriel", "Rodriguez Rondon",
+           email = "gabriel.rodriguezrondon@mail.mcgill.ca",
+           role = c("aut", "cre"),
+           comment = c(ORCID = "")),
+    person("Nazmul", "Ahsan", role = "aut"),
+    person("Jean-Marie", "Dufour", role = "aut"))
+Description: Estimation, simulation, hypothesis testing, and forecasting for
+    univariate higher-order stochastic volatility SV(p) models. Supports
+    Gaussian, Student-t, and Generalized Error Distribution (GED) innovations,
+    with optional leverage effects. Estimation uses closed-form Winsorized
+    ARMA-SV (W-ARMA-SV) moment-based methods that avoid numerical
+    optimization. Hypothesis testing includes Local Monte Carlo (LMC) and
+    Maximized Monte Carlo (MMC) procedures for leverage effects, heavy tails,
+    and autoregressive order selection. Forecasting is based on Kalman
+    filtering and smoothing. See Ahsan and Dufour (2021)
+    <doi:10.1016/j.jeconom.2020.01.018>, Ahsan, Dufour, and Rodriguez Rondon
+    (2025) for details.
+License: GPL (>= 3)
+Encoding: UTF-8
+LazyData: false
+Imports:
+    Rcpp (>= 1.0.0),
+    gsignal,
+    expm,
+    stats
+Suggests:
+    pso,
+    GenSA,
+    NMOF,
+    parallel,
+    doParallel,
+    foreach,
+    doRNG,
+    testthat (>= 3.0.0),
+    knitr,
+    rmarkdown
+LinkingTo:
+    Rcpp,
+    RcppArmadillo
+RoxygenNote: 7.3.3
+VignetteBuilder: knitr

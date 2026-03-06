@@ -1,0 +1,93 @@
+// ============================================================================ //
+// wARMASVp: Winsorized ARMA Estimation for Higher-Order SV Models
+// Authors: Nazmul Ahsan, Jean-Marie Dufour, Gabriel Rodriguez Rondon
+// ============================================================================ //
+#include <RcppArmadillo.h>
+#include <RcppArmadilloExtensions/sample.h>
+// [[Rcpp::depends(RcppArmadillo)]]
+using namespace Rcpp;
+
+// [[Rcpp::export]]
+arma::mat statPhi_cpp(arma::mat phiB) {
+  Rcpp::Environment gsignal("package:gsignal");
+  Rcpp::Function polyR = gsignal["poly"];
+  double Del = 1 - 0.0001;
+  arma::vec pl = arma::join_cols(arma::vec{1}, -phiB);
+  arma::cx_vec r = roots(pl);
+  arma::uvec indices = find(abs(r) >= 1);
+  r.elem(indices) = sign(r.elem(indices)) * Del;
+  arma::vec polyc = real(as<arma::vec>(polyR(r)));
+  phiB = -polyc.subvec(1, polyc.n_elem - 1);
+  return(phiB);
+}
+
+// [[Rcpp::export]]
+double kendall_corr(arma::vec x, arma::vec y) {
+  int n = x.n_elem;
+  if (n != (int)y.n_elem) {
+    Rcpp::stop("Input vectors must have the same length.");
+  }
+  int concordant = 0;
+  int discordant = 0;
+  int tied_pairs = 0;
+  for (int i = 0; i < (n - 1); ++i) {
+    for (int j = i + 1; j < n; ++j) {
+      double diff_x = x(i) - x(j);
+      double diff_y = y(i) - y(j);
+      if (diff_x == 0 && diff_y == 0) {
+        tied_pairs++;
+      } else {
+        concordant += (diff_x * diff_y > 0);
+        discordant += (diff_x * diff_y < 0);
+      }
+    }
+  }
+  double adj_concordant = concordant + 0.5 * tied_pairs;
+  double adj_discordant = discordant + 0.5 * tied_pairs;
+  if (adj_concordant + adj_discordant == 0) {
+    return 0.0;
+  }
+  double tau = (adj_concordant - adj_discordant) / sqrt((adj_concordant + adj_discordant) * n * (n - 1) / 2);
+  return tau;
+}
+
+// [[Rcpp::export]]
+arma::mat acov_g(arma::mat y, int k) {
+  int Tsize = y.n_rows;
+  arma::mat gamma = (1.0 / (Tsize - k)) * trans(y.rows(k, Tsize - 1)) * y.rows(0, Tsize - k - 1);
+  return gamma;
+}
+
+// [[Rcpp::export]]
+arma::mat acov_symmetric(arma::mat y, int k) {
+  int Tsize = y.n_rows;
+  if (k >= 0) {
+    return (1.0 / (Tsize - k)) * trans(y.rows(k, Tsize - 1)) * y.rows(0, Tsize - k - 1);
+  } else {
+    int kp = -k;
+    return (1.0 / (Tsize - kp)) * trans(y.rows(0, Tsize - kp - 1)) * y.rows(kp, Tsize - 1);
+  }
+}
+
+// [[Rcpp::export]]
+arma::cx_vec signR_cpp(arma::cx_vec vec) {
+  if (std::is_same<arma::cx_vec::elem_type, std::complex<double>>::value) {
+    return vec / arma::abs(vec);
+  } else {
+    return arma::sign(vec);
+  }
+}
+
+// [[Rcpp::export]]
+arma::vec rged_cpp(int n, double mean = 0.0, double sd = 1.0, double nu = 2.0) {
+  // Generalized Error Distribution random deviates
+  double lambda = std::sqrt(std::pow(2.0, -2.0 / nu) * R::gammafn(1.0 / nu) / R::gammafn(3.0 / nu));
+  arma::vec r(n);
+  arma::vec g = Rcpp::rgamma(n, 1.0 / nu, 1.0);
+  arma::vec u = Rcpp::runif(n);
+  for (int i = 0; i < n; ++i) {
+    double sign = (u[i] < 0.5) ? -1.0 : 1.0;
+    r[i] = lambda * std::pow(2.0 * g[i], 1.0 / nu) * sign;
+  }
+  return mean + sd * r;
+}

@@ -1,0 +1,254 @@
+## ============================================================================ #
+## SV(2) Heavy-Tail Simulation Script
+## Produces: Appendix Tables A1 (Student-t SV(2)) and A2 (GED SV(2))
+## SV(2) DGPs are chosen to match persistence (largest root) of SV(1) DGPs
+## in main Tables 3 and 4.
+## ============================================================================ #
+
+rm(list = ls())
+library(wARMASVp)
+
+# Paper directory
+paper_dir <- "~/Dropbox/Res/papers/SVp_Rpack/paper"
+cat(sprintf("Paper directory: %s\n", paper_dir))
+dir.create(file.path(paper_dir, "tables"), showWarnings = FALSE)
+
+set.seed(535725)
+
+# ============================================================================ #
+# Global Settings (same as run_simulations.R)
+# ============================================================================ #
+
+B      <- 1000
+burnin <- 500
+del    <- 1e-6
+wDecay <- FALSE
+J      <- 100
+
+Tsize_ls <- c(500, 1000, 2000, 5000)
+
+fmt <- function(x) sprintf("%.4f", x)
+
+largest_root <- function(phi) {
+  p <- length(phi)
+  if (p == 1) return(abs(phi))
+  max(abs(polyroot(c(-rev(phi), 1))))
+}
+
+cat("=== SV(2) Heavy-Tail Simulations ===\n")
+cat(sprintf("B=%d, J=%d, burnin=%d, T={%s}\n",
+            B, J, burnin, paste(Tsize_ls, collapse = ",")))
+cat(sprintf("del=%g\n\n", del))
+
+# ============================================================================ #
+# DGP Design: SV(2) matching SV(1) persistence
+#
+# SV(1) DGPs:
+#   Medium persistence: phi = 0.90 (root = 0.90)
+#   High persistence:   phi = 0.95 (root = 0.95)
+#
+# SV(2) DGPs: phi2 = root * (root - phi1), with phi1 = 0.20
+#   Medium: phi = (0.20, 0.6300), root = 0.90
+#   High:   phi = (0.20, 0.7125), root = 0.95
+# ============================================================================ #
+
+# Exact phi2 values for precise root matching
+phi2_medium <- 0.90 * (0.90 - 0.20)  # = 0.63
+phi2_high   <- 0.95 * (0.95 - 0.20)  # = 0.7125
+
+cat(sprintf("SV(2) Medium: phi=(0.20, %.4f), root=%.4f\n",
+            phi2_medium, largest_root(c(0.20, phi2_medium))))
+cat(sprintf("SV(2) High:   phi=(0.20, %.4f), root=%.4f\n\n",
+            phi2_high, largest_root(c(0.20, phi2_high))))
+
+
+# ============================================================================ #
+# TABLE A1: Student-t SV(2)                                                ----
+# ============================================================================ #
+
+cat("====== TABLE A1: Student-t SV(2) ======\n")
+
+dgp_tabA1 <- list(
+  list(phi = c(0.20, phi2_medium), sigy = 1.0, sigv = 1.0, nu = 3,
+       persist = "Medium"),
+  list(phi = c(0.20, phi2_high),   sigy = 1.0, sigv = 1.0, nu = 3,
+       persist = "High"),
+  list(phi = c(0.20, phi2_medium), sigy = 1.0, sigv = 1.0, nu = 10,
+       persist = "Medium"),
+  list(phi = c(0.20, phi2_high),   sigy = 1.0, sigv = 1.0, nu = 10,
+       persist = "High")
+)
+
+results_tabA1 <- list()
+for (dgp in dgp_tabA1) {
+  true_theta <- c(dgp$phi, dgp$sigy, dgp$sigv, dgp$nu)
+  n_par <- 5
+  for (Tsize in Tsize_ls) {
+    cat(sprintf("  Student-t SV(2) nu=%d, %s pers., T=%d\n",
+                dgp$nu, dgp$persist, Tsize))
+    estimsB <- matrix(NA, B, n_par)
+    xb <- 1
+    while (xb <= B) {
+      y <- sim_svp(Tsize, phi = dgp$phi, sigy = dgp$sigy,
+                   sigv = dgp$sigv, errorType = "Student-t",
+                   nu = dgp$nu, burnin = burnin)
+      mdl <- tryCatch(
+        suppressWarnings(svp(y, p = 2, J = J, leverage = FALSE,
+                             errorType = "Student-t", del = del,
+                             wDecay = wDecay)),
+        error = function(e) NULL
+      )
+      if (!is.null(mdl) && all(!is.na(mdl$theta))) {
+        estimsB[xb, ] <- c(mdl$phi, mdl$sigy, mdl$sigv, mdl$v)
+        xb <- xb + 1
+      }
+    }
+    bias <- colMeans(estimsB) - true_theta
+    rmse <- sqrt(colMeans((estimsB - matrix(true_theta, B, n_par,
+                                            byrow = TRUE))^2))
+    results_tabA1[[length(results_tabA1) + 1]] <- list(
+      dgp = dgp, Tsize = Tsize, bias = bias, rmse = rmse)
+  }
+}
+
+# Write tableA1.tex
+find_resA1 <- function(dgp, Tsize) {
+  for (r in results_tabA1) {
+    if (all(r$dgp$phi == dgp$phi) && r$dgp$nu == dgp$nu &&
+        r$Tsize == Tsize)
+      return(r)
+  }
+  NULL
+}
+
+sink(file.path(paper_dir, "tables/tableA1.tex"))
+cat("\\begin{table}[!t]\n\\centering\n")
+cat("\\caption{Monte Carlo estimation results: Student-$t$ SV(2) models.}\n")
+cat("\\label{tab:student_t_sv2}\n\\small\n")
+cat("\\vspace{0.3cm}\n\n")
+cat("\\adjustbox{max width=\\textwidth}{%\n")
+cat("\\begin{tabular}{l l rrrrr c rrrrr}\n\\hline\\hline\n")
+cat(" & & \\multicolumn{5}{c}{Bias} & & \\multicolumn{5}{c}{RMSE} \\\\\n")
+cat("\\cline{3-7} \\cline{9-13}\n")
+cat("DGP & $T$ & $\\phi_1$ & $\\phi_2$ & $\\sigma_y$ & $\\sigma_v$ & $\\nu$ & & $\\phi_1$ & $\\phi_2$ & $\\sigma_y$ & $\\sigma_v$ & $\\nu$ \\\\\n\\hline\n")
+for (dgp in dgp_tabA1) {
+  nu_label <- if (dgp$nu == 3) "Heavy tails" else "Moderate tails"
+  cat(sprintf("\\multirow{4}{*}{\\makecell[l]{$\\nu\\!=\\!%d$ (%s),\\\\\\ %s pers.\\\\\\ \\footnotesize True: $\\phi_1\\!=\\!%.2f,\\; \\phi_2\\!=\\!%.2f,$\\\\\\ \\footnotesize $\\sigma_y\\!=\\!%.1f,\\; \\sigma_v\\!=\\!%.1f,\\; \\nu\\!=\\!%d$}}",
+              dgp$nu, nu_label, dgp$persist,
+              dgp$phi[1], dgp$phi[2], dgp$sigy, dgp$sigv, dgp$nu))
+  for (i in seq_along(Tsize_ls)) {
+    Tsize <- Tsize_ls[i]
+    res <- find_resA1(dgp, Tsize)
+    cat(sprintf(" & %d & %s & %s & %s & %s & %s & & %s & %s & %s & %s & %s \\\\\n",
+                Tsize,
+                fmt(res$bias[1]), fmt(res$bias[2]), fmt(res$bias[3]),
+                fmt(res$bias[4]), fmt(res$bias[5]),
+                fmt(res$rmse[1]), fmt(res$rmse[2]), fmt(res$rmse[3]),
+                fmt(res$rmse[4]), fmt(res$rmse[5])))
+  }
+  cat("\\hline\n")
+}
+cat("\\end{tabular}}\n\n")
+
+cat("\\vspace{0.3cm}\n\\begin{minipage}{\\textwidth}\n\\footnotesize\n")
+cat("\\textit{Notes:} Bias and RMSE of the W-ARMA-SV estimator for SV(2) models with standardized Student-$t$ innovations, $z_t \\sim t_\\nu/\\sqrt{\\nu/(\\nu-2)}$. The SV(2) DGPs use $\\phi_1 = 0.20$ with $\\phi_2$ chosen so that the largest AR root matches the SV(1) persistence in Table~\\ref{tab:student_t} (root $= 0.90$ for medium, $0.95$ for high persistence). Based on $B = ", B, "$ Monte Carlo replications with $J = ", J, "$ and $\\delta = ", del, "$. $T$ = sample size.\n", sep = "")
+cat("\\end{minipage}\n\\end{table}\n")
+sink()
+cat("  -> tableA1.tex written\n\n")
+
+
+# ============================================================================ #
+# TABLE A2: GED SV(2)                                                      ----
+# ============================================================================ #
+
+cat("====== TABLE A2: GED SV(2) ======\n")
+
+dgp_tabA2 <- list(
+  list(phi = c(0.20, phi2_medium), sigy = 1.0, sigv = 1.0, nu = 1.5,
+       persist = "Medium"),
+  list(phi = c(0.20, phi2_high),   sigy = 1.0, sigv = 1.0, nu = 1.5,
+       persist = "High"),
+  list(phi = c(0.20, phi2_medium), sigy = 1.0, sigv = 1.0, nu = 1.0,
+       persist = "Medium"),
+  list(phi = c(0.20, phi2_high),   sigy = 1.0, sigv = 1.0, nu = 1.0,
+       persist = "High")
+)
+
+results_tabA2 <- list()
+for (dgp in dgp_tabA2) {
+  true_theta <- c(dgp$phi, dgp$sigy, dgp$sigv, dgp$nu)
+  n_par <- 5
+  for (Tsize in Tsize_ls) {
+    cat(sprintf("  GED SV(2) nu=%.1f, %s pers., T=%d\n",
+                dgp$nu, dgp$persist, Tsize))
+    estimsB <- matrix(NA, B, n_par)
+    xb <- 1
+    while (xb <= B) {
+      y <- sim_svp(Tsize, phi = dgp$phi, sigy = dgp$sigy,
+                   sigv = dgp$sigv, errorType = "GED",
+                   nu = dgp$nu, burnin = burnin)
+      mdl <- tryCatch(
+        suppressWarnings(svp(y, p = 2, J = J, leverage = FALSE,
+                             errorType = "GED", del = del,
+                             wDecay = wDecay)),
+        error = function(e) NULL
+      )
+      if (!is.null(mdl) && all(!is.na(mdl$theta))) {
+        estimsB[xb, ] <- c(mdl$phi, mdl$sigy, mdl$sigv, mdl$v)
+        xb <- xb + 1
+      }
+    }
+    bias <- colMeans(estimsB) - true_theta
+    rmse <- sqrt(colMeans((estimsB - matrix(true_theta, B, n_par,
+                                            byrow = TRUE))^2))
+    results_tabA2[[length(results_tabA2) + 1]] <- list(
+      dgp = dgp, Tsize = Tsize, bias = bias, rmse = rmse)
+  }
+}
+
+# Write tableA2.tex
+find_resA2 <- function(dgp, Tsize) {
+  for (r in results_tabA2) {
+    if (all(r$dgp$phi == dgp$phi) && r$dgp$nu == dgp$nu &&
+        r$Tsize == Tsize)
+      return(r)
+  }
+  NULL
+}
+
+sink(file.path(paper_dir, "tables/tableA2.tex"))
+cat("\\begin{table}[!t]\n\\centering\n")
+cat("\\caption{Monte Carlo estimation results: GED SV(2) models.}\n")
+cat("\\label{tab:ged_sv2}\n\\small\n")
+cat("\\vspace{0.3cm}\n\n")
+cat("\\adjustbox{max width=\\textwidth}{%\n")
+cat("\\begin{tabular}{l l rrrrr c rrrrr}\n\\hline\\hline\n")
+cat(" & & \\multicolumn{5}{c}{Bias} & & \\multicolumn{5}{c}{RMSE} \\\\\n")
+cat("\\cline{3-7} \\cline{9-13}\n")
+cat("DGP & $T$ & $\\phi_1$ & $\\phi_2$ & $\\sigma_y$ & $\\sigma_v$ & $\\nu$ & & $\\phi_1$ & $\\phi_2$ & $\\sigma_y$ & $\\sigma_v$ & $\\nu$ \\\\\n\\hline\n")
+for (dgp in dgp_tabA2) {
+  nu_label <- if (dgp$nu == 1.0) "Laplace" else "Heavy tails"
+  cat(sprintf("\\multirow{4}{*}{\\makecell[l]{$\\nu\\!=\\!%.1f$ (%s),\\\\\\ %s pers.\\\\\\ \\footnotesize True: $\\phi_1\\!=\\!%.2f,\\; \\phi_2\\!=\\!%.2f,$\\\\\\ \\footnotesize $\\sigma_y\\!=\\!%.1f,\\; \\sigma_v\\!=\\!%.1f,\\; \\nu\\!=\\!%.1f$}}",
+              dgp$nu, nu_label, dgp$persist,
+              dgp$phi[1], dgp$phi[2], dgp$sigy, dgp$sigv, dgp$nu))
+  for (i in seq_along(Tsize_ls)) {
+    Tsize <- Tsize_ls[i]
+    res <- find_resA2(dgp, Tsize)
+    cat(sprintf(" & %d & %s & %s & %s & %s & %s & & %s & %s & %s & %s & %s \\\\\n",
+                Tsize,
+                fmt(res$bias[1]), fmt(res$bias[2]), fmt(res$bias[3]),
+                fmt(res$bias[4]), fmt(res$bias[5]),
+                fmt(res$rmse[1]), fmt(res$rmse[2]), fmt(res$rmse[3]),
+                fmt(res$rmse[4]), fmt(res$rmse[5])))
+  }
+  cat("\\hline\n")
+}
+cat("\\end{tabular}}\n\n")
+
+cat("\\vspace{0.3cm}\n\\begin{minipage}{\\textwidth}\n\\footnotesize\n")
+cat("\\textit{Notes:} Bias and RMSE of the W-ARMA-SV estimator for SV(2) models with standardized GED innovations. The SV(2) DGPs use $\\phi_1 = 0.20$ with $\\phi_2$ chosen so that the largest AR root matches the SV(1) persistence in Table~\\ref{tab:ged} (root $= 0.90$ for medium, $0.95$ for high persistence). Based on $B = ", B, "$ Monte Carlo replications with $J = ", J, "$ and $\\delta = ", del, "$. $T$ = sample size.\n", sep = "")
+cat("\\end{minipage}\n\\end{table}\n")
+sink()
+cat("  -> tableA2.tex written\n\n")
+
+cat("=== Done ===\n")
