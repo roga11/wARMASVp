@@ -14,9 +14,8 @@
 #' When \code{leverage = TRUE}, the correlation between \eqn{z_t} and
 #' \eqn{v_t} is \eqn{\rho}.
 #'
-#' Currently, heavy-tailed errors (\code{errorType = "Student-t"} or
-#' \code{"GED"}) are only supported with \code{p = 1} and
-#' \code{leverage = FALSE}.
+#' Heavy-tailed errors (\code{errorType = "Student-t"} or \code{"GED"})
+#' with leverage effects are not yet supported.
 #'
 #' @param n Integer. Length of the simulated series.
 #' @param phi Numeric vector. AR coefficients for log-volatility (length p).

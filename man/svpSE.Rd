@@ -38,17 +38,11 @@ Student-t, and GED.
 }
 \examples{
 \donttest{
-# Gaussian
+# Gaussian SV(1)
 y <- sim_svp(1000, phi = 0.95, sigy = 1, sigv = 0.2)
 fit <- svp(y)
 se <- svpSE(fit, n_sim = 49)
 se$CI
-
-# Student-t
-y_t <- sim_svp(1000, phi = 0.9, sigy = 1, sigv = 0.2,
-               errorType = "Student-t", nu = 5)
-fit_t <- svp(y_t, errorType = "Student-t")
-se_t <- svpSE(fit_t, n_sim = 49)
 }
 
 }

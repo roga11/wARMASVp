@@ -33,6 +33,14 @@ inference for higher-order stochastic volatility models with leverage.
 Ahsan, N., Dufour, J.-M., and Rodriguez Rondon, G. (2025). Estimation and
 inference for stochastic volatility models with heavy-tailed distributions.
 }
+\seealso{
+Useful links:
+\itemize{
+  \item \url{https://github.com/roga11/wARMASVp}
+  \item Report bugs at \url{https://github.com/roga11/wARMASVp/issues}
+}
+
+}
 \author{
 \strong{Maintainer}: Gabriel Rodriguez Rondon \email{gabriel.rodriguezrondon@mail.mcgill.ca}
 

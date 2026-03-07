@@ -14,10 +14,8 @@
 #' When \code{leverage = TRUE}, the correlation between \eqn{z_t} and
 #' \eqn{v_t} is estimated as \eqn{\rho}.
 #'
-#' Currently, heavy-tailed errors (\code{errorType = "Student-t"} or
-#' \code{"GED"}) are only supported with \code{p = 1} and
-#' \code{leverage = FALSE}. These restrictions will be relaxed in future
-#' versions.
+#' Heavy-tailed errors (\code{errorType = "Student-t"} or \code{"GED"})
+#' with leverage effects are not yet supported.
 #'
 #' @param y Numeric vector. Observed returns (e.g., de-meaned log returns).
 #' @param p Integer. Order of the volatility process. Default is 1.
@@ -143,17 +141,11 @@ svp <- function(y, p = 1, J = 10, leverage = FALSE, errorType = "Gaussian",
 #'
 #' @examples
 #' \donttest{
-#' # Gaussian
+#' # Gaussian SV(1)
 #' y <- sim_svp(1000, phi = 0.95, sigy = 1, sigv = 0.2)
 #' fit <- svp(y)
 #' se <- svpSE(fit, n_sim = 49)
 #' se$CI
-#'
-#' # Student-t
-#' y_t <- sim_svp(1000, phi = 0.9, sigy = 1, sigv = 0.2,
-#'                errorType = "Student-t", nu = 5)
-#' fit_t <- svp(y_t, errorType = "Student-t")
-#' se_t <- svpSE(fit_t, n_sim = 49)
 #' }
 #'
 #' @export

@@ -176,7 +176,7 @@
 
 
 
-#' --- Generate GED Random Deviates ---
+#' @noRd
 rged <- function(n, mean = 0, sd = 1, nu = 2) {
   as.numeric(rged_cpp(as.integer(n), mean, sd, nu))
 }
