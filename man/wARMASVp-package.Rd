@@ -42,7 +42,7 @@ Useful links:
 
 }
 \author{
-\strong{Maintainer}: Gabriel Rodriguez Rondon \email{gabriel.rodriguezrondon@mail.mcgill.ca}
+\strong{Maintainer}: Gabriel Rodriguez Rondon \email{gabriel.rodriguezrondon@mail.mcgill.ca} (\href{https://orcid.org/0009-0005-3769-9921}{ORCID})
 
 Authors:
 \itemize{

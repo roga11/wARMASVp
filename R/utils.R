@@ -9,10 +9,7 @@
 #'
 #' @return A \code{(q*p) x (q*p)} companion matrix.
 #'
-#' @examples
-#' companionMat(c(0.7, 0.2), p = 2, q = 1)
-#'
-#' @export
+#' @keywords internal
 companionMat <- function(phi, p, q) {
   F_tmp <- phi
   if (p > 1) {

@@ -20,7 +20,4 @@ A \code{(q*p) x (q*p)} companion matrix.
 Builds the companion matrix representation for an AR(p) process, which is
 used in the state-space formulation of SV(p) models.
 }
-\examples{
-companionMat(c(0.7, 0.2), p = 2, q = 1)
-
-}
+\keyword{internal}

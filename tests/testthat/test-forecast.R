@@ -27,7 +27,7 @@ test_that("plot.svp_forecast works without error", {
 })
 
 test_that("companionMat returns correct dimensions", {
-  C <- companionMat(c(0.7, 0.2), p = 2, q = 1)
+  C <- wARMASVp:::companionMat(c(0.7, 0.2), p = 2, q = 1)
   expect_equal(dim(C), c(2, 2))
   expect_equal(unname(C[1, 1]), 0.7)
   expect_equal(unname(C[1, 2]), 0.2)
