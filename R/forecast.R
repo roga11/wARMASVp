@@ -8,9 +8,15 @@
 #' @param J Integer. Winsorizing parameter. Default 10.
 #' @param H Integer. Maximum forecast horizon. Default 1.
 #' @param leverage Logical. Estimate leverage. Default \code{TRUE}.
+#' @param errorType Character. Innovation distribution: \code{"Gaussian"},
+#'   \code{"Student-t"}, or \code{"GED"}. Default \code{"Gaussian"}.
 #' @param rho_type Character. Correlation type for leverage. Default \code{"pearson"}.
 #' @param del Numeric. Small constant for log transformation. Default \code{1e-10}.
+#' @param trunc_lev Logical. Truncate leverage correlation estimate to
+#'   \code{[-1,1]}. Default \code{TRUE}.
 #' @param wDecay Logical. Use decaying weights. Default \code{FALSE}.
+#' @param logNu Logical. Solve for \eqn{\nu} in log-space for numerical
+#'   stability (Student-t only). Default \code{FALSE}.
 #'
 #' @return An object of class \code{"svp_forecast"}, a list containing:
 #' \describe{
@@ -24,6 +30,13 @@
 #'   \item{H}{The forecast horizon.}
 #' }
 #'
+#' @note The Kalman filter update step uses a Gaussian approximation for the
+#'   measurement equation regardless of \code{errorType}. When
+#'   \code{errorType} is \code{"Student-t"} or \code{"GED"}, the
+#'   distribution-specific measurement noise variance \eqn{\sigma_\varepsilon^2}
+#'   is used, but the filter update remains linear-Gaussian. This is standard
+#'   practice for non-Gaussian state-space models.
+#'
 #' @examples
 #' \donttest{
 #' y <- sim_svp(1000, phi = 0.95, sigy = 1, sigv = 0.2, leverage = TRUE, rho = -0.3)$y
@@ -34,10 +47,13 @@
 #' @importFrom expm %^%
 #' @export
 forecast_svp <- function(y, p = 1, J = 10, H = 1, leverage = TRUE,
-                         rho_type = "pearson", del = 1e-10, wDecay = FALSE) {
+                         errorType = "Gaussian", rho_type = "pearson",
+                         del = 1e-10, trunc_lev = TRUE, wDecay = FALSE,
+                         logNu = FALSE) {
   y <- as.matrix(as.numeric(y))
-  mdl <- svp(as.numeric(y), p, J, leverage = leverage, rho_type = rho_type,
-             del = del, wDecay = wDecay)
+  mdl <- svp(as.numeric(y), p, J, leverage = leverage, errorType = errorType,
+             rho_type = rho_type, del = del, trunc_lev = trunc_lev,
+             wDecay = wDecay, logNu = logNu)
 
   mu <- mdl$mu
   phi <- mdl$phi

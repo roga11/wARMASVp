@@ -4,7 +4,8 @@
 #' latent log-volatility process from an estimated SV(p) model.
 #'
 #' @param y Numeric vector. Observed returns.
-#' @param model An \code{"svp"} object from \code{\link{svp}}.
+#' @param model An \code{"svp"} object from \code{\link{svp}}. Accepts classes
+#'   \code{"svp"}, \code{"svp_t"}, and \code{"svp_ged"}.
 #' @param del Numeric. Small constant for log transformation. Default \code{1e-10}.
 #'
 #' @return A list with:
@@ -14,6 +15,12 @@
 #'   \item{zt}{Filtered standardized residuals.}
 #'   \item{zt_smoothed}{Smoothed standardized residuals.}
 #' }
+#'
+#' @note The Kalman filter update uses a Gaussian approximation for the
+#'   measurement equation. For Student-t and GED models, the
+#'   distribution-specific measurement noise variance
+#'   \eqn{\sigma_\varepsilon^2(\nu)} is used in place of
+#'   \eqn{\pi^2/2}, but the filter update itself remains linear-Gaussian.
 #'
 #' @examples
 #' \donttest{
@@ -25,7 +32,9 @@
 #'
 #' @export
 kalman_filter <- function(y, model, del = 1e-10) {
-  if (!inherits(model, "svp")) stop("model must be of class 'svp'.")
+  if (!inherits(model, c("svp", "svp_t", "svp_ged"))) {
+    stop("model must be of class 'svp', 'svp_t', or 'svp_ged'.")
+  }
   y <- as.matrix(as.numeric(y))
   mu <- model$mu
   phi <- model$phi
@@ -33,6 +42,15 @@ kalman_filter <- function(y, model, del = 1e-10) {
   delta_p <- if (is.null(model$rho) || is.na(model$rho)) 0 else model$rho
   sigma_y <- model$sigy
   sigma_v <- model$sigv
+
+  # Measurement noise variance: distribution-specific sigma_eps^2
+  if (inherits(model, "svp_t") && !is.null(model$v) && is.finite(model$v)) {
+    sig_eps2 <- psigamma(0.5, 1) + psigamma(model$v / 2, 1)
+  } else if (inherits(model, "svp_ged") && !is.null(model$v) && is.finite(model$v)) {
+    sig_eps2 <- (2 / model$v)^2 * psigamma(1 / model$v, 1)
+  } else {
+    sig_eps2 <- (pi^2) / 2
+  }
 
   ys <- log(y^2 + del) - mu
   Tsize <- length(ys)
@@ -58,7 +76,7 @@ kalman_filter <- function(y, model, del = 1e-10) {
   for (t in 1:Tsize) {
     # Update
     K <- P_pred[, , t] %*% t(Hprm) %*%
-      (1 / (Hprm %*% P_pred[, , t] %*% t(Hprm) + (pi^2) / 2))
+      (1 / (Hprm %*% P_pred[, , t] %*% t(Hprm) + sig_eps2))
     xi_estimated[, t] <- xi_pred[, t, drop = FALSE] +
       K %*% (ys[t] - Hprm %*% xi_pred[, t, drop = FALSE])
     P_updated[, , t] <- P_pred[, , t] - K %*% Hprm %*% P_pred[, , t]

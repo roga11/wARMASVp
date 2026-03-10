@@ -11,6 +11,7 @@ lmc_t(
   nu_null,
   burnin = 500,
   del = 1e-10,
+  wDecay = FALSE,
   Bartlett = TRUE,
   Amat = NULL,
   logNu = TRUE
@@ -28,6 +29,8 @@ lmc_t(
 \item{burnin}{Integer. Burn-in for simulation. Default 500.}
 
 \item{del}{Numeric. Small constant for log transformation. Default \code{1e-10}.}
+
+\item{wDecay}{Logical. Use decaying weights. Default \code{FALSE}.}
 
 \item{Bartlett}{Logical. Use Bartlett kernel HAC for weighting matrix.
 Default \code{TRUE}.}

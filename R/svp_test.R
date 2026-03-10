@@ -181,6 +181,9 @@ mmc_ar <- function(y, p_null, p_alt, J = 10, N = 99, burnin = 500,
 #' @param burnin Integer. Burn-in for simulation. Default 500.
 #' @param rho_type Character. Correlation type. Default \code{"pearson"}.
 #' @param del Numeric. Small constant for log transformation. Default \code{1e-10}.
+#' @param trunc_lev Logical. Truncate leverage correlation estimate to
+#'   \code{[-1,1]}. Default \code{TRUE}.
+#' @param wDecay Logical. Use decaying weights. Default \code{FALSE}.
 #' @param Bartlett Logical. If \code{TRUE}, use Bartlett kernel HAC weighting
 #'   matrix. If \code{FALSE}, use identity matrix. Default \code{FALSE}.
 #'
@@ -206,13 +209,15 @@ mmc_ar <- function(y, p_null, p_alt, J = 10, N = 99, burnin = 500,
 #' @export
 lmc_lev <- function(y, p = 1, J = 10, N = 99, rho_null = 0,
                     burnin = 500, rho_type = "pearson", del = 1e-10,
+                    trunc_lev = TRUE, wDecay = FALSE,
                     Bartlett = FALSE) {
   cl <- match.call()
   y_vec <- as.numeric(y)
   y_mat <- as.matrix(y_vec)
   Tsize <- length(y_vec)
   # Estimate model under alternative
-  mdl_alt <- svp(y_vec, p, J, leverage = TRUE, rho_type = rho_type, del = del)
+  mdl_alt <- svp(y_vec, p, J, leverage = TRUE, rho_type = rho_type, del = del,
+                 trunc_lev = trunc_lev, wDecay = wDecay)
   if (!is.null(mdl_alt$rho_type) && !is.na(mdl_alt$rho_type) &&
       mdl_alt$rho_type != rho_type) {
     warning("rho_type in estimated model differs from specified rho_type.")
@@ -236,10 +241,12 @@ lmc_lev <- function(y, p = 1, J = 10, N = 99, rho_null = 0,
   betasim_null <- c(mdl_alt$phi, mdl_alt$sigy, mdl_alt$sigv, rho_null)
   if (isTRUE(Bartlett)) {
     sN <- .simnull_Amat(betasim_null, rho_null, p, J, Tsize, N, burnin,
-                        rho_type, del, TRUE)
+                        rho_type, del, TRUE, wDecay = wDecay,
+                        trunc_lev = trunc_lev)
   } else {
     sN <- .simnull(betasim_null, rho_null, p, J, Tsize, N, burnin,
-                   Amat, rho_type, del)
+                   Amat, rho_type, del, wDecay = wDecay,
+                   trunc_lev = trunc_lev)
   }
   # Compute p-value
   pval <- (N + 1 - sum(s0 >= sN)) / (N + 1)
@@ -288,13 +295,15 @@ mmc_lev <- function(y, p = 1, J = 10, N = 99, rho_null = 0,
                     burnin = 500, eps = NULL, threshold = 1,
                     method = "pso", maxit = NULL,
                     rho_type = "pearson", del = 1e-10,
+                    trunc_lev = TRUE, wDecay = FALSE,
                     Bartlett = FALSE) {
   cl <- match.call()
   y_vec <- as.numeric(y)
   y_mat <- as.matrix(y_vec)
   Tsize <- length(y_vec)
   # Estimate model under alternative
-  mdl_alt <- svp(y_vec, p, J, leverage = TRUE, rho_type = rho_type, del = del)
+  mdl_alt <- svp(y_vec, p, J, leverage = TRUE, rho_type = rho_type, del = del,
+                 trunc_lev = trunc_lev, wDecay = wDecay)
   theta_0 <- c(mdl_alt$phi, mdl_alt$sigy, mdl_alt$sigv)
   if (is.null(eps)) {
     eps <- rep(0.3, length(theta_0))
@@ -336,7 +345,8 @@ mmc_lev <- function(y, p = 1, J = 10, N = 99, rho_null = 0,
     }
     extra_args <- list(y = y_mat, j = J, N = N, mdl_alt = mdl_alt,
                        rho_null = rho_null, ini = burnin,
-                       rho_type = rho_type, del = del)
+                       rho_type = rho_type, del = del,
+                       wDecay = wDecay, trunc_lev = trunc_lev)
     if (isTRUE(Bartlett)) extra_args$Bartlett <- TRUE
     if (!isTRUE(Bartlett)) extra_args$Amat <- diag(p + 3)
     out <- do.call(NMOF::gridSearch,
@@ -351,7 +361,8 @@ mmc_lev <- function(y, p = 1, J = 10, N = 99, rho_null = 0,
     if (is.null(maxit)) maxit <- 100
     extra_args <- list(y = y_mat, j = J, N = N, mdl_alt = mdl_alt,
                        rho_null = rho_null, ini = burnin,
-                       rho_type = rho_type, del = del)
+                       rho_type = rho_type, del = del,
+                       wDecay = wDecay, trunc_lev = trunc_lev)
     if (isTRUE(Bartlett)) extra_args$Bartlett <- TRUE
     if (!isTRUE(Bartlett)) extra_args$Amat <- diag(p + 3)
     out <- do.call(GenSA::GenSA,
@@ -367,7 +378,8 @@ mmc_lev <- function(y, p = 1, J = 10, N = 99, rho_null = 0,
     if (is.null(maxit)) maxit <- 100
     extra_args <- list(y = y_mat, j = J, N = N, mdl_alt = mdl_alt,
                        rho_null = rho_null, ini = burnin,
-                       rho_type = rho_type, del = del)
+                       rho_type = rho_type, del = del,
+                       wDecay = wDecay, trunc_lev = trunc_lev)
     if (isTRUE(Bartlett)) extra_args$Bartlett <- TRUE
     if (!isTRUE(Bartlett)) extra_args$Amat <- diag(p + 3)
     out <- do.call(pso::psoptim,
@@ -403,6 +415,7 @@ mmc_lev <- function(y, p = 1, J = 10, N = 99, rho_null = 0,
 #' @param nu_null Numeric. Value of \eqn{\nu} under the null hypothesis.
 #' @param burnin Integer. Burn-in for simulation. Default 500.
 #' @param del Numeric. Small constant for log transformation. Default \code{1e-10}.
+#' @param wDecay Logical. Use decaying weights. Default \code{FALSE}.
 #' @param Bartlett Logical. Use Bartlett kernel HAC for weighting matrix.
 #'   Default \code{TRUE}.
 #' @param Amat Weighting matrix specification. \code{NULL} for identity,
@@ -420,15 +433,16 @@ mmc_lev <- function(y, p = 1, J = 10, N = 99, rho_null = 0,
 #'
 #' @export
 lmc_t <- function(y, J = 10, N = 99, nu_null, burnin = 500,
-                  del = 1e-10, Bartlett = TRUE, Amat = NULL,
-                  logNu = TRUE) {
+                  del = 1e-10, wDecay = FALSE, Bartlett = TRUE,
+                  Amat = NULL, logNu = TRUE) {
   cl <- match.call()
   y_vec <- as.numeric(y)
   y_mat <- as.matrix(y_vec)
   Tsize <- length(y_vec)
   p <- 1L
   # Estimate model under alternative
-  mdl_alt <- svp(y_vec, p = 1, J = J, errorType = "Student-t", del = del, logNu = logNu)
+  mdl_alt <- svp(y_vec, p = 1, J = J, errorType = "Student-t", del = del,
+                 logNu = logNu, wDecay = wDecay)
   mdl_null <- mdl_alt
   mdl_null$v <- nu_null
   # Handle Amat specification
@@ -445,7 +459,8 @@ lmc_t <- function(y, J = 10, N = 99, nu_null, burnin = 500,
   # Simulate null distribution
   betasim_null <- c(mdl_alt$phi, mdl_alt$sigy, mdl_alt$sigv, nu_null)
   sN <- .simnull_t(betasim_null, nu_null, J, Tsize, N, burnin,
-                   Amat_mat, del, WAmat, Bartlett, logNu)
+                   Amat_mat, del, WAmat, Bartlett, logNu,
+                   wDecay = wDecay)
   pval <- (N + 1 - sum(s0 >= sN)) / (N + 1)
   out <- list(s0 = s0, sN = as.numeric(sN), pval = pval,
               test_type = "LMC Student-t",
@@ -475,13 +490,15 @@ lmc_t <- function(y, J = 10, N = 99, nu_null, burnin = 500,
 #'
 #' @export
 lmc_ged <- function(y, J = 10, N = 99, nu_null, burnin = 500,
-                    del = 1e-10, Bartlett = TRUE, Amat = NULL) {
+                    del = 1e-10, wDecay = FALSE, Bartlett = TRUE,
+                    Amat = NULL) {
   cl <- match.call()
   y_vec <- as.numeric(y)
   y_mat <- as.matrix(y_vec)
   Tsize <- length(y_vec)
   p <- 1L
-  mdl_alt <- svp(y_vec, p = 1, J = J, errorType = "GED", del = del)
+  mdl_alt <- svp(y_vec, p = 1, J = J, errorType = "GED", del = del,
+                 wDecay = wDecay)
   mdl_null <- mdl_alt
   mdl_null$v <- nu_null
   wa <- .parse_Amat(Amat, p)
@@ -495,7 +512,7 @@ lmc_ged <- function(y, J = 10, N = 99, nu_null, burnin = 500,
   s0 <- s0_tmp
   betasim_null <- c(mdl_alt$phi, mdl_alt$sigy, mdl_alt$sigv, nu_null)
   sN <- .simnull_ged(betasim_null, nu_null, J, Tsize, N, burnin,
-                     Amat_mat, del, WAmat, Bartlett)
+                     Amat_mat, del, WAmat, Bartlett, wDecay = wDecay)
   pval <- (N + 1 - sum(s0 >= sN)) / (N + 1)
   out <- list(s0 = s0, sN = as.numeric(sN), pval = pval,
               test_type = "LMC GED",
@@ -531,13 +548,14 @@ lmc_ged <- function(y, J = 10, N = 99, nu_null, burnin = 500,
 #' @export
 mmc_t <- function(y, J = 10, N = 99, nu_null, burnin = 500,
                   eps = NULL, threshold = 1, method = "pso", maxit = NULL,
-                  del = 1e-10, Bartlett = TRUE, Amat = NULL,
-                  logNu = TRUE) {
+                  del = 1e-10, wDecay = FALSE, Bartlett = TRUE,
+                  Amat = NULL, logNu = TRUE) {
   cl <- match.call()
   y_vec <- as.numeric(y)
   y_mat <- as.matrix(y_vec)
   Tsize <- length(y_vec)
-  mdl_alt <- svp(y_vec, p = 1, J = J, errorType = "Student-t", del = del, logNu = logNu)
+  mdl_alt <- svp(y_vec, p = 1, J = J, errorType = "Student-t", del = del,
+                 logNu = logNu, wDecay = wDecay)
   p <- length(mdl_alt$phi)
   theta_0 <- c(mdl_alt$phi, mdl_alt$sigy, mdl_alt$sigv)
   if (is.null(eps)) eps <- rep(0.3, length(theta_0))
@@ -561,7 +579,8 @@ mmc_t <- function(y, J = 10, N = 99, nu_null, burnin = 500,
                             threshold, maxit,
                             y = y_mat, j = J, N = N, mdl_alt = mdl_alt,
                             nu_null = nu_null, ini = burnin, Amat = Amat_mat,
-                            del = del, Bartlett = Bartlett, logNu = logNu)
+                            del = del, Bartlett = Bartlett, logNu = logNu,
+                            wDecay = wDecay)
   out$value <- -out$value
   out$s0 <- s0_tmp
   out$call <- cl
@@ -594,12 +613,14 @@ mmc_t <- function(y, J = 10, N = 99, nu_null, burnin = 500,
 #' @export
 mmc_ged <- function(y, J = 10, N = 99, nu_null, burnin = 500,
                     eps = NULL, threshold = 1, method = "pso", maxit = NULL,
-                    del = 1e-10, Bartlett = TRUE, Amat = NULL) {
+                    del = 1e-10, wDecay = FALSE, Bartlett = TRUE,
+                    Amat = NULL) {
   cl <- match.call()
   y_vec <- as.numeric(y)
   y_mat <- as.matrix(y_vec)
   Tsize <- length(y_vec)
-  mdl_alt <- svp(y_vec, p = 1, J = J, errorType = "GED", del = del)
+  mdl_alt <- svp(y_vec, p = 1, J = J, errorType = "GED", del = del,
+                 wDecay = wDecay)
   p <- length(mdl_alt$phi)
   theta_0 <- c(mdl_alt$phi, mdl_alt$sigy, mdl_alt$sigv)
   if (is.null(eps)) eps <- rep(0.3, length(theta_0))
@@ -623,7 +644,7 @@ mmc_ged <- function(y, J = 10, N = 99, nu_null, burnin = 500,
                             threshold, maxit,
                             y = y_mat, j = J, N = N, mdl_alt = mdl_alt,
                             nu_null = nu_null, ini = burnin, Amat = Amat_mat,
-                            del = del, Bartlett = Bartlett)
+                            del = del, Bartlett = Bartlett, wDecay = wDecay)
   out$value <- -out$value
   out$s0 <- s0_tmp
   out$call <- cl

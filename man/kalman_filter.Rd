@@ -9,7 +9,8 @@ kalman_filter(y, model, del = 1e-10)
 \arguments{
 \item{y}{Numeric vector. Observed returns.}
 
-\item{model}{An \code{"svp"} object from \code{\link{svp}}.}
+\item{model}{An \code{"svp"} object from \code{\link{svp}}. Accepts classes
+\code{"svp"}, \code{"svp_t"}, and \code{"svp_ged"}.}
 
 \item{del}{Numeric. Small constant for log transformation. Default \code{1e-10}.}
 }
@@ -25,6 +26,13 @@ A list with:
 \description{
 Applies Kalman filtering and Rauch-Tung-Striebel smoothing to estimate the
 latent log-volatility process from an estimated SV(p) model.
+}
+\note{
+The Kalman filter update uses a Gaussian approximation for the
+  measurement equation. For Student-t and GED models, the
+  distribution-specific measurement noise variance
+  \eqn{\sigma_\varepsilon^2(\nu)} is used in place of
+  \eqn{\pi^2/2}, but the filter update itself remains linear-Gaussian.
 }
 \examples{
 \donttest{

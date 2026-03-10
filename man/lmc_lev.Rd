@@ -13,6 +13,8 @@ lmc_lev(
   burnin = 500,
   rho_type = "pearson",
   del = 1e-10,
+  trunc_lev = TRUE,
+  wDecay = FALSE,
   Bartlett = FALSE
 )
 }
@@ -32,6 +34,11 @@ lmc_lev(
 \item{rho_type}{Character. Correlation type. Default \code{"pearson"}.}
 
 \item{del}{Numeric. Small constant for log transformation. Default \code{1e-10}.}
+
+\item{trunc_lev}{Logical. Truncate leverage correlation estimate to
+\code{[-1,1]}. Default \code{TRUE}.}
+
+\item{wDecay}{Logical. Use decaying weights. Default \code{FALSE}.}
 
 \item{Bartlett}{Logical. If \code{TRUE}, use Bartlett kernel HAC weighting
 matrix. If \code{FALSE}, use identity matrix. Default \code{FALSE}.}

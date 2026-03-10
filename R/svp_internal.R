@@ -40,6 +40,8 @@
   para$J <- J
   para$leverage <- leverage
   para$del <- del
+  para$wDecay <- wDecay
+  para$trunc_lev <- trunc_lev
   class(para) <- "svp"
   return(para)
 }
@@ -61,28 +63,27 @@
   # Estimate sigma_eps^2 = gamma(0) - gamma(1)/rho_w(1)
   se2 <- stats::var(as.numeric(ly2)) - gam1 / rho_w1
   se2b <- as.numeric(se2) - psigamma(0.5, 1)
-  se2b <- max(1e-6, se2b)
-  # Estimate nu via root-finding on trigamma
-  if (logNu) {
+  # Estimate nu via root-finding on trigamma: psigamma(nu/2, 1) = se2b
+  nu_lower <- 2.01
+  nu_upper <- 500
+  if (se2b <= psigamma(nu_upper / 2, 1)) {
+    # se2b too small: tails indistinguishable from Gaussian
+    nuh <- nu_upper
+    warning("Estimated nu at upper boundary (", nu_upper,
+            "); tails indistinguishable from Gaussian.")
+  } else if (se2b >= psigamma(nu_lower / 2, 1)) {
+    # se2b too large: extremely heavy tails
+    nuh <- nu_lower
+    warning("Estimated nu at lower boundary (", nu_lower,
+            "); extremely heavy tails.")
+  } else if (logNu) {
     f_log <- function(logx) psigamma(exp(logx) / 2, 1) - se2b
-    lower <- log(2.01)
-    upper <- log(500)
-    if (f_log(lower) * f_log(upper) < 0) {
-      nuh <- exp(stats::uniroot(f_log, interval = c(lower, upper), tol = 1e-6)$root)
-    } else {
-      warning("Root-finding for nu failed; returning NA.")
-      nuh <- NA_real_
-    }
+    nuh <- exp(stats::uniroot(f_log, interval = c(log(nu_lower), log(nu_upper)),
+                              tol = 1e-6)$root)
   } else {
     f <- function(x) psigamma(x / 2, 1) - se2b
-    lower <- 2.01
-    upper <- 500
-    if (f(lower) * f(upper) < 0) {
-      nuh <- stats::uniroot(f, interval = c(lower, upper), tol = 1e-6, maxiter = 1000)$root
-    } else {
-      warning("Root-finding for nu failed; returning NA.")
-      nuh <- NA_real_
-    }
+    nuh <- stats::uniroot(f, interval = c(nu_lower, nu_upper),
+                          tol = 1e-6, maxiter = 1000)$root
   }
   # Estimate sigv
   var_log_sq_t <- psigamma(0.5, 1) + psigamma(nuh / 2, 1)
@@ -108,7 +109,8 @@
   theta <- c(phi_reg, sigy, sv_reg, nuh)
   out <- list(mu = mu, phi = phi_reg, sigv = as.numeric(sv_reg),
               sigy = as.numeric(sigy), v = nuh, theta = theta,
-              y = as.numeric(y), J = J, p = as.integer(p), del = del)
+              y = as.numeric(y), J = J, p = as.integer(p), del = del,
+              wDecay = wDecay, logNu = logNu)
   class(out) <- "svp_t"
   return(out)
 }
@@ -129,7 +131,7 @@
   gam1 <- (1 / (N - 1)) * as.numeric(t(ys[2:N, , drop = FALSE]) %*% ys[1:(N - 1), , drop = FALSE])
   # Estimate sigma_eps^2 = gamma(0) - gamma(1)/rho_w(1)
   se2 <- as.numeric(stats::var(as.numeric(ly2)) - gam1 / rho_w1)
-  # Estimate nu
+  # Estimate nu: solve (2/nu)^2 * psigamma(1/nu, 1) = se2
   f <- function(x) ((2 / x)^2) * psigamma(1 / x, 1) - se2
   m1 <- sum(abs(ly2)) / N
   m2 <- sqrt(sum((abs(ly2) - m1)^2) / N)
@@ -139,8 +141,21 @@
   if (f(lower) * f(upper) < 0) {
     ged_nuh <- stats::uniroot(f, interval = c(lower, upper), tol = 1e-6, maxiter = 1000)$root
   } else {
-    warning("Root-finding for nu failed; returning NA.")
-    ged_nuh <- NA_real_
+    # Adaptive bounds failed; try wider fixed bounds
+    fixed_lower <- 0.1
+    fixed_upper <- 20
+    if (f(fixed_lower) * f(fixed_upper) < 0) {
+      ged_nuh <- stats::uniroot(f, interval = c(fixed_lower, fixed_upper),
+                                tol = 1e-6, maxiter = 1000)$root
+    } else if (se2 <= ((2 / fixed_upper)^2) * psigamma(1 / fixed_upper, 1)) {
+      ged_nuh <- fixed_upper
+      warning("Estimated GED nu at upper boundary (", fixed_upper,
+              "); tails indistinguishable from Gaussian.")
+    } else {
+      ged_nuh <- fixed_lower
+      warning("Estimated GED nu at lower boundary (", fixed_lower,
+              "); extremely heavy tails.")
+    }
   }
   # Estimate sigv
   var_log_sq_ged <- ((2 / ged_nuh)^2) * psigamma(1 / ged_nuh, 1)
@@ -167,7 +182,8 @@
   theta <- c(phi_reg, sigy, sv_reg, ged_nuh)
   out <- list(mu = mu, phi = phi_reg, sigv = as.numeric(sv_reg),
               sigy = as.numeric(sigy), v = ged_nuh, theta = theta,
-              y = as.numeric(y), J = J, p = as.integer(p), del = del)
+              y = as.numeric(y), J = J, p = as.integer(p), del = del,
+              wDecay = wDecay)
   class(out) <- "svp_ged"
   return(out)
 }
@@ -190,6 +206,8 @@ rged <- function(n, mean = 0, sd = 1, nu = 2) {
   p <- object$p
   Tsize <- length(object$y)
   has_lev <- isTRUE(object$leverage) && !is.na(object$rho)
+  wDecay <- if (is.null(object$wDecay)) FALSE else object$wDecay
+  trunc_lev <- if (is.null(object$trunc_lev)) TRUE else object$trunc_lev
   n_params <- if (has_lev) p + 3 else p + 2
   betamat <- matrix(0, n_sim, n_params)
   if (has_lev) {
@@ -213,7 +231,8 @@ rged <- function(n, mean = 0, sd = 1, nu = 2) {
     }
     out_tmp <- tryCatch(
       svp(u, p = p, J = object$J, leverage = has_lev,
-          rho_type = rho_type, del = object$del, trunc_lev = TRUE),
+          rho_type = rho_type, del = object$del, trunc_lev = trunc_lev,
+          wDecay = wDecay),
       error = function(e) NULL
     )
     if (!is.null(out_tmp) && !isTRUE(out_tmp$nonstationary_ind)) {
@@ -230,6 +249,7 @@ rged <- function(n, mean = 0, sd = 1, nu = 2) {
 
 .svpSE_t <- function(object, n_sim, alpha, burnin, logNu) {
   Tsize <- length(object$y)
+  wDecay <- if (is.null(object$wDecay)) FALSE else object$wDecay
   n_params <- length(object$phi) + 3
   betamat <- matrix(0, n_sim, n_params)
   betasim <- c(object$phi, object$sigy, object$sigv, object$v)
@@ -240,10 +260,11 @@ rged <- function(n, mean = 0, sd = 1, nu = 2) {
                      nu = object$v, burnin = burnin)
     out_tmp <- tryCatch(
       svp(as.numeric(u_out), p = object$p, J = object$J,
-          errorType = "Student-t", del = object$del, logNu = logNu),
+          errorType = "Student-t", del = object$del, logNu = logNu,
+          wDecay = wDecay),
       error = function(e) NULL
     )
-    if (!is.null(out_tmp)) {
+    if (!is.null(out_tmp) && is.finite(out_tmp$v)) {
       betamat[xn, ] <- c(out_tmp$phi, out_tmp$sigy, out_tmp$sigv, out_tmp$v)
       xn <- xn + 1
     }
@@ -253,6 +274,7 @@ rged <- function(n, mean = 0, sd = 1, nu = 2) {
 
 .svpSE_ged <- function(object, n_sim, alpha, burnin) {
   Tsize <- length(object$y)
+  wDecay <- if (is.null(object$wDecay)) FALSE else object$wDecay
   n_params <- length(object$phi) + 3
   betamat <- matrix(0, n_sim, n_params)
   betasim <- c(object$phi, object$sigy, object$sigv, object$v)
@@ -263,10 +285,10 @@ rged <- function(n, mean = 0, sd = 1, nu = 2) {
                      nu = object$v, burnin = burnin)
     out_tmp <- tryCatch(
       svp(as.numeric(u_out), p = object$p, J = object$J,
-          errorType = "GED", del = object$del),
+          errorType = "GED", del = object$del, wDecay = wDecay),
       error = function(e) NULL
     )
-    if (!is.null(out_tmp)) {
+    if (!is.null(out_tmp) && is.finite(out_tmp$v)) {
       betamat[xn, ] <- c(out_tmp$phi, out_tmp$sigy, out_tmp$sigv, out_tmp$v)
       xn <- xn + 1
     }
@@ -328,7 +350,8 @@ rged <- function(n, mean = 0, sd = 1, nu = 2) {
 
 # MMC p-value for leverage test (identity Amat)
 .mmc_pval_lev <- function(theta, y, j, N, mdl_alt, rho_null, ini,
-                          Amat, rho_type, del = 1e-10) {
+                          Amat, rho_type, del = 1e-10,
+                          wDecay = FALSE, trunc_lev = TRUE) {
   y <- as.matrix(as.numeric(y))
   Tsize <- nrow(y)
   p <- length(mdl_alt$phi)
@@ -343,7 +366,8 @@ rged <- function(n, mean = 0, sd = 1, nu = 2) {
   if (!is.na(s0_tmp) && s0_tmp >= 0 && stationary) {
     betasim_null <- c(theta[1:p], theta[p + 1], theta[p + 2], rho_null)
     sN <- .simnull(betasim_null, rho_null, p, j, Tsize, N, ini,
-                   Amat, rho_type, del)
+                   Amat, rho_type, del, wDecay = wDecay,
+                   trunc_lev = trunc_lev)
     pval <- -((N + 1 - sum(s0_tmp >= sN)) / (N + 1))
   } else {
     pval <- 9999999999999
@@ -353,7 +377,8 @@ rged <- function(n, mean = 0, sd = 1, nu = 2) {
 
 # MMC p-value for leverage test (Bartlett kernel Amat)
 .mmc_pval_lev_Amat <- function(theta, y, j, N, mdl_alt, rho_null, ini,
-                               rho_type, del = 1e-10, Bartlett = TRUE) {
+                               rho_type, del = 1e-10, Bartlett = TRUE,
+                               wDecay = FALSE, trunc_lev = TRUE) {
   y <- as.matrix(as.numeric(y))
   Tsize <- nrow(y)
   p <- length(mdl_alt$phi)
@@ -368,7 +393,8 @@ rged <- function(n, mean = 0, sd = 1, nu = 2) {
   if (!is.na(s0_tmp) && s0_tmp >= 0 && stationary) {
     betasim_null <- c(theta[1:p], theta[p + 1], theta[p + 2], rho_null)
     sN <- .simnull_Amat(betasim_null, rho_null, p, j, Tsize, N, ini,
-                        rho_type, del, Bartlett)
+                        rho_type, del, Bartlett, wDecay = wDecay,
+                        trunc_lev = trunc_lev)
     pval <- -((N + 1 - sum(s0_tmp >= sN)) / (N + 1))
   } else {
     pval <- 9999999999999
@@ -379,7 +405,7 @@ rged <- function(n, mean = 0, sd = 1, nu = 2) {
 # MMC p-value for Student-t (returns negative for minimization)
 .mmc_pval_t <- function(theta, y, j, N, mdl_alt, nu_null, ini,
                         Amat, del = 1e-10, Bartlett = TRUE,
-                        logNu = TRUE) {
+                        logNu = TRUE, wDecay = FALSE) {
   y <- as.matrix(as.numeric(y))
   Tsize <- nrow(y)
   p <- length(mdl_alt$phi)
@@ -394,7 +420,8 @@ rged <- function(n, mean = 0, sd = 1, nu = 2) {
   if (is.finite(s0_tmp) && s0_tmp >= 0 && stationary) {
     betasim_null <- c(theta[1:p], theta[p + 1], theta[p + 2], nu_null)
     sN <- .simnull_t(betasim_null, nu_null, j, Tsize, N, ini,
-                     Amat, del, FALSE, Bartlett, logNu)
+                     Amat, del, FALSE, Bartlett, logNu,
+                     wDecay = wDecay)
     pval <- -((N + 1 - sum(s0_tmp >= sN)) / (N + 1))
   } else {
     pval <- 9999999999999
@@ -404,7 +431,8 @@ rged <- function(n, mean = 0, sd = 1, nu = 2) {
 
 # MMC p-value for GED (returns negative for minimization)
 .mmc_pval_ged <- function(theta, y, j, N, mdl_alt, nu_null, ini,
-                          Amat, del = 1e-10, Bartlett = TRUE) {
+                          Amat, del = 1e-10, Bartlett = TRUE,
+                          wDecay = FALSE) {
   y <- as.matrix(as.numeric(y))
   Tsize <- nrow(y)
   p <- length(mdl_alt$phi)
@@ -419,7 +447,7 @@ rged <- function(n, mean = 0, sd = 1, nu = 2) {
   if (is.finite(s0_tmp) && s0_tmp >= 0 && stationary) {
     betasim_null <- c(theta[1:p], theta[p + 1], theta[p + 2], nu_null)
     sN <- .simnull_ged(betasim_null, nu_null, j, Tsize, N, ini,
-                       Amat, del, FALSE, Bartlett)
+                       Amat, del, FALSE, Bartlett, wDecay = wDecay)
     pval <- -((N + 1 - sum(s0_tmp >= sN)) / (N + 1))
   } else {
     pval <- 9999999999999
@@ -863,7 +891,8 @@ LRT_moment_ged <- function(y, mdl_out, Amat, WAmat = FALSE, del = 1e-10,
 
 # Simulate null distribution for leverage test (identity Amat)
 .simnull <- function(betasim_null, rho_null, p, j, Tsize, N, ini,
-                     Amat, rho_type, del = 1e-10) {
+                     Amat, rho_type, del = 1e-10,
+                     wDecay = FALSE, trunc_lev = TRUE) {
   phi_sim <- betasim_null[seq_len(p)]
   sigy_sim <- betasim_null[p + 1]
   sigv_sim <- betasim_null[p + 2]
@@ -876,7 +905,8 @@ LRT_moment_ged <- function(y, mdl_out, Amat, WAmat = FALSE, del = 1e-10,
                      rho = rho_sim, burnin = ini)
     u <- u_out$y
     out_tmp <- tryCatch(
-      svp(u, p, j, leverage = TRUE, rho_type = rho_type, del = del),
+      svp(u, p, j, leverage = TRUE, rho_type = rho_type, del = del,
+          trunc_lev = trunc_lev, wDecay = wDecay),
       error = function(e) NULL
     )
     if (!is.null(out_tmp) && abs(out_tmp$rho) <= 1 &&
@@ -897,7 +927,8 @@ LRT_moment_ged <- function(y, mdl_out, Amat, WAmat = FALSE, del = 1e-10,
 
 # Simulate null distribution for leverage test (Bartlett kernel Amat)
 .simnull_Amat <- function(betasim_null, rho_null, p, j, Tsize, N, ini,
-                          rho_type, del = 1e-10, Bartlett = TRUE) {
+                          rho_type, del = 1e-10, Bartlett = TRUE,
+                          wDecay = FALSE, trunc_lev = TRUE) {
   phi_sim <- betasim_null[seq_len(p)]
   sigy_sim <- betasim_null[p + 1]
   sigv_sim <- betasim_null[p + 2]
@@ -910,7 +941,8 @@ LRT_moment_ged <- function(y, mdl_out, Amat, WAmat = FALSE, del = 1e-10,
                      rho = rho_sim, burnin = ini)
     u <- u_out$y
     out_tmp <- tryCatch(
-      svp(u, p, j, leverage = TRUE, rho_type = rho_type, del = del),
+      svp(u, p, j, leverage = TRUE, rho_type = rho_type, del = del,
+          trunc_lev = trunc_lev, wDecay = wDecay),
       error = function(e) NULL
     )
     if (!is.null(out_tmp) && abs(out_tmp$rho) <= 1 &&
@@ -932,7 +964,8 @@ LRT_moment_ged <- function(y, mdl_out, Amat, WAmat = FALSE, del = 1e-10,
 # Simulate null distribution for Student-t test
 .simnull_t <- function(betasim_null, nu_null, j, Tsize, N, ini,
                        Amat, del = 1e-10, WAmat = FALSE,
-                       Bartlett = TRUE, logNu = TRUE) {
+                       Bartlett = TRUE, logNu = TRUE,
+                       wDecay = FALSE) {
   p <- length(betasim_null) - 3
   phi_sim <- betasim_null[1:p]
   sigy_sim <- betasim_null[p + 1]
@@ -945,7 +978,8 @@ LRT_moment_ged <- function(y, mdl_out, Amat, WAmat = FALSE, del = 1e-10,
                            sigv = sigv_sim, errorType = "Student-t",
                            nu = nu_sim, burnin = ini))
     out_tmp <- tryCatch(
-      svp(as.numeric(u), p = p, J = j, errorType = "Student-t", del = del, logNu = logNu),
+      svp(as.numeric(u), p = p, J = j, errorType = "Student-t", del = del,
+          logNu = logNu, wDecay = wDecay),
       error = function(e) NULL
     )
     if (!is.null(out_tmp)) {
@@ -968,7 +1002,7 @@ LRT_moment_ged <- function(y, mdl_out, Amat, WAmat = FALSE, del = 1e-10,
 # Simulate null distribution for GED test
 .simnull_ged <- function(betasim_null, nu_null, j, Tsize, N, ini,
                          Amat, del = 1e-10, WAmat = FALSE,
-                         Bartlett = TRUE) {
+                         Bartlett = TRUE, wDecay = FALSE) {
   p <- length(betasim_null) - 3
   phi_sim <- betasim_null[1:p]
   sigy_sim <- betasim_null[p + 1]
@@ -981,7 +1015,8 @@ LRT_moment_ged <- function(y, mdl_out, Amat, WAmat = FALSE, del = 1e-10,
                            sigv = sigv_sim, errorType = "GED",
                            nu = nu_sim, burnin = ini))
     out_tmp <- tryCatch(
-      svp(as.numeric(u), p = p, J = j, errorType = "GED", del = del),
+      svp(as.numeric(u), p = p, J = j, errorType = "GED", del = del,
+          wDecay = wDecay),
       error = function(e) NULL
     )
     if (!is.null(out_tmp)) {

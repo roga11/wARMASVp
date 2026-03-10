@@ -10,9 +10,12 @@ forecast_svp(
   J = 10,
   H = 1,
   leverage = TRUE,
+  errorType = "Gaussian",
   rho_type = "pearson",
   del = 1e-10,
-  wDecay = FALSE
+  trunc_lev = TRUE,
+  wDecay = FALSE,
+  logNu = FALSE
 )
 }
 \arguments{
@@ -26,11 +29,20 @@ forecast_svp(
 
 \item{leverage}{Logical. Estimate leverage. Default \code{TRUE}.}
 
+\item{errorType}{Character. Innovation distribution: \code{"Gaussian"},
+\code{"Student-t"}, or \code{"GED"}. Default \code{"Gaussian"}.}
+
 \item{rho_type}{Character. Correlation type for leverage. Default \code{"pearson"}.}
 
 \item{del}{Numeric. Small constant for log transformation. Default \code{1e-10}.}
 
+\item{trunc_lev}{Logical. Truncate leverage correlation estimate to
+\code{[-1,1]}. Default \code{TRUE}.}
+
 \item{wDecay}{Logical. Use decaying weights. Default \code{FALSE}.}
+
+\item{logNu}{Logical. Solve for \eqn{\nu} in log-space for numerical
+stability (Student-t only). Default \code{FALSE}.}
 }
 \value{
 An object of class \code{"svp_forecast"}, a list containing:
@@ -48,6 +60,14 @@ An object of class \code{"svp_forecast"}, a list containing:
 \description{
 Estimates an SV(p) model, applies Kalman filtering/smoothing, and produces
 multi-step ahead forecasts of log-volatility.
+}
+\note{
+The Kalman filter update step uses a Gaussian approximation for the
+  measurement equation regardless of \code{errorType}. When
+  \code{errorType} is \code{"Student-t"} or \code{"GED"}, the
+  distribution-specific measurement noise variance \eqn{\sigma_\varepsilon^2}
+  is used, but the filter update remains linear-Gaussian. This is standard
+  practice for non-Gaussian state-space models.
 }
 \examples{
 \donttest{

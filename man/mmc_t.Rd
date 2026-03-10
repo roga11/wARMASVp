@@ -15,6 +15,7 @@ mmc_t(
   method = "pso",
   maxit = NULL,
   del = 1e-10,
+  wDecay = FALSE,
   Bartlett = TRUE,
   Amat = NULL,
   logNu = TRUE
@@ -41,6 +42,8 @@ Default \code{"pso"}.}
 \item{maxit}{Integer. Maximum iterations/evaluations. Default depends on method.}
 
 \item{del}{Numeric. Small constant for log transformation. Default \code{1e-10}.}
+
+\item{wDecay}{Logical. Use decaying weights. Default \code{FALSE}.}
 
 \item{Bartlett}{Logical. Use Bartlett kernel HAC for weighting matrix.
 Default \code{TRUE}.}
