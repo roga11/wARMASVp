@@ -38,7 +38,7 @@ autocovariance blocks used. Default is 10.}
 \eqn{\log(y_t^2 + \delta)}. Default is \code{1e-10}.}
 
 \item{trunc_lev}{Logical. If \code{TRUE}, truncate the estimated leverage
-parameter to \code{[-1, 1]}. Default is \code{TRUE}. Setting to
+parameter to \code{[-0.999, 0.999]}. Default is \code{TRUE}. Setting to
 \code{FALSE} can reduce bias in some cases but may yield estimates
 outside the parameter space.}
 

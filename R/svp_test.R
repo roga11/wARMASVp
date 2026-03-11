@@ -182,7 +182,7 @@ mmc_ar <- function(y, p_null, p_alt, J = 10, N = 99, burnin = 500,
 #' @param rho_type Character. Correlation type. Default \code{"pearson"}.
 #' @param del Numeric. Small constant for log transformation. Default \code{1e-10}.
 #' @param trunc_lev Logical. Truncate leverage correlation estimate to
-#'   \code{[-1,1]}. Default \code{TRUE}.
+#'   \code{[-0.999, 0.999]}. Default \code{TRUE}.
 #' @param wDecay Logical. Use decaying weights. Default \code{FALSE}.
 #' @param Bartlett Logical. If \code{TRUE}, use Bartlett kernel HAC weighting
 #'   matrix. If \code{FALSE}, use identity matrix. Default \code{FALSE}.

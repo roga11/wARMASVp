@@ -108,10 +108,10 @@ List svpCpp(arma::vec u, int p, int J, bool trunc_lev, double del, int rho_type 
   // compute rho (delta)
   double rho = (sqrt(2 * arma::datum::pi) * EH) / (s_vh_ols * pow(s_yh, 2)) * exp(-0.25 * gammatilde);
   if (trunc_lev) {
-    if (rho < -1) {
-      rho = -1;
-    } else if (rho > 1) {
-      rho = 1;
+    if (rho < -0.999) {
+      rho = -0.999;
+    } else if (rho > 0.999) {
+      rho = 0.999;
     }
   }
   // ----- Organize output

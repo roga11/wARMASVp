@@ -13,7 +13,7 @@
 #' @param rho_type Character. Correlation type for leverage. Default \code{"pearson"}.
 #' @param del Numeric. Small constant for log transformation. Default \code{1e-10}.
 #' @param trunc_lev Logical. Truncate leverage correlation estimate to
-#'   \code{[-1,1]}. Default \code{TRUE}.
+#'   \code{[-0.999, 0.999]}. Default \code{TRUE}.
 #' @param wDecay Logical. Use decaying weights. Default \code{FALSE}.
 #' @param logNu Logical. Solve for \eqn{\nu} in log-space for numerical
 #'   stability (Student-t only). Default \code{FALSE}.

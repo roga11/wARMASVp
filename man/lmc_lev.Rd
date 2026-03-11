@@ -36,7 +36,7 @@ lmc_lev(
 \item{del}{Numeric. Small constant for log transformation. Default \code{1e-10}.}
 
 \item{trunc_lev}{Logical. Truncate leverage correlation estimate to
-\code{[-1,1]}. Default \code{TRUE}.}
+\code{[-0.999, 0.999]}. Default \code{TRUE}.}
 
 \item{wDecay}{Logical. Use decaying weights. Default \code{FALSE}.}
 
