@@ -89,7 +89,8 @@
 #' @export
 svp <- function(y, p = 1, J = 10, leverage = FALSE, errorType = "Gaussian",
                 rho_type = "pearson", del = 1e-10, trunc_lev = TRUE,
-                wDecay = FALSE, logNu = FALSE) {
+                wDecay = FALSE, logNu = FALSE,
+                sigvMethod = "hybrid", winsorize_eps = 0) {
   cl <- match.call()
   y <- as.numeric(y)
   errorType <- match.arg(errorType, c("Gaussian", "Student-t", "GED"))
@@ -100,13 +101,15 @@ svp <- function(y, p = 1, J = 10, leverage = FALSE, errorType = "Gaussian",
          "Use errorType = 'Gaussian' with leverage = TRUE, or ",
          "errorType = '", errorType, "' with leverage = FALSE.")
   }
+  sigvMethod <- match.arg(sigvMethod, c("hybrid", "direct", "factored"))
   # Dispatch
   if (errorType == "Gaussian") {
-    out <- .svp_gaussian(y, p, J, leverage, rho_type, del, trunc_lev, wDecay)
+    out <- .svp_gaussian(y, p, J, leverage, rho_type, del, trunc_lev, wDecay,
+                         sigvMethod)
   } else if (errorType == "Student-t") {
-    out <- .svp_t(y, p, J, del, wDecay, logNu)
+    out <- .svp_t(y, p, J, del, wDecay, logNu, sigvMethod, winsorize_eps)
   } else if (errorType == "GED") {
-    out <- .svp_ged(y, p, J, del, wDecay)
+    out <- .svp_ged(y, p, J, del, wDecay, sigvMethod, winsorize_eps)
   }
   out$errorType <- errorType
   out$call <- cl

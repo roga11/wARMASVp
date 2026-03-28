@@ -91,37 +91,21 @@ List svpCpp(arma::vec u, int p, int J, bool trunc_lev, double del, int rho_type 
   } else if (rho_type == 1) {
     EH = ((1.0 / (N - 2)) * as_scalar(trans(yabs.subvec(1, N - 1) - mua) * (u.subvec(0, N - 2) - muu)));
   }
-  // gamma tilde
-  double gammatilde;
-  if (p == 1) {
-    gammatilde = pow(s_vh_ols, 2) / (1 - phiB(0));
-  } else if (p == 2) {
-    gammatilde = pow(s_vh_ols, 2) / ((1 - phiB(0) - phiB(1)) * (1 + phiB(1)));
-  } else if (p == 3) {
-    gammatilde = ((1 - phiB(2)) * pow(s_vh_ols, 2)) / ((1 - phiB(0) - phiB(1) - phiB(2)) * (1 + phiB(0) * phiB(2) + phiB(1) - pow(phiB(2), 2)));
-  } else if (p == 4) {
-    gammatilde = ((1 - phiB(2) - phiB(0) * phiB(3) - pow(phiB(3), 2)) * pow(s_vh_ols, 2)) / ((1 - phiB(0) - phiB(1) - phiB(2) - phiB(3)) * (1 + phiB(0) * (phiB(2) + phiB(1)) + phiB(3) + 2 * phiB(1) * phiB(3) + pow(phiB(0), 2) * phiB(3) + phiB(1) * pow(phiB(3), 2) - pow(phiB(2), 2) - pow(phiB(3), 2) - pow(phiB(3), 3) - phiB(0) * phiB(2) * phiB(3)));
-  } else {
-    Rcpp::warning("Order 'p' must be <=4 for gammatilde computation.");
-    gammatilde = NA_REAL;
-  }
-  // compute rho (delta)
-  double rho = (sqrt(2 * arma::datum::pi) * EH) / (s_vh_ols * pow(s_yh, 2)) * exp(-0.25 * gammatilde);
-  if (trunc_lev) {
-    if (rho < -0.999) {
-      rho = -0.999;
-    } else if (rho > 0.999) {
-      rho = 0.999;
-    }
-  }
-  // ----- Organize output
+  // gammatilde and rho are now computed in R using a general-p formula
+  // (the closed-form expressions below were correct for p=1,2,3 but had an
+  // algebraic error for p=4 and did not support p>=5).
+  // See .svp_gaussian() in svp_internal.R for the general formula:
+  //   gamma_w0 = sigv^2 / (1 - sum(phi * rho_w(1:p)))
+  //   gammatilde = gamma_w0 * (1 + rho_w(1))
+  //   rho = (sqrt(2*pi) * EH) / (sigv * sigy^2) * exp(-0.25 * gammatilde)
+
+  // ----- Organize output (return EH for R-level rho computation)
   List para = List::create(
     Named("mu") = mu,
     Named("phi") = phiB,
     Named("sigv") = s_vh_ols,
     Named("sigy") = s_yh,
-    Named("rho") = rho,
-    Named("gammatilde") = gammatilde,
+    Named("EH") = EH,
     Named("nonstationary_ind") = (indices.n_elem > 0)
   );
   return para;

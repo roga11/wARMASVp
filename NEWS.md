@@ -27,9 +27,13 @@ Initial release.
 * `kalman_filter()`: Kalman filtering and smoothing for SV(p) state-space form.
 * `forecast_svp()`: h-step-ahead volatility forecasts with confidence bands.
 
-## Bug Fixes
+## Convention Changes
 
-* Corrected Student-t mean-of-log-squared formula:
-  `mu_bar(nu) = psi(1/2) - psi(nu/2) + log(nu - 2)`.
-  The previous formula omitted the standardization correction for unit-variance
-  Student-t innovations.
+* Switched Student-t innovations from standardized (unit variance) to
+  unstandardized (raw t(nu) with Var = nu/(nu-2)), matching the SV-t
+  literature (Chib, Nardari & Shephard 2002; Jacquier, Polson & Rossi 2004)
+  and the SVHT reference paper (Ahsan, Dufour & Rodriguez Rondon 2025b).
+  The mean-of-log-squared formula is now:
+  `mu_bar(nu) = psi(1/2) - psi(nu/2) + log(nu)`.
+  Simulation no longer divides raw Student-t samples by sqrt(nu/(nu-2)).
+  GED innovations remain standardized (unit variance), following Nelson (1991).

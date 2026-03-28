@@ -49,11 +49,13 @@
 forecast_svp <- function(y, p = 1, J = 10, H = 1, leverage = TRUE,
                          errorType = "Gaussian", rho_type = "pearson",
                          del = 1e-10, trunc_lev = TRUE, wDecay = FALSE,
-                         logNu = FALSE) {
+                         logNu = FALSE, sigvMethod = "hybrid",
+                         winsorize_eps = 0) {
   y <- as.matrix(as.numeric(y))
   mdl <- svp(as.numeric(y), p, J, leverage = leverage, errorType = errorType,
              rho_type = rho_type, del = del, trunc_lev = trunc_lev,
-             wDecay = wDecay, logNu = logNu)
+             wDecay = wDecay, logNu = logNu, sigvMethod = sigvMethod,
+             winsorize_eps = winsorize_eps)
 
   mu <- mdl$mu
   phi <- mdl$phi

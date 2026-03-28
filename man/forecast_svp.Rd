@@ -15,7 +15,9 @@ forecast_svp(
   del = 1e-10,
   trunc_lev = TRUE,
   wDecay = FALSE,
-  logNu = FALSE
+  logNu = FALSE,
+  sigvMethod = "hybrid",
+  winsorize_eps = 0
 )
 }
 \arguments{

@@ -3,7 +3,8 @@
 # =========================================================================== #
 
 # --- Gaussian SV(p) estimation (with optional leverage) ---
-.svp_gaussian <- function(y, p, J, leverage, rho_type, del, trunc_lev, wDecay) {
+.svp_gaussian <- function(y, p, J, leverage, rho_type, del, trunc_lev, wDecay,
+                          sigvMethod = "hybrid") {
   y <- as.numeric(y)
   if (length(y) < 2 * p + J) {
     stop("Time series too short for the given p and J.")
@@ -19,21 +20,69 @@
     para$rho <- NA_real_
     para$gammatilde <- NA_real_
     para$theta <- c(para$phi, para$sigy, para$sigv)
-  } else if (rho_type == "kendall") {
-    para <- svpCpp(y, p, J, trunc_lev, del, rho_type = 2L, wDecay)
-    para$rho_type <- rho_type
-    para$theta <- c(para$phi, para$sigy, para$sigv, para$rho)
-  } else if (rho_type == "pearson") {
-    para <- svpCpp(y, p, J, trunc_lev, del, rho_type = 1L, wDecay)
-    para$rho_type <- rho_type
-    para$theta <- c(para$phi, para$sigy, para$sigv, para$rho)
-  } else if (rho_type == "both") {
-    para_ken <- svpCpp(y, p, J, trunc_lev, del, rho_type = 2L, wDecay)
-    para <- svpCpp(y, p, J, trunc_lev, del, rho_type = 1L, wDecay)
-    para$rho_kendall <- para_ken$rho
-    para$rho_pearson <- para$rho
-    para$rho_type <- rho_type
-    para$theta <- c(para$phi, para$sigy, para$sigv, para$rho)
+  } else if (rho_type %in% c("kendall", "pearson", "both")) {
+    # Compute leverage via C++ (returns EH), then gammatilde and rho in R
+    .compute_lev <- function(cpp_out, trunc_lev_flag) {
+      phi_lev <- as.numeric(cpp_out$phi)
+      sigv_lev <- cpp_out$sigv
+      sigy_lev <- cpp_out$sigy
+      EH_lev <- cpp_out$EH
+      # General-p gammatilde: gamma_w(0) * (1 + rho_w(1))
+      rho_w_lev <- as.numeric(stats::ARMAacf(ar = phi_lev, lag.max = p)[-1])
+      gamma_w0 <- sigv_lev^2 / (1 - sum(phi_lev * rho_w_lev))
+      gt <- gamma_w0 * (1 + rho_w_lev[1])
+      # rho = (sqrt(2*pi) * EH) / (sigv * sigy^2) * exp(-gammatilde/4)
+      rho_val <- (sqrt(2 * pi) * EH_lev) / (sigv_lev * sigy_lev^2) * exp(-0.25 * gt)
+      if (trunc_lev_flag) rho_val <- max(-0.999, min(0.999, rho_val))
+      list(rho = rho_val, gammatilde = gt)
+    }
+    if (rho_type == "kendall") {
+      para <- svpCpp(y, p, J, trunc_lev, del, rho_type = 2L, wDecay)
+      lev <- .compute_lev(para, trunc_lev)
+      para$rho <- lev$rho
+      para$gammatilde <- lev$gammatilde
+      para$rho_type <- rho_type
+      para$theta <- c(para$phi, para$sigy, para$sigv, para$rho)
+    } else if (rho_type == "pearson") {
+      para <- svpCpp(y, p, J, trunc_lev, del, rho_type = 1L, wDecay)
+      lev <- .compute_lev(para, trunc_lev)
+      para$rho <- lev$rho
+      para$gammatilde <- lev$gammatilde
+      para$rho_type <- rho_type
+      para$theta <- c(para$phi, para$sigy, para$sigv, para$rho)
+    } else {
+      para_ken <- svpCpp(y, p, J, trunc_lev, del, rho_type = 2L, wDecay)
+      para <- svpCpp(y, p, J, trunc_lev, del, rho_type = 1L, wDecay)
+      lev_ken <- .compute_lev(para_ken, trunc_lev)
+      lev_pea <- .compute_lev(para, trunc_lev)
+      para$rho <- lev_pea$rho
+      para$gammatilde <- lev_pea$gammatilde
+      para$rho_kendall <- lev_ken$rho
+      para$rho_pearson <- lev_pea$rho
+      para$rho_type <- rho_type
+      para$theta <- c(para$phi, para$sigy, para$sigv, para$rho)
+    }
+  }
+  # Override sigv if method != "hybrid" (C++ uses hybrid by default)
+  if (sigvMethod != "hybrid") {
+    ly2 <- log(y^2 + del)
+    ys_g <- ly2 - mean(ly2)
+    N_g <- length(ly2)
+    var_ly2 <- stats::var(as.numeric(ly2))
+    sig_eps2 <- (pi^2) / 2
+    phi_g <- as.numeric(para$phi)
+    if (sigvMethod == "direct") {
+      gam_vec_g <- numeric(p)
+      for (k in seq_len(p)) {
+        gam_vec_g[k] <- (1 / (N_g - 1)) * sum(ys_g[(k + 1):N_g] * ys_g[1:(N_g - k)])
+      }
+      sv2 <- var_ly2 - sum(phi_g * gam_vec_g) - sig_eps2
+    } else {
+      rho_w_p <- as.numeric(stats::ARMAacf(ar = phi_g, lag.max = p)[-1])
+      sv2 <- (var_ly2 - sig_eps2) * (1 - sum(phi_g * rho_w_p))
+    }
+    para$sigv <- sqrt(abs(sv2))
+    para$theta[p + 2] <- para$sigv
   }
   para$y <- y
   para$p <- p
@@ -42,12 +91,14 @@
   para$del <- del
   para$wDecay <- wDecay
   para$trunc_lev <- trunc_lev
+  para$sigvMethod <- sigvMethod
   class(para) <- "svp"
   return(para)
 }
 
 # --- Student-t SV(p) estimation ---
-.svp_t <- function(y, p, J, del, wDecay, logNu) {
+.svp_t <- function(y, p, J, del, wDecay, logNu,
+                   sigvMethod = "hybrid", winsorize_eps = FALSE) {
   y <- as.matrix(as.numeric(y))
   N <- nrow(y)
   ly2 <- log(y^2 + del)
@@ -56,23 +107,41 @@
   # Estimate phi via W-ARMA-SV (distribution-free)
   para_base <- svpCpp_nolev(as.numeric(y), p, J, del, wDecay)
   phi_reg <- as.numeric(para_base$phi)
-  # Compute theoretical lag-1 autocorrelation of AR(p) process
-  rho_w1 <- as.numeric(stats::ARMAacf(ar = phi_reg, lag.max = 1)[2])
-  # Compute sample autocovariance at lag 1
-  gam1 <- (1 / (N - 1)) * as.numeric(t(ys[2:N, , drop = FALSE]) %*% ys[1:(N - 1), , drop = FALSE])
-  # Estimate sigma_eps^2 = gamma(0) - gamma(1)/rho_w(1)
-  se2 <- stats::var(as.numeric(ly2)) - gam1 / rho_w1
+  var_ly2 <- stats::var(as.numeric(ly2))
+  # Estimate sigma_eps^2
+  # winsorize_eps: 0 or FALSE = off; TRUE = use J; integer > 0 = use that as J_w
+  J_w <- 0L
+  if (is.logical(winsorize_eps)) {
+    if (winsorize_eps) J_w <- J
+  } else if (is.numeric(winsorize_eps) && winsorize_eps > 0) {
+    J_w <- as.integer(winsorize_eps)
+  }
+  if (J_w > 0L) {
+    # OLS winsorized estimator (SVHT Eq. 69): average gamma_w(0) across J_w lags
+    rho_w_all <- as.numeric(stats::ARMAacf(ar = phi_reg, lag.max = J_w)[-1])
+    gam_all <- numeric(J_w)
+    for (k in seq_len(J_w)) {
+      gam_all[k] <- (1 / (N - 1)) * as.numeric(
+        t(ys[(k + 1):N, , drop = FALSE]) %*% ys[1:(N - k), , drop = FALSE])
+    }
+    gamma_w0_ols <- sum(gam_all * rho_w_all) / sum(rho_w_all^2)
+    se2 <- var_ly2 - gamma_w0_ols
+  } else {
+    # Single-lag estimator (SVHT Eq. 18): sigma_eps^2 = gamma(0) - gamma(1)/rho_w(1)
+    rho_w1 <- as.numeric(stats::ARMAacf(ar = phi_reg, lag.max = 1)[2])
+    gam1 <- (1 / (N - 1)) * as.numeric(
+      t(ys[2:N, , drop = FALSE]) %*% ys[1:(N - 1), , drop = FALSE])
+    se2 <- var_ly2 - gam1 / rho_w1
+  }
   se2b <- as.numeric(se2) - psigamma(0.5, 1)
   # Estimate nu via root-finding on trigamma: psigamma(nu/2, 1) = se2b
   nu_lower <- 2.01
   nu_upper <- 500
   if (se2b <= psigamma(nu_upper / 2, 1)) {
-    # se2b too small: tails indistinguishable from Gaussian
     nuh <- nu_upper
     warning("Estimated nu at upper boundary (", nu_upper,
             "); tails indistinguishable from Gaussian.")
   } else if (se2b >= psigamma(nu_lower / 2, 1)) {
-    # se2b too large: extremely heavy tails
     nuh <- nu_lower
     warning("Estimated nu at lower boundary (", nu_lower,
             "); extremely heavy tails.")
@@ -87,20 +156,27 @@
   }
   # Estimate sigv
   var_log_sq_t <- psigamma(0.5, 1) + psigamma(nuh / 2, 1)
-  if (p == 1L) {
-    # AD2021 formula for p=1 (more stable)
-    sv_reg <- sqrt(abs((1 - phi_reg^2) * (stats::var(as.numeric(ly2)) - var_log_sq_t)))
+  # Compute sample autocovariances at lags 1,...,p (needed by direct/hybrid for p>=2)
+  gam_vec <- numeric(p)
+  for (k in seq_len(p)) {
+    gam_vec[k] <- (1 / (N - 1)) * as.numeric(
+      t(ys[(k + 1):N, , drop = FALSE]) %*% ys[1:(N - k), , drop = FALSE])
+  }
+  if (sigvMethod == "direct") {
+    sv_reg <- sqrt(abs(var_ly2 - sum(phi_reg * gam_vec) - var_log_sq_t))
+  } else if (sigvMethod == "factored") {
+    rho_w_p <- as.numeric(stats::ARMAacf(ar = phi_reg, lag.max = p)[-1])
+    sv_reg <- sqrt(abs((var_ly2 - var_log_sq_t) * (1 - sum(phi_reg * rho_w_p))))
   } else {
-    # General formula: gamma(0) - sum(phi_j * gamma(j)) - sigma_eps^2
-    gam_vec <- numeric(p)
-    for (k in seq_len(p)) {
-      gam_vec[k] <- (1 / (N - 1)) * as.numeric(
-        t(ys[(k + 1):N, , drop = FALSE]) %*% ys[1:(N - k), , drop = FALSE])
+    # "hybrid": AD2021 for p=1, direct for p>=2
+    if (p == 1L) {
+      sv_reg <- sqrt(abs((1 - phi_reg^2) * (var_ly2 - var_log_sq_t)))
+    } else {
+      sv_reg <- sqrt(abs(var_ly2 - sum(phi_reg * gam_vec) - var_log_sq_t))
     }
-    sv_reg <- sqrt(abs(stats::var(as.numeric(ly2)) - sum(phi_reg * gam_vec) - var_log_sq_t))
   }
   # Estimate sigy
-  mu_log_sq_t <- psigamma(0.5, 0) - psigamma(nuh / 2, 0) + log(nuh - 2)
+  mu_log_sq_t <- psigamma(0.5, 0) - psigamma(nuh / 2, 0) + log(nuh)
   if (p == 1L) {
     sigy <- sqrt(exp(mean(log(y^2)) - mu_log_sq_t))
   } else {
@@ -110,13 +186,15 @@
   out <- list(mu = mu, phi = phi_reg, sigv = as.numeric(sv_reg),
               sigy = as.numeric(sigy), v = nuh, theta = theta,
               y = as.numeric(y), J = J, p = as.integer(p), del = del,
-              wDecay = wDecay, logNu = logNu)
+              wDecay = wDecay, logNu = logNu,
+              sigvMethod = sigvMethod, winsorize_eps = winsorize_eps)
   class(out) <- "svp_t"
   return(out)
 }
 
 # --- GED SV(p) estimation ---
-.svp_ged <- function(y, p, J, del, wDecay) {
+.svp_ged <- function(y, p, J, del, wDecay,
+                     sigvMethod = "hybrid", winsorize_eps = FALSE) {
   y <- as.matrix(as.numeric(y))
   N <- nrow(y)
   ly2 <- log(y^2 + del)
@@ -125,12 +203,32 @@
   # Estimate phi (distribution-free)
   para_base <- svpCpp_nolev(as.numeric(y), p, J, del, wDecay)
   phi_reg <- as.numeric(para_base$phi)
-  # Compute theoretical lag-1 autocorrelation of AR(p) process
-  rho_w1 <- as.numeric(stats::ARMAacf(ar = phi_reg, lag.max = 1)[2])
-  # Compute sample autocovariance at lag 1
-  gam1 <- (1 / (N - 1)) * as.numeric(t(ys[2:N, , drop = FALSE]) %*% ys[1:(N - 1), , drop = FALSE])
-  # Estimate sigma_eps^2 = gamma(0) - gamma(1)/rho_w(1)
-  se2 <- as.numeric(stats::var(as.numeric(ly2)) - gam1 / rho_w1)
+  var_ly2 <- stats::var(as.numeric(ly2))
+  # Estimate sigma_eps^2
+  # winsorize_eps: 0 or FALSE = off; TRUE = use J; integer > 0 = use that as J_w
+  J_w <- 0L
+  if (is.logical(winsorize_eps)) {
+    if (winsorize_eps) J_w <- J
+  } else if (is.numeric(winsorize_eps) && winsorize_eps > 0) {
+    J_w <- as.integer(winsorize_eps)
+  }
+  if (J_w > 0L) {
+    # OLS winsorized estimator (SVHT Eq. 69)
+    rho_w_all <- as.numeric(stats::ARMAacf(ar = phi_reg, lag.max = J_w)[-1])
+    gam_all <- numeric(J_w)
+    for (k in seq_len(J_w)) {
+      gam_all[k] <- (1 / (N - 1)) * as.numeric(
+        t(ys[(k + 1):N, , drop = FALSE]) %*% ys[1:(N - k), , drop = FALSE])
+    }
+    gamma_w0_ols <- sum(gam_all * rho_w_all) / sum(rho_w_all^2)
+    se2 <- var_ly2 - gamma_w0_ols
+  } else {
+    # Single-lag estimator (SVHT Eq. 18)
+    rho_w1 <- as.numeric(stats::ARMAacf(ar = phi_reg, lag.max = 1)[2])
+    gam1 <- (1 / (N - 1)) * as.numeric(
+      t(ys[2:N, , drop = FALSE]) %*% ys[1:(N - 1), , drop = FALSE])
+    se2 <- as.numeric(var_ly2 - gam1 / rho_w1)
+  }
   # Estimate nu: solve (2/nu)^2 * psigamma(1/nu, 1) = se2
   f <- function(x) ((2 / x)^2) * psigamma(1 / x, 1) - se2
   m1 <- sum(abs(ly2)) / N
@@ -141,7 +239,6 @@
   if (f(lower) * f(upper) < 0) {
     ged_nuh <- stats::uniroot(f, interval = c(lower, upper), tol = 1e-6, maxiter = 1000)$root
   } else {
-    # Adaptive bounds failed; try wider fixed bounds
     fixed_lower <- 0.1
     fixed_upper <- 20
     if (f(fixed_lower) * f(fixed_upper) < 0) {
@@ -159,17 +256,22 @@
   }
   # Estimate sigv
   var_log_sq_ged <- ((2 / ged_nuh)^2) * psigamma(1 / ged_nuh, 1)
-  if (p == 1L) {
-    # AD2021 formula for p=1 (more stable)
-    sv_reg <- sqrt(abs((1 - phi_reg^2) * (stats::var(as.numeric(ly2)) - var_log_sq_ged)))
+  gam_vec <- numeric(p)
+  for (k in seq_len(p)) {
+    gam_vec[k] <- (1 / (N - 1)) * as.numeric(
+      t(ys[(k + 1):N, , drop = FALSE]) %*% ys[1:(N - k), , drop = FALSE])
+  }
+  if (sigvMethod == "direct") {
+    sv_reg <- sqrt(abs(var_ly2 - sum(phi_reg * gam_vec) - var_log_sq_ged))
+  } else if (sigvMethod == "factored") {
+    rho_w_p <- as.numeric(stats::ARMAacf(ar = phi_reg, lag.max = p)[-1])
+    sv_reg <- sqrt(abs((var_ly2 - var_log_sq_ged) * (1 - sum(phi_reg * rho_w_p))))
   } else {
-    # General formula: gamma(0) - sum(phi_j * gamma(j)) - sigma_eps^2
-    gam_vec <- numeric(p)
-    for (k in seq_len(p)) {
-      gam_vec[k] <- (1 / (N - 1)) * as.numeric(
-        t(ys[(k + 1):N, , drop = FALSE]) %*% ys[1:(N - k), , drop = FALSE])
+    if (p == 1L) {
+      sv_reg <- sqrt(abs((1 - phi_reg^2) * (var_ly2 - var_log_sq_ged)))
+    } else {
+      sv_reg <- sqrt(abs(var_ly2 - sum(phi_reg * gam_vec) - var_log_sq_ged))
     }
-    sv_reg <- sqrt(abs(stats::var(as.numeric(ly2)) - sum(phi_reg * gam_vec) - var_log_sq_ged))
   }
   # Estimate sigy
   mu_log_sq_ged <- (2 / ged_nuh) * psigamma(1 / ged_nuh, 0) +
@@ -183,7 +285,8 @@
   out <- list(mu = mu, phi = phi_reg, sigv = as.numeric(sv_reg),
               sigy = as.numeric(sigy), v = ged_nuh, theta = theta,
               y = as.numeric(y), J = J, p = as.integer(p), del = del,
-              wDecay = wDecay)
+              wDecay = wDecay,
+              sigvMethod = sigvMethod, winsorize_eps = winsorize_eps)
   class(out) <- "svp_ged"
   return(out)
 }
@@ -229,10 +332,11 @@ rged <- function(n, mean = 0, sd = 1, nu = 2) {
       u <- sim_svp(Tsize, phi = object$phi, sigy = object$sigy,
                    sigv = object$sigv, burnin = burnin)
     }
+    sigvMethod_g <- if (is.null(object$sigvMethod)) "hybrid" else object$sigvMethod
     out_tmp <- tryCatch(
       svp(u, p = p, J = object$J, leverage = has_lev,
           rho_type = rho_type, del = object$del, trunc_lev = trunc_lev,
-          wDecay = wDecay),
+          wDecay = wDecay, sigvMethod = sigvMethod_g),
       error = function(e) NULL
     )
     if (!is.null(out_tmp) && !isTRUE(out_tmp$nonstationary_ind)) {
@@ -258,10 +362,13 @@ rged <- function(n, mean = 0, sd = 1, nu = 2) {
     u_out <- sim_svp(Tsize, phi = object$phi, sigy = object$sigy,
                      sigv = object$sigv, errorType = "Student-t",
                      nu = object$v, burnin = burnin)
+    sigvMethod_t <- if (is.null(object$sigvMethod)) "hybrid" else object$sigvMethod
+    winsorize_eps_t <- if (is.null(object$winsorize_eps)) FALSE else object$winsorize_eps
     out_tmp <- tryCatch(
       svp(as.numeric(u_out), p = object$p, J = object$J,
           errorType = "Student-t", del = object$del, logNu = logNu,
-          wDecay = wDecay),
+          wDecay = wDecay, sigvMethod = sigvMethod_t,
+          winsorize_eps = winsorize_eps_t),
       error = function(e) NULL
     )
     if (!is.null(out_tmp) && is.finite(out_tmp$v)) {
@@ -283,9 +390,12 @@ rged <- function(n, mean = 0, sd = 1, nu = 2) {
     u_out <- sim_svp(Tsize, phi = object$phi, sigy = object$sigy,
                      sigv = object$sigv, errorType = "GED",
                      nu = object$v, burnin = burnin)
+    sigvMethod_ged <- if (is.null(object$sigvMethod)) "hybrid" else object$sigvMethod
+    winsorize_eps_ged <- if (is.null(object$winsorize_eps)) FALSE else object$winsorize_eps
     out_tmp <- tryCatch(
       svp(as.numeric(u_out), p = object$p, J = object$J,
-          errorType = "GED", del = object$del, wDecay = wDecay),
+          errorType = "GED", del = object$del, wDecay = wDecay,
+          sigvMethod = sigvMethod_ged, winsorize_eps = winsorize_eps_ged),
       error = function(e) NULL
     )
     if (!is.null(out_tmp) && is.finite(out_tmp$v)) {
@@ -419,9 +529,12 @@ rged <- function(n, mean = 0, sd = 1, nu = 2) {
   stationary <- all(Mod(polyroot(c(1, -theta[1:p]))) > 1)
   if (is.finite(s0_tmp) && s0_tmp >= 0 && stationary) {
     betasim_null <- c(theta[1:p], theta[p + 1], theta[p + 2], nu_null)
+    sigvMethod_mt <- if (is.null(mdl_alt$sigvMethod)) "hybrid" else mdl_alt$sigvMethod
+    winsorize_eps_mt <- if (is.null(mdl_alt$winsorize_eps)) FALSE else mdl_alt$winsorize_eps
     sN <- .simnull_t(betasim_null, nu_null, j, Tsize, N, ini,
                      Amat, del, FALSE, Bartlett, logNu,
-                     wDecay = wDecay)
+                     wDecay = wDecay, sigvMethod = sigvMethod_mt,
+                     winsorize_eps = winsorize_eps_mt)
     pval <- -((N + 1 - sum(s0_tmp >= sN)) / (N + 1))
   } else {
     pval <- 9999999999999
@@ -446,8 +559,12 @@ rged <- function(n, mean = 0, sd = 1, nu = 2) {
   stationary <- all(Mod(polyroot(c(1, -theta[1:p]))) > 1)
   if (is.finite(s0_tmp) && s0_tmp >= 0 && stationary) {
     betasim_null <- c(theta[1:p], theta[p + 1], theta[p + 2], nu_null)
+    sigvMethod_mg <- if (is.null(mdl_alt$sigvMethod)) "hybrid" else mdl_alt$sigvMethod
+    winsorize_eps_mg <- if (is.null(mdl_alt$winsorize_eps)) FALSE else mdl_alt$winsorize_eps
     sN <- .simnull_ged(betasim_null, nu_null, j, Tsize, N, ini,
-                       Amat, del, FALSE, Bartlett, wDecay = wDecay)
+                       Amat, del, FALSE, Bartlett, wDecay = wDecay,
+                       sigvMethod = sigvMethod_mg,
+                       winsorize_eps = winsorize_eps_mg)
     pval <- -((N + 1 - sum(s0_tmp >= sN)) / (N + 1))
   } else {
     pval <- 9999999999999
@@ -729,7 +846,7 @@ LRT_moment_t <- function(y, mdl_out, Amat, WAmat = FALSE, del = 1e-10,
   # Compute theoretical lag-1 autocorrelation
   rho_w1 <- as.numeric(stats::ARMAacf(ar = phi, lag.max = 1)[2])
   # Distribution-specific constants
-  mu_log_sq_t <- psigamma(0.5, 0) - psigamma(mdl_out$v / 2, 0) + log(mdl_out$v - 2)
+  mu_log_sq_t <- psigamma(0.5, 0) - psigamma(mdl_out$v / 2, 0) + log(mdl_out$v)
   var_log_sq_t <- psigamma(0.5, 1) + psigamma(mdl_out$v / 2, 1)
   # g1: mean condition
   m1 <- mu - mu_log_sq_t - log(mdl_out$sigy^2)
@@ -965,7 +1082,8 @@ LRT_moment_ged <- function(y, mdl_out, Amat, WAmat = FALSE, del = 1e-10,
 .simnull_t <- function(betasim_null, nu_null, j, Tsize, N, ini,
                        Amat, del = 1e-10, WAmat = FALSE,
                        Bartlett = TRUE, logNu = TRUE,
-                       wDecay = FALSE) {
+                       wDecay = FALSE, sigvMethod = "hybrid",
+                       winsorize_eps = FALSE) {
   p <- length(betasim_null) - 3
   phi_sim <- betasim_null[1:p]
   sigy_sim <- betasim_null[p + 1]
@@ -979,7 +1097,8 @@ LRT_moment_ged <- function(y, mdl_out, Amat, WAmat = FALSE, del = 1e-10,
                            nu = nu_sim, burnin = ini))
     out_tmp <- tryCatch(
       svp(as.numeric(u), p = p, J = j, errorType = "Student-t", del = del,
-          logNu = logNu, wDecay = wDecay),
+          logNu = logNu, wDecay = wDecay, sigvMethod = sigvMethod,
+          winsorize_eps = winsorize_eps),
       error = function(e) NULL
     )
     if (!is.null(out_tmp)) {
@@ -1002,7 +1121,8 @@ LRT_moment_ged <- function(y, mdl_out, Amat, WAmat = FALSE, del = 1e-10,
 # Simulate null distribution for GED test
 .simnull_ged <- function(betasim_null, nu_null, j, Tsize, N, ini,
                          Amat, del = 1e-10, WAmat = FALSE,
-                         Bartlett = TRUE, wDecay = FALSE) {
+                         Bartlett = TRUE, wDecay = FALSE,
+                         sigvMethod = "hybrid", winsorize_eps = FALSE) {
   p <- length(betasim_null) - 3
   phi_sim <- betasim_null[1:p]
   sigy_sim <- betasim_null[p + 1]
@@ -1016,7 +1136,8 @@ LRT_moment_ged <- function(y, mdl_out, Amat, WAmat = FALSE, del = 1e-10,
                            nu = nu_sim, burnin = ini))
     out_tmp <- tryCatch(
       svp(as.numeric(u), p = p, J = j, errorType = "GED", del = del,
-          wDecay = wDecay),
+          wDecay = wDecay, sigvMethod = sigvMethod,
+          winsorize_eps = winsorize_eps),
       error = function(e) NULL
     )
     if (!is.null(out_tmp)) {

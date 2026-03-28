@@ -89,11 +89,9 @@ arma::mat sim_sv_t_cpp(arma::vec beta, int p, int N, int K, int burnin) {
   arma::mat eta = arma::randn(n, K);
   arma::mat eps(n, K);
 
-  double scale = std::sqrt(nu / (nu - 2.0));
   for (int j = 0; j < K; ++j) {
     for (int i = 0; i < n; ++i) {
-      double t_sample = R::rt(nu);
-      eps(i, j) = t_sample / scale;
+      eps(i, j) = R::rt(nu);
     }
   }
 
