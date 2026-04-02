@@ -59,6 +59,385 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
+// solve_lyapunov_discrete_cpp
+arma::mat solve_lyapunov_discrete_cpp(const arma::mat& F_mat, const arma::mat& Q);
+RcppExport SEXP _wARMASVp_solve_lyapunov_discrete_cpp(SEXP F_matSEXP, SEXP QSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< const arma::mat& >::type F_mat(F_matSEXP);
+    Rcpp::traits::input_parameter< const arma::mat& >::type Q(QSEXP);
+    rcpp_result_gen = Rcpp::wrap(solve_lyapunov_discrete_cpp(F_mat, Q));
+    return rcpp_result_gen;
+END_RCPP
+}
+// kalman_filter_cpp
+List kalman_filter_cpp(const arma::vec& y_star, const arma::vec& y_raw, const arma::vec& phi, double sigma_y, double sigma_v, double delta_p, double sig_eps2, double var_zt, const arma::mat& P0);
+RcppExport SEXP _wARMASVp_kalman_filter_cpp(SEXP y_starSEXP, SEXP y_rawSEXP, SEXP phiSEXP, SEXP sigma_ySEXP, SEXP sigma_vSEXP, SEXP delta_pSEXP, SEXP sig_eps2SEXP, SEXP var_ztSEXP, SEXP P0SEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< const arma::vec& >::type y_star(y_starSEXP);
+    Rcpp::traits::input_parameter< const arma::vec& >::type y_raw(y_rawSEXP);
+    Rcpp::traits::input_parameter< const arma::vec& >::type phi(phiSEXP);
+    Rcpp::traits::input_parameter< double >::type sigma_y(sigma_ySEXP);
+    Rcpp::traits::input_parameter< double >::type sigma_v(sigma_vSEXP);
+    Rcpp::traits::input_parameter< double >::type delta_p(delta_pSEXP);
+    Rcpp::traits::input_parameter< double >::type sig_eps2(sig_eps2SEXP);
+    Rcpp::traits::input_parameter< double >::type var_zt(var_ztSEXP);
+    Rcpp::traits::input_parameter< const arma::mat& >::type P0(P0SEXP);
+    rcpp_result_gen = Rcpp::wrap(kalman_filter_cpp(y_star, y_raw, phi, sigma_y, sigma_v, delta_p, sig_eps2, var_zt, P0));
+    return rcpp_result_gen;
+END_RCPP
+}
+// gmkf_filter_cpp
+List gmkf_filter_cpp(const arma::vec& y_star, const arma::vec& y_raw, const arma::vec& phi, double sigma_y, double sigma_v, double delta_p, double var_zt, const arma::vec& mix_weights, const arma::vec& mix_means, const arma::vec& mix_vars, double mu_intercept, const arma::mat& P0);
+RcppExport SEXP _wARMASVp_gmkf_filter_cpp(SEXP y_starSEXP, SEXP y_rawSEXP, SEXP phiSEXP, SEXP sigma_ySEXP, SEXP sigma_vSEXP, SEXP delta_pSEXP, SEXP var_ztSEXP, SEXP mix_weightsSEXP, SEXP mix_meansSEXP, SEXP mix_varsSEXP, SEXP mu_interceptSEXP, SEXP P0SEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< const arma::vec& >::type y_star(y_starSEXP);
+    Rcpp::traits::input_parameter< const arma::vec& >::type y_raw(y_rawSEXP);
+    Rcpp::traits::input_parameter< const arma::vec& >::type phi(phiSEXP);
+    Rcpp::traits::input_parameter< double >::type sigma_y(sigma_ySEXP);
+    Rcpp::traits::input_parameter< double >::type sigma_v(sigma_vSEXP);
+    Rcpp::traits::input_parameter< double >::type delta_p(delta_pSEXP);
+    Rcpp::traits::input_parameter< double >::type var_zt(var_ztSEXP);
+    Rcpp::traits::input_parameter< const arma::vec& >::type mix_weights(mix_weightsSEXP);
+    Rcpp::traits::input_parameter< const arma::vec& >::type mix_means(mix_meansSEXP);
+    Rcpp::traits::input_parameter< const arma::vec& >::type mix_vars(mix_varsSEXP);
+    Rcpp::traits::input_parameter< double >::type mu_intercept(mu_interceptSEXP);
+    Rcpp::traits::input_parameter< const arma::mat& >::type P0(P0SEXP);
+    rcpp_result_gen = Rcpp::wrap(gmkf_filter_cpp(y_star, y_raw, phi, sigma_y, sigma_v, delta_p, var_zt, mix_weights, mix_means, mix_vars, mu_intercept, P0));
+    return rcpp_result_gen;
+END_RCPP
+}
+// LRT_moment_lev_svp_cpp
+double LRT_moment_lev_svp_cpp(arma::vec y, Rcpp::List mdl_out, arma::mat Amat, std::string rho_type, double del);
+RcppExport SEXP _wARMASVp_LRT_moment_lev_svp_cpp(SEXP ySEXP, SEXP mdl_outSEXP, SEXP AmatSEXP, SEXP rho_typeSEXP, SEXP delSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< arma::vec >::type y(ySEXP);
+    Rcpp::traits::input_parameter< Rcpp::List >::type mdl_out(mdl_outSEXP);
+    Rcpp::traits::input_parameter< arma::mat >::type Amat(AmatSEXP);
+    Rcpp::traits::input_parameter< std::string >::type rho_type(rho_typeSEXP);
+    Rcpp::traits::input_parameter< double >::type del(delSEXP);
+    rcpp_result_gen = Rcpp::wrap(LRT_moment_lev_svp_cpp(y, mdl_out, Amat, rho_type, del));
+    return rcpp_result_gen;
+END_RCPP
+}
+// LRT_moment_lev_t_cpp
+double LRT_moment_lev_t_cpp(arma::vec y, Rcpp::List mdl_out, arma::mat Amat, std::string rho_type, double del);
+RcppExport SEXP _wARMASVp_LRT_moment_lev_t_cpp(SEXP ySEXP, SEXP mdl_outSEXP, SEXP AmatSEXP, SEXP rho_typeSEXP, SEXP delSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< arma::vec >::type y(ySEXP);
+    Rcpp::traits::input_parameter< Rcpp::List >::type mdl_out(mdl_outSEXP);
+    Rcpp::traits::input_parameter< arma::mat >::type Amat(AmatSEXP);
+    Rcpp::traits::input_parameter< std::string >::type rho_type(rho_typeSEXP);
+    Rcpp::traits::input_parameter< double >::type del(delSEXP);
+    rcpp_result_gen = Rcpp::wrap(LRT_moment_lev_t_cpp(y, mdl_out, Amat, rho_type, del));
+    return rcpp_result_gen;
+END_RCPP
+}
+// LRT_moment_lev_ged_cpp
+double LRT_moment_lev_ged_cpp(arma::vec y, Rcpp::List mdl_out, arma::mat Amat, std::string rho_type, double del, arma::vec gh_nodes, arma::vec gh_weights);
+RcppExport SEXP _wARMASVp_LRT_moment_lev_ged_cpp(SEXP ySEXP, SEXP mdl_outSEXP, SEXP AmatSEXP, SEXP rho_typeSEXP, SEXP delSEXP, SEXP gh_nodesSEXP, SEXP gh_weightsSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< arma::vec >::type y(ySEXP);
+    Rcpp::traits::input_parameter< Rcpp::List >::type mdl_out(mdl_outSEXP);
+    Rcpp::traits::input_parameter< arma::mat >::type Amat(AmatSEXP);
+    Rcpp::traits::input_parameter< std::string >::type rho_type(rho_typeSEXP);
+    Rcpp::traits::input_parameter< double >::type del(delSEXP);
+    Rcpp::traits::input_parameter< arma::vec >::type gh_nodes(gh_nodesSEXP);
+    Rcpp::traits::input_parameter< arma::vec >::type gh_weights(gh_weightsSEXP);
+    rcpp_result_gen = Rcpp::wrap(LRT_moment_lev_ged_cpp(y, mdl_out, Amat, rho_type, del, gh_nodes, gh_weights));
+    return rcpp_result_gen;
+END_RCPP
+}
+// LRT_moment_t_cpp
+double LRT_moment_t_cpp(arma::vec y, Rcpp::List mdl_out, arma::mat Amat, bool WAmat, double del, bool Bartlett, Rcpp::Nullable<Rcpp::Function> pinv_fn);
+RcppExport SEXP _wARMASVp_LRT_moment_t_cpp(SEXP ySEXP, SEXP mdl_outSEXP, SEXP AmatSEXP, SEXP WAmatSEXP, SEXP delSEXP, SEXP BartlettSEXP, SEXP pinv_fnSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< arma::vec >::type y(ySEXP);
+    Rcpp::traits::input_parameter< Rcpp::List >::type mdl_out(mdl_outSEXP);
+    Rcpp::traits::input_parameter< arma::mat >::type Amat(AmatSEXP);
+    Rcpp::traits::input_parameter< bool >::type WAmat(WAmatSEXP);
+    Rcpp::traits::input_parameter< double >::type del(delSEXP);
+    Rcpp::traits::input_parameter< bool >::type Bartlett(BartlettSEXP);
+    Rcpp::traits::input_parameter< Rcpp::Nullable<Rcpp::Function> >::type pinv_fn(pinv_fnSEXP);
+    rcpp_result_gen = Rcpp::wrap(LRT_moment_t_cpp(y, mdl_out, Amat, WAmat, del, Bartlett, pinv_fn));
+    return rcpp_result_gen;
+END_RCPP
+}
+// LRT_moment_ged_cpp
+double LRT_moment_ged_cpp(arma::vec y, Rcpp::List mdl_out, arma::mat Amat, bool WAmat, double del, bool Bartlett, Rcpp::Nullable<Rcpp::Function> pinv_fn);
+RcppExport SEXP _wARMASVp_LRT_moment_ged_cpp(SEXP ySEXP, SEXP mdl_outSEXP, SEXP AmatSEXP, SEXP WAmatSEXP, SEXP delSEXP, SEXP BartlettSEXP, SEXP pinv_fnSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< arma::vec >::type y(ySEXP);
+    Rcpp::traits::input_parameter< Rcpp::List >::type mdl_out(mdl_outSEXP);
+    Rcpp::traits::input_parameter< arma::mat >::type Amat(AmatSEXP);
+    Rcpp::traits::input_parameter< bool >::type WAmat(WAmatSEXP);
+    Rcpp::traits::input_parameter< double >::type del(delSEXP);
+    Rcpp::traits::input_parameter< bool >::type Bartlett(BartlettSEXP);
+    Rcpp::traits::input_parameter< Rcpp::Nullable<Rcpp::Function> >::type pinv_fn(pinv_fnSEXP);
+    rcpp_result_gen = Rcpp::wrap(LRT_moment_ged_cpp(y, mdl_out, Amat, WAmat, del, Bartlett, pinv_fn));
+    return rcpp_result_gen;
+END_RCPP
+}
+// LRT_moment_lev_svp_Amat_cpp
+double LRT_moment_lev_svp_Amat_cpp(arma::vec y, Rcpp::List mdl_out, std::string rho_type, double del, bool Bartlett, Rcpp::Nullable<Rcpp::Function> pinv_fn);
+RcppExport SEXP _wARMASVp_LRT_moment_lev_svp_Amat_cpp(SEXP ySEXP, SEXP mdl_outSEXP, SEXP rho_typeSEXP, SEXP delSEXP, SEXP BartlettSEXP, SEXP pinv_fnSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< arma::vec >::type y(ySEXP);
+    Rcpp::traits::input_parameter< Rcpp::List >::type mdl_out(mdl_outSEXP);
+    Rcpp::traits::input_parameter< std::string >::type rho_type(rho_typeSEXP);
+    Rcpp::traits::input_parameter< double >::type del(delSEXP);
+    Rcpp::traits::input_parameter< bool >::type Bartlett(BartlettSEXP);
+    Rcpp::traits::input_parameter< Rcpp::Nullable<Rcpp::Function> >::type pinv_fn(pinv_fnSEXP);
+    rcpp_result_gen = Rcpp::wrap(LRT_moment_lev_svp_Amat_cpp(y, mdl_out, rho_type, del, Bartlett, pinv_fn));
+    return rcpp_result_gen;
+END_RCPP
+}
+// LRT_moment_ar_Amat_cpp
+double LRT_moment_ar_Amat_cpp(arma::vec y, Rcpp::List mdl_out, double del, bool Bartlett, Rcpp::Nullable<Rcpp::Function> pinv_fn);
+RcppExport SEXP _wARMASVp_LRT_moment_ar_Amat_cpp(SEXP ySEXP, SEXP mdl_outSEXP, SEXP delSEXP, SEXP BartlettSEXP, SEXP pinv_fnSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< arma::vec >::type y(ySEXP);
+    Rcpp::traits::input_parameter< Rcpp::List >::type mdl_out(mdl_outSEXP);
+    Rcpp::traits::input_parameter< double >::type del(delSEXP);
+    Rcpp::traits::input_parameter< bool >::type Bartlett(BartlettSEXP);
+    Rcpp::traits::input_parameter< Rcpp::Nullable<Rcpp::Function> >::type pinv_fn(pinv_fnSEXP);
+    rcpp_result_gen = Rcpp::wrap(LRT_moment_ar_Amat_cpp(y, mdl_out, del, Bartlett, pinv_fn));
+    return rcpp_result_gen;
+END_RCPP
+}
+// LRT_moment_lev_t_Amat_cpp
+double LRT_moment_lev_t_Amat_cpp(arma::vec y, Rcpp::List mdl_out, std::string rho_type, double del, bool Bartlett, Rcpp::Nullable<Rcpp::Function> pinv_fn);
+RcppExport SEXP _wARMASVp_LRT_moment_lev_t_Amat_cpp(SEXP ySEXP, SEXP mdl_outSEXP, SEXP rho_typeSEXP, SEXP delSEXP, SEXP BartlettSEXP, SEXP pinv_fnSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< arma::vec >::type y(ySEXP);
+    Rcpp::traits::input_parameter< Rcpp::List >::type mdl_out(mdl_outSEXP);
+    Rcpp::traits::input_parameter< std::string >::type rho_type(rho_typeSEXP);
+    Rcpp::traits::input_parameter< double >::type del(delSEXP);
+    Rcpp::traits::input_parameter< bool >::type Bartlett(BartlettSEXP);
+    Rcpp::traits::input_parameter< Rcpp::Nullable<Rcpp::Function> >::type pinv_fn(pinv_fnSEXP);
+    rcpp_result_gen = Rcpp::wrap(LRT_moment_lev_t_Amat_cpp(y, mdl_out, rho_type, del, Bartlett, pinv_fn));
+    return rcpp_result_gen;
+END_RCPP
+}
+// LRT_moment_lev_ged_Amat_cpp
+double LRT_moment_lev_ged_Amat_cpp(arma::vec y, Rcpp::List mdl_out, std::string rho_type, double del, bool Bartlett, Rcpp::Nullable<Rcpp::Function> pinv_fn, arma::vec gh_nodes, arma::vec gh_weights);
+RcppExport SEXP _wARMASVp_LRT_moment_lev_ged_Amat_cpp(SEXP ySEXP, SEXP mdl_outSEXP, SEXP rho_typeSEXP, SEXP delSEXP, SEXP BartlettSEXP, SEXP pinv_fnSEXP, SEXP gh_nodesSEXP, SEXP gh_weightsSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< arma::vec >::type y(ySEXP);
+    Rcpp::traits::input_parameter< Rcpp::List >::type mdl_out(mdl_outSEXP);
+    Rcpp::traits::input_parameter< std::string >::type rho_type(rho_typeSEXP);
+    Rcpp::traits::input_parameter< double >::type del(delSEXP);
+    Rcpp::traits::input_parameter< bool >::type Bartlett(BartlettSEXP);
+    Rcpp::traits::input_parameter< Rcpp::Nullable<Rcpp::Function> >::type pinv_fn(pinv_fnSEXP);
+    Rcpp::traits::input_parameter< arma::vec >::type gh_nodes(gh_nodesSEXP);
+    Rcpp::traits::input_parameter< arma::vec >::type gh_weights(gh_weightsSEXP);
+    rcpp_result_gen = Rcpp::wrap(LRT_moment_lev_ged_Amat_cpp(y, mdl_out, rho_type, del, Bartlett, pinv_fn, gh_nodes, gh_weights));
+    return rcpp_result_gen;
+END_RCPP
+}
+// particle_filter_svp_cpp
+List particle_filter_svp_cpp(const arma::vec& y_raw, const arma::vec& phi, double sigma_y, double sigma_v, double nu, int dist_code, double delta, int M, int seed);
+RcppExport SEXP _wARMASVp_particle_filter_svp_cpp(SEXP y_rawSEXP, SEXP phiSEXP, SEXP sigma_ySEXP, SEXP sigma_vSEXP, SEXP nuSEXP, SEXP dist_codeSEXP, SEXP deltaSEXP, SEXP MSEXP, SEXP seedSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< const arma::vec& >::type y_raw(y_rawSEXP);
+    Rcpp::traits::input_parameter< const arma::vec& >::type phi(phiSEXP);
+    Rcpp::traits::input_parameter< double >::type sigma_y(sigma_ySEXP);
+    Rcpp::traits::input_parameter< double >::type sigma_v(sigma_vSEXP);
+    Rcpp::traits::input_parameter< double >::type nu(nuSEXP);
+    Rcpp::traits::input_parameter< int >::type dist_code(dist_codeSEXP);
+    Rcpp::traits::input_parameter< double >::type delta(deltaSEXP);
+    Rcpp::traits::input_parameter< int >::type M(MSEXP);
+    Rcpp::traits::input_parameter< int >::type seed(seedSEXP);
+    rcpp_result_gen = Rcpp::wrap(particle_filter_svp_cpp(y_raw, phi, sigma_y, sigma_v, nu, dist_code, delta, M, seed));
+    return rcpp_result_gen;
+END_RCPP
+}
+// find_nu_t_cpp
+double find_nu_t_cpp(double se2b, double nu_lower, double nu_upper, bool logNu, double tol, int maxiter);
+RcppExport SEXP _wARMASVp_find_nu_t_cpp(SEXP se2bSEXP, SEXP nu_lowerSEXP, SEXP nu_upperSEXP, SEXP logNuSEXP, SEXP tolSEXP, SEXP maxiterSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< double >::type se2b(se2bSEXP);
+    Rcpp::traits::input_parameter< double >::type nu_lower(nu_lowerSEXP);
+    Rcpp::traits::input_parameter< double >::type nu_upper(nu_upperSEXP);
+    Rcpp::traits::input_parameter< bool >::type logNu(logNuSEXP);
+    Rcpp::traits::input_parameter< double >::type tol(tolSEXP);
+    Rcpp::traits::input_parameter< int >::type maxiter(maxiterSEXP);
+    rcpp_result_gen = Rcpp::wrap(find_nu_t_cpp(se2b, nu_lower, nu_upper, logNu, tol, maxiter));
+    return rcpp_result_gen;
+END_RCPP
+}
+// find_nu_ged_cpp
+double find_nu_ged_cpp(double se2, double lower, double upper, double tol, int maxiter);
+RcppExport SEXP _wARMASVp_find_nu_ged_cpp(SEXP se2SEXP, SEXP lowerSEXP, SEXP upperSEXP, SEXP tolSEXP, SEXP maxiterSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< double >::type se2(se2SEXP);
+    Rcpp::traits::input_parameter< double >::type lower(lowerSEXP);
+    Rcpp::traits::input_parameter< double >::type upper(upperSEXP);
+    Rcpp::traits::input_parameter< double >::type tol(tolSEXP);
+    Rcpp::traits::input_parameter< int >::type maxiter(maxiterSEXP);
+    rcpp_result_gen = Rcpp::wrap(find_nu_ged_cpp(se2, lower, upper, tol, maxiter));
+    return rcpp_result_gen;
+END_RCPP
+}
+// find_delta_ged_cpp
+double find_delta_ged_cpp(double target, double sigv, double nu, arma::vec gh_nodes, arma::vec gh_weights, double tol);
+RcppExport SEXP _wARMASVp_find_delta_ged_cpp(SEXP targetSEXP, SEXP sigvSEXP, SEXP nuSEXP, SEXP gh_nodesSEXP, SEXP gh_weightsSEXP, SEXP tolSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< double >::type target(targetSEXP);
+    Rcpp::traits::input_parameter< double >::type sigv(sigvSEXP);
+    Rcpp::traits::input_parameter< double >::type nu(nuSEXP);
+    Rcpp::traits::input_parameter< arma::vec >::type gh_nodes(gh_nodesSEXP);
+    Rcpp::traits::input_parameter< arma::vec >::type gh_weights(gh_weightsSEXP);
+    Rcpp::traits::input_parameter< double >::type tol(tolSEXP);
+    rcpp_result_gen = Rcpp::wrap(find_delta_ged_cpp(target, sigv, nu, gh_nodes, gh_weights, tol));
+    return rcpp_result_gen;
+END_RCPP
+}
+// sim_from_innov_gaussian_cpp
+arma::vec sim_from_innov_gaussian_cpp(const arma::vec& phi, double sigma_y, double sigma_v, const arma::vec& eta_vec, const arma::vec& eps_vec, int p, int T_out, int burnin);
+RcppExport SEXP _wARMASVp_sim_from_innov_gaussian_cpp(SEXP phiSEXP, SEXP sigma_ySEXP, SEXP sigma_vSEXP, SEXP eta_vecSEXP, SEXP eps_vecSEXP, SEXP pSEXP, SEXP T_outSEXP, SEXP burninSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< const arma::vec& >::type phi(phiSEXP);
+    Rcpp::traits::input_parameter< double >::type sigma_y(sigma_ySEXP);
+    Rcpp::traits::input_parameter< double >::type sigma_v(sigma_vSEXP);
+    Rcpp::traits::input_parameter< const arma::vec& >::type eta_vec(eta_vecSEXP);
+    Rcpp::traits::input_parameter< const arma::vec& >::type eps_vec(eps_vecSEXP);
+    Rcpp::traits::input_parameter< int >::type p(pSEXP);
+    Rcpp::traits::input_parameter< int >::type T_out(T_outSEXP);
+    Rcpp::traits::input_parameter< int >::type burnin(burninSEXP);
+    rcpp_result_gen = Rcpp::wrap(sim_from_innov_gaussian_cpp(phi, sigma_y, sigma_v, eta_vec, eps_vec, p, T_out, burnin));
+    return rcpp_result_gen;
+END_RCPP
+}
+// sim_from_innov_gaussian_lev_cpp
+arma::vec sim_from_innov_gaussian_lev_cpp(const arma::vec& phi, double sigma_y, double sigma_v, double rho, const arma::vec& zeta_vec, const arma::vec& aux_vec, int p, int T_out, int burnin);
+RcppExport SEXP _wARMASVp_sim_from_innov_gaussian_lev_cpp(SEXP phiSEXP, SEXP sigma_ySEXP, SEXP sigma_vSEXP, SEXP rhoSEXP, SEXP zeta_vecSEXP, SEXP aux_vecSEXP, SEXP pSEXP, SEXP T_outSEXP, SEXP burninSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< const arma::vec& >::type phi(phiSEXP);
+    Rcpp::traits::input_parameter< double >::type sigma_y(sigma_ySEXP);
+    Rcpp::traits::input_parameter< double >::type sigma_v(sigma_vSEXP);
+    Rcpp::traits::input_parameter< double >::type rho(rhoSEXP);
+    Rcpp::traits::input_parameter< const arma::vec& >::type zeta_vec(zeta_vecSEXP);
+    Rcpp::traits::input_parameter< const arma::vec& >::type aux_vec(aux_vecSEXP);
+    Rcpp::traits::input_parameter< int >::type p(pSEXP);
+    Rcpp::traits::input_parameter< int >::type T_out(T_outSEXP);
+    Rcpp::traits::input_parameter< int >::type burnin(burninSEXP);
+    rcpp_result_gen = Rcpp::wrap(sim_from_innov_gaussian_lev_cpp(phi, sigma_y, sigma_v, rho, zeta_vec, aux_vec, p, T_out, burnin));
+    return rcpp_result_gen;
+END_RCPP
+}
+// sim_from_innov_t_cpp
+arma::vec sim_from_innov_t_cpp(const arma::vec& phi, double sigma_y, double sigma_v, const arma::vec& eta_vec, const arma::vec& eps_vec, int p, int T_out, int burnin);
+RcppExport SEXP _wARMASVp_sim_from_innov_t_cpp(SEXP phiSEXP, SEXP sigma_ySEXP, SEXP sigma_vSEXP, SEXP eta_vecSEXP, SEXP eps_vecSEXP, SEXP pSEXP, SEXP T_outSEXP, SEXP burninSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< const arma::vec& >::type phi(phiSEXP);
+    Rcpp::traits::input_parameter< double >::type sigma_y(sigma_ySEXP);
+    Rcpp::traits::input_parameter< double >::type sigma_v(sigma_vSEXP);
+    Rcpp::traits::input_parameter< const arma::vec& >::type eta_vec(eta_vecSEXP);
+    Rcpp::traits::input_parameter< const arma::vec& >::type eps_vec(eps_vecSEXP);
+    Rcpp::traits::input_parameter< int >::type p(pSEXP);
+    Rcpp::traits::input_parameter< int >::type T_out(T_outSEXP);
+    Rcpp::traits::input_parameter< int >::type burnin(burninSEXP);
+    rcpp_result_gen = Rcpp::wrap(sim_from_innov_t_cpp(phi, sigma_y, sigma_v, eta_vec, eps_vec, p, T_out, burnin));
+    return rcpp_result_gen;
+END_RCPP
+}
+// sim_from_innov_ged_cpp
+arma::vec sim_from_innov_ged_cpp(const arma::vec& phi, double sigma_y, double sigma_v, const arma::vec& eta_vec, const arma::vec& eps_vec, int p, int T_out, int burnin);
+RcppExport SEXP _wARMASVp_sim_from_innov_ged_cpp(SEXP phiSEXP, SEXP sigma_ySEXP, SEXP sigma_vSEXP, SEXP eta_vecSEXP, SEXP eps_vecSEXP, SEXP pSEXP, SEXP T_outSEXP, SEXP burninSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< const arma::vec& >::type phi(phiSEXP);
+    Rcpp::traits::input_parameter< double >::type sigma_y(sigma_ySEXP);
+    Rcpp::traits::input_parameter< double >::type sigma_v(sigma_vSEXP);
+    Rcpp::traits::input_parameter< const arma::vec& >::type eta_vec(eta_vecSEXP);
+    Rcpp::traits::input_parameter< const arma::vec& >::type eps_vec(eps_vecSEXP);
+    Rcpp::traits::input_parameter< int >::type p(pSEXP);
+    Rcpp::traits::input_parameter< int >::type T_out(T_outSEXP);
+    Rcpp::traits::input_parameter< int >::type burnin(burninSEXP);
+    rcpp_result_gen = Rcpp::wrap(sim_from_innov_ged_cpp(phi, sigma_y, sigma_v, eta_vec, eps_vec, p, T_out, burnin));
+    return rcpp_result_gen;
+END_RCPP
+}
+// sim_from_innov_t_lev_cpp
+arma::vec sim_from_innov_t_lev_cpp(const arma::vec& phi, double sigma_y, double sigma_v, double nu, double rho, const arma::vec& zeta_vec, const arma::vec& aux_vec, const arma::vec& U_chi2_vec, int p, int T_out, int burnin);
+RcppExport SEXP _wARMASVp_sim_from_innov_t_lev_cpp(SEXP phiSEXP, SEXP sigma_ySEXP, SEXP sigma_vSEXP, SEXP nuSEXP, SEXP rhoSEXP, SEXP zeta_vecSEXP, SEXP aux_vecSEXP, SEXP U_chi2_vecSEXP, SEXP pSEXP, SEXP T_outSEXP, SEXP burninSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< const arma::vec& >::type phi(phiSEXP);
+    Rcpp::traits::input_parameter< double >::type sigma_y(sigma_ySEXP);
+    Rcpp::traits::input_parameter< double >::type sigma_v(sigma_vSEXP);
+    Rcpp::traits::input_parameter< double >::type nu(nuSEXP);
+    Rcpp::traits::input_parameter< double >::type rho(rhoSEXP);
+    Rcpp::traits::input_parameter< const arma::vec& >::type zeta_vec(zeta_vecSEXP);
+    Rcpp::traits::input_parameter< const arma::vec& >::type aux_vec(aux_vecSEXP);
+    Rcpp::traits::input_parameter< const arma::vec& >::type U_chi2_vec(U_chi2_vecSEXP);
+    Rcpp::traits::input_parameter< int >::type p(pSEXP);
+    Rcpp::traits::input_parameter< int >::type T_out(T_outSEXP);
+    Rcpp::traits::input_parameter< int >::type burnin(burninSEXP);
+    rcpp_result_gen = Rcpp::wrap(sim_from_innov_t_lev_cpp(phi, sigma_y, sigma_v, nu, rho, zeta_vec, aux_vec, U_chi2_vec, p, T_out, burnin));
+    return rcpp_result_gen;
+END_RCPP
+}
+// sim_from_innov_ged_lev_cpp
+arma::vec sim_from_innov_ged_lev_cpp(const arma::vec& phi, double sigma_y, double sigma_v, double nu, double rho, const arma::vec& zeta_vec, const arma::vec& aux_vec, int p, int T_out, int burnin);
+RcppExport SEXP _wARMASVp_sim_from_innov_ged_lev_cpp(SEXP phiSEXP, SEXP sigma_ySEXP, SEXP sigma_vSEXP, SEXP nuSEXP, SEXP rhoSEXP, SEXP zeta_vecSEXP, SEXP aux_vecSEXP, SEXP pSEXP, SEXP T_outSEXP, SEXP burninSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< const arma::vec& >::type phi(phiSEXP);
+    Rcpp::traits::input_parameter< double >::type sigma_y(sigma_ySEXP);
+    Rcpp::traits::input_parameter< double >::type sigma_v(sigma_vSEXP);
+    Rcpp::traits::input_parameter< double >::type nu(nuSEXP);
+    Rcpp::traits::input_parameter< double >::type rho(rhoSEXP);
+    Rcpp::traits::input_parameter< const arma::vec& >::type zeta_vec(zeta_vecSEXP);
+    Rcpp::traits::input_parameter< const arma::vec& >::type aux_vec(aux_vecSEXP);
+    Rcpp::traits::input_parameter< int >::type p(pSEXP);
+    Rcpp::traits::input_parameter< int >::type T_out(T_outSEXP);
+    Rcpp::traits::input_parameter< int >::type burnin(burninSEXP);
+    rcpp_result_gen = Rcpp::wrap(sim_from_innov_ged_lev_cpp(phi, sigma_y, sigma_v, nu, rho, zeta_vec, aux_vec, p, T_out, burnin));
+    return rcpp_result_gen;
+END_RCPP
+}
 // sim_svp_norm_cpp
 arma::mat sim_svp_norm_cpp(arma::vec beta, int p, int N, int burnin);
 RcppExport SEXP _wARMASVp_sim_svp_norm_cpp(SEXP betaSEXP, SEXP pSEXP, SEXP NSEXP, SEXP burninSEXP) {
@@ -114,6 +493,34 @@ BEGIN_RCPP
     Rcpp::traits::input_parameter< int >::type K(KSEXP);
     Rcpp::traits::input_parameter< int >::type burnin(burninSEXP);
     rcpp_result_gen = Rcpp::wrap(sim_sv_ged_cpp(beta, p, N, K, burnin));
+    return rcpp_result_gen;
+END_RCPP
+}
+// sim_svp_leverage_t_cpp
+List sim_svp_leverage_t_cpp(arma::vec beta, int p, int N, int burnin);
+RcppExport SEXP _wARMASVp_sim_svp_leverage_t_cpp(SEXP betaSEXP, SEXP pSEXP, SEXP NSEXP, SEXP burninSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< arma::vec >::type beta(betaSEXP);
+    Rcpp::traits::input_parameter< int >::type p(pSEXP);
+    Rcpp::traits::input_parameter< int >::type N(NSEXP);
+    Rcpp::traits::input_parameter< int >::type burnin(burninSEXP);
+    rcpp_result_gen = Rcpp::wrap(sim_svp_leverage_t_cpp(beta, p, N, burnin));
+    return rcpp_result_gen;
+END_RCPP
+}
+// sim_svp_leverage_ged_cpp
+List sim_svp_leverage_ged_cpp(arma::vec beta, int p, int N, int burnin);
+RcppExport SEXP _wARMASVp_sim_svp_leverage_ged_cpp(SEXP betaSEXP, SEXP pSEXP, SEXP NSEXP, SEXP burninSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< arma::vec >::type beta(betaSEXP);
+    Rcpp::traits::input_parameter< int >::type p(pSEXP);
+    Rcpp::traits::input_parameter< int >::type N(NSEXP);
+    Rcpp::traits::input_parameter< int >::type burnin(burninSEXP);
+    rcpp_result_gen = Rcpp::wrap(sim_svp_leverage_ged_cpp(beta, p, N, burnin));
     return rcpp_result_gen;
 END_RCPP
 }
@@ -194,10 +601,34 @@ static const R_CallMethodDef CallEntries[] = {
     {"_wARMASVp_svpCpp", (DL_FUNC) &_wARMASVp_svpCpp, 7},
     {"_wARMASVp_svpCpp_nolev", (DL_FUNC) &_wARMASVp_svpCpp_nolev, 5},
     {"_wARMASVp_svpCpp_h_ahead", (DL_FUNC) &_wARMASVp_svpCpp_h_ahead, 6},
+    {"_wARMASVp_solve_lyapunov_discrete_cpp", (DL_FUNC) &_wARMASVp_solve_lyapunov_discrete_cpp, 2},
+    {"_wARMASVp_kalman_filter_cpp", (DL_FUNC) &_wARMASVp_kalman_filter_cpp, 9},
+    {"_wARMASVp_gmkf_filter_cpp", (DL_FUNC) &_wARMASVp_gmkf_filter_cpp, 12},
+    {"_wARMASVp_LRT_moment_lev_svp_cpp", (DL_FUNC) &_wARMASVp_LRT_moment_lev_svp_cpp, 5},
+    {"_wARMASVp_LRT_moment_lev_t_cpp", (DL_FUNC) &_wARMASVp_LRT_moment_lev_t_cpp, 5},
+    {"_wARMASVp_LRT_moment_lev_ged_cpp", (DL_FUNC) &_wARMASVp_LRT_moment_lev_ged_cpp, 7},
+    {"_wARMASVp_LRT_moment_t_cpp", (DL_FUNC) &_wARMASVp_LRT_moment_t_cpp, 7},
+    {"_wARMASVp_LRT_moment_ged_cpp", (DL_FUNC) &_wARMASVp_LRT_moment_ged_cpp, 7},
+    {"_wARMASVp_LRT_moment_lev_svp_Amat_cpp", (DL_FUNC) &_wARMASVp_LRT_moment_lev_svp_Amat_cpp, 6},
+    {"_wARMASVp_LRT_moment_ar_Amat_cpp", (DL_FUNC) &_wARMASVp_LRT_moment_ar_Amat_cpp, 5},
+    {"_wARMASVp_LRT_moment_lev_t_Amat_cpp", (DL_FUNC) &_wARMASVp_LRT_moment_lev_t_Amat_cpp, 6},
+    {"_wARMASVp_LRT_moment_lev_ged_Amat_cpp", (DL_FUNC) &_wARMASVp_LRT_moment_lev_ged_Amat_cpp, 8},
+    {"_wARMASVp_particle_filter_svp_cpp", (DL_FUNC) &_wARMASVp_particle_filter_svp_cpp, 9},
+    {"_wARMASVp_find_nu_t_cpp", (DL_FUNC) &_wARMASVp_find_nu_t_cpp, 6},
+    {"_wARMASVp_find_nu_ged_cpp", (DL_FUNC) &_wARMASVp_find_nu_ged_cpp, 5},
+    {"_wARMASVp_find_delta_ged_cpp", (DL_FUNC) &_wARMASVp_find_delta_ged_cpp, 6},
+    {"_wARMASVp_sim_from_innov_gaussian_cpp", (DL_FUNC) &_wARMASVp_sim_from_innov_gaussian_cpp, 8},
+    {"_wARMASVp_sim_from_innov_gaussian_lev_cpp", (DL_FUNC) &_wARMASVp_sim_from_innov_gaussian_lev_cpp, 9},
+    {"_wARMASVp_sim_from_innov_t_cpp", (DL_FUNC) &_wARMASVp_sim_from_innov_t_cpp, 8},
+    {"_wARMASVp_sim_from_innov_ged_cpp", (DL_FUNC) &_wARMASVp_sim_from_innov_ged_cpp, 8},
+    {"_wARMASVp_sim_from_innov_t_lev_cpp", (DL_FUNC) &_wARMASVp_sim_from_innov_t_lev_cpp, 11},
+    {"_wARMASVp_sim_from_innov_ged_lev_cpp", (DL_FUNC) &_wARMASVp_sim_from_innov_ged_lev_cpp, 10},
     {"_wARMASVp_sim_svp_norm_cpp", (DL_FUNC) &_wARMASVp_sim_svp_norm_cpp, 4},
     {"_wARMASVp_sim_svp_leverage_norm_cpp", (DL_FUNC) &_wARMASVp_sim_svp_leverage_norm_cpp, 4},
     {"_wARMASVp_sim_sv_t_cpp", (DL_FUNC) &_wARMASVp_sim_sv_t_cpp, 5},
     {"_wARMASVp_sim_sv_ged_cpp", (DL_FUNC) &_wARMASVp_sim_sv_ged_cpp, 5},
+    {"_wARMASVp_sim_svp_leverage_t_cpp", (DL_FUNC) &_wARMASVp_sim_svp_leverage_t_cpp, 4},
+    {"_wARMASVp_sim_svp_leverage_ged_cpp", (DL_FUNC) &_wARMASVp_sim_svp_leverage_ged_cpp, 4},
     {"_wARMASVp_statPhi_cpp", (DL_FUNC) &_wARMASVp_statPhi_cpp, 1},
     {"_wARMASVp_kendall_corr", (DL_FUNC) &_wARMASVp_kendall_corr, 2},
     {"_wARMASVp_acov_g", (DL_FUNC) &_wARMASVp_acov_g, 2},

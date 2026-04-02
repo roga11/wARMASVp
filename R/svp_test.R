@@ -151,11 +151,19 @@ mmc_ar <- function(y, p_null, p_alt, J = 10, N = 99, burnin = 500,
     phi_extra <- mdl_alt$phi[(p_null + 1):p_alt]
     s0 <- Tsize * sum(phi_extra^2)
   }
+  # Pre-draw innovations for fixed-error MMC (Dufour 2006)
+  n_total <- burnin + Tsize
+  N_draw <- ceiling(N * 1.5) + 10L
+  innov_ar <- list(
+    eta = matrix(rnorm(n_total * N_draw), nrow = n_total, ncol = N_draw),
+    eps = matrix(rnorm(n_total * N_draw), nrow = n_total, ncol = N_draw)
+  )
   out <- .run_mmc_optimizer(method, theta_0, .mmc_pval_ar, lower, upper,
                             threshold, maxit,
                             y = y_vec, p_null = p_null, p_alt = p_alt,
                             j = J, N = N, s0 = s0, ini = burnin,
-                            del = del, wDecay = wDecay, Bartlett = Bartlett)
+                            del = del, wDecay = wDecay, Bartlett = Bartlett,
+                            innovations = innov_ar)
   out$value <- -out$value
   out$s0 <- s0
   out$call <- cl
@@ -186,6 +194,14 @@ mmc_ar <- function(y, p_null, p_alt, J = 10, N = 99, burnin = 500,
 #' @param wDecay Logical. Use decaying weights. Default \code{FALSE}.
 #' @param Bartlett Logical. If \code{TRUE}, use Bartlett kernel HAC weighting
 #'   matrix. If \code{FALSE}, use identity matrix. Default \code{FALSE}.
+#' @param errorType Character. Error distribution: \code{"Gaussian"} (default),
+#'   \code{"Student-t"}, or \code{"GED"}.
+#' @param logNu Logical. Use log-space for nu estimation (Student-t only).
+#'   Default \code{FALSE}.
+#' @param sigvMethod Method for sigma_v estimation: \code{"factored"} (default),
+#'   \code{"direct"}, or \code{"hybrid"}.
+#' @param winsorize_eps Number of extreme autocovariance lags to winsorize
+#'   (0 = none). Default 0.
 #'
 #' @return An object of class \code{"svp_test"}, a list containing:
 #' \describe{
@@ -201,7 +217,6 @@ mmc_ar <- function(y, p_null, p_alt, J = 10, N = 99, burnin = 500,
 #' @examples
 #' \donttest{
 #' y <- sim_svp(1000, phi = 0.95, sigy = 1, sigv = 0.2, leverage = TRUE, rho = -0.3)$y
-#' fit <- svp(y, p = 1, leverage = TRUE)
 #' test <- lmc_lev(y, p = 1, J = 10, N = 99)
 #' print(test)
 #' }
@@ -210,48 +225,111 @@ mmc_ar <- function(y, p_null, p_alt, J = 10, N = 99, burnin = 500,
 lmc_lev <- function(y, p = 1, J = 10, N = 99, rho_null = 0,
                     burnin = 500, rho_type = "pearson", del = 1e-10,
                     trunc_lev = TRUE, wDecay = FALSE,
-                    Bartlett = FALSE) {
+                    Bartlett = FALSE, errorType = "Gaussian",
+                    logNu = FALSE, sigvMethod = "factored",
+                    winsorize_eps = 0) {
   cl <- match.call()
   y_vec <- as.numeric(y)
   y_mat <- as.matrix(y_vec)
   Tsize <- length(y_vec)
+  errorType <- match.arg(errorType, c("Gaussian", "Student-t", "GED"))
+  # Warn about HAC reliability for Student-t nu <= 4
   # Estimate model under alternative
-  mdl_alt <- svp(y_vec, p, J, leverage = TRUE, rho_type = rho_type, del = del,
-                 trunc_lev = trunc_lev, wDecay = wDecay)
-  if (!is.null(mdl_alt$rho_type) && !is.na(mdl_alt$rho_type) &&
-      mdl_alt$rho_type != rho_type) {
-    warning("rho_type in estimated model differs from specified rho_type.")
-  }
+  mdl_alt <- svp(y_vec, p, J, leverage = TRUE, errorType = errorType,
+                 rho_type = rho_type, del = del, trunc_lev = trunc_lev,
+                 wDecay = wDecay, logNu = logNu, sigvMethod = sigvMethod,
+                 winsorize_eps = winsorize_eps)
   mdl_null <- mdl_alt
   mdl_null$rho <- rho_null
-  # Compute test statistic from observed data
-  if (isTRUE(Bartlett)) {
-    s0_tmp <- Tsize * (LRT_moment_lev_svp_Amat(y_mat, mdl_null, rho_type, del, TRUE) -
-                         LRT_moment_lev_svp_Amat(y_mat, mdl_alt, rho_type, del, TRUE))
-  } else {
-    Amat <- diag(p + 3)
-    s0_tmp <- Tsize * (LRT_moment_lev_svp(y_mat, mdl_null, Amat, rho_type, del) -
-                         LRT_moment_lev_svp(y_mat, mdl_alt, Amat, rho_type, del))
-  }
-  if (is.na(s0_tmp) || s0_tmp < 0) {
-    stop("Test statistic is not valid (NA or negative).")
-  }
-  s0 <- s0_tmp
-  # Simulate null distribution
-  betasim_null <- c(mdl_alt$phi, mdl_alt$sigy, mdl_alt$sigv, rho_null)
-  if (isTRUE(Bartlett)) {
-    sN <- .simnull_Amat(betasim_null, rho_null, p, J, Tsize, N, burnin,
-                        rho_type, del, TRUE, wDecay = wDecay,
-                        trunc_lev = trunc_lev)
-  } else {
-    sN <- .simnull(betasim_null, rho_null, p, J, Tsize, N, burnin,
-                   Amat, rho_type, del, wDecay = wDecay,
-                   trunc_lev = trunc_lev)
+  if (errorType == "Gaussian") {
+    # --- Gaussian leverage test (p+3 moments) ---
+    if (isTRUE(Bartlett)) {
+      s0_tmp <- Tsize * (LRT_moment_lev_svp_Amat(y_mat, mdl_null, rho_type, del, TRUE) -
+                           LRT_moment_lev_svp_Amat(y_mat, mdl_alt, rho_type, del, TRUE))
+    } else {
+      Amat <- diag(p + 3)
+      s0_tmp <- Tsize * (LRT_moment_lev_svp(y_mat, mdl_null, Amat, rho_type, del) -
+                           LRT_moment_lev_svp(y_mat, mdl_alt, Amat, rho_type, del))
+    }
+    if (is.na(s0_tmp)) stop("Test statistic is NA.")
+    if (s0_tmp < 0) warning("Test statistic is negative (", round(s0_tmp, 4), "); capped at 1e-10.")
+    s0 <- max(s0_tmp, 1e-10)
+    betasim_null <- c(mdl_alt$phi, mdl_alt$sigy, mdl_alt$sigv, rho_null)
+    if (isTRUE(Bartlett)) {
+      sN <- .simnull_Amat(betasim_null, rho_null, p, J, Tsize, N, burnin,
+                          rho_type, del, TRUE, wDecay = wDecay,
+                          trunc_lev = trunc_lev)
+    } else {
+      sN <- .simnull(betasim_null, rho_null, p, J, Tsize, N, burnin,
+                     Amat, rho_type, del, wDecay = wDecay,
+                     trunc_lev = trunc_lev)
+    }
+  } else if (errorType == "Student-t") {
+    # --- Student-t leverage test (p+4 moments) ---
+    if (isTRUE(Bartlett) && !is.null(mdl_alt$v) && mdl_alt$v <= 4) {
+      warning("HAC weighting may be unreliable for Student-t with nu <= 4. ",
+              "LMC/MMC p-values remain valid regardless.")
+    }
+    if (isTRUE(Bartlett)) {
+      s0_tmp <- Tsize * (LRT_moment_lev_t_Amat(y_mat, mdl_null, rho_type, del, TRUE) -
+                           LRT_moment_lev_t_Amat(y_mat, mdl_alt, rho_type, del, TRUE))
+    } else {
+      Amat <- diag(p + 4)
+      s0_tmp <- Tsize * (LRT_moment_lev_t(y_mat, mdl_null, Amat, rho_type, del) -
+                           LRT_moment_lev_t(y_mat, mdl_alt, Amat, rho_type, del))
+    }
+    if (is.na(s0_tmp)) stop("Test statistic is NA.")
+    if (s0_tmp < 0) warning("Test statistic is negative (", round(s0_tmp, 4), "); capped at 1e-10.")
+    s0 <- max(s0_tmp, 1e-10)
+    betasim_null <- c(mdl_alt$phi, mdl_alt$sigy, mdl_alt$sigv,
+                      mdl_alt$v, rho_null)
+    if (isTRUE(Bartlett)) {
+      sN <- .simnull_lev_t_Amat(betasim_null, rho_null, p, J, Tsize, N, burnin,
+                                 rho_type, del, TRUE, wDecay = wDecay,
+                                 trunc_lev = trunc_lev, logNu = logNu,
+                                 sigvMethod = sigvMethod,
+                                 winsorize_eps = winsorize_eps)
+    } else {
+      sN <- .simnull_lev_t(betasim_null, rho_null, p, J, Tsize, N, burnin,
+                            Amat, rho_type, del, wDecay = wDecay,
+                            trunc_lev = trunc_lev, logNu = logNu,
+                            sigvMethod = sigvMethod,
+                            winsorize_eps = winsorize_eps)
+    }
+  } else if (errorType == "GED") {
+    # --- GED leverage test (p+4 moments) ---
+    if (isTRUE(Bartlett)) {
+      s0_tmp <- Tsize * (LRT_moment_lev_ged_Amat(y_mat, mdl_null, rho_type, del, TRUE) -
+                           LRT_moment_lev_ged_Amat(y_mat, mdl_alt, rho_type, del, TRUE))
+    } else {
+      Amat <- diag(p + 4)
+      s0_tmp <- Tsize * (LRT_moment_lev_ged(y_mat, mdl_null, Amat, rho_type, del) -
+                           LRT_moment_lev_ged(y_mat, mdl_alt, Amat, rho_type, del))
+    }
+    if (is.na(s0_tmp)) stop("Test statistic is NA.")
+    if (s0_tmp < 0) warning("Test statistic is negative (", round(s0_tmp, 4), "); capped at 1e-10.")
+    s0 <- max(s0_tmp, 1e-10)
+    betasim_null <- c(mdl_alt$phi, mdl_alt$sigy, mdl_alt$sigv,
+                      mdl_alt$v, rho_null)
+    if (isTRUE(Bartlett)) {
+      sN <- .simnull_lev_ged_Amat(betasim_null, rho_null, p, J, Tsize, N, burnin,
+                                   rho_type, del, TRUE, wDecay = wDecay,
+                                   trunc_lev = trunc_lev,
+                                   sigvMethod = sigvMethod,
+                                   winsorize_eps = winsorize_eps)
+    } else {
+      sN <- .simnull_lev_ged(betasim_null, rho_null, p, J, Tsize, N, burnin,
+                              Amat, rho_type, del, wDecay = wDecay,
+                              trunc_lev = trunc_lev,
+                              sigvMethod = sigvMethod,
+                              winsorize_eps = winsorize_eps)
+    }
   }
   # Compute p-value
   pval <- (N + 1 - sum(s0 >= sN)) / (N + 1)
+  test_label <- paste0("LMC Leverage (", errorType, ")")
   out <- list(s0 = s0, sN = as.numeric(sN), pval = pval,
-              test_type = "LMC Leverage",
+              test_type = test_label,
               null_param = "rho", null_value = rho_null,
               call = cl)
   class(out) <- "svp_test"
@@ -271,7 +349,7 @@ lmc_lev <- function(y, p = 1, J = 10, N = 99, rho_null = 0,
 #' @param threshold Numeric. Target p-value (optimization stops if reached).
 #'   Default 1.
 #' @param method Character. Optimization method: \code{"pso"} (particle swarm),
-#'   \code{"GenSA"} (generalized simulated annealing), or \code{"gridSearch"}.
+#'   \code{"GenSA"} (generalized simulated annealing).
 #'   Default \code{"pso"}.
 #' @param maxit Integer or list. Maximum iterations/evaluations for the
 #'   optimizer. Default depends on method.
@@ -296,103 +374,131 @@ mmc_lev <- function(y, p = 1, J = 10, N = 99, rho_null = 0,
                     method = "pso", maxit = NULL,
                     rho_type = "pearson", del = 1e-10,
                     trunc_lev = TRUE, wDecay = FALSE,
-                    Bartlett = FALSE) {
+                    Bartlett = FALSE, errorType = "Gaussian",
+                    logNu = FALSE, sigvMethod = "factored",
+                    winsorize_eps = 0) {
   cl <- match.call()
   y_vec <- as.numeric(y)
   y_mat <- as.matrix(y_vec)
   Tsize <- length(y_vec)
+  errorType <- match.arg(errorType, c("Gaussian", "Student-t", "GED"))
   # Estimate model under alternative
-  mdl_alt <- svp(y_vec, p, J, leverage = TRUE, rho_type = rho_type, del = del,
-                 trunc_lev = trunc_lev, wDecay = wDecay)
-  theta_0 <- c(mdl_alt$phi, mdl_alt$sigy, mdl_alt$sigv)
-  if (is.null(eps)) {
-    eps <- rep(0.3, length(theta_0))
+  mdl_alt <- svp(y_vec, p, J, leverage = TRUE, errorType = errorType,
+                 rho_type = rho_type, del = del, trunc_lev = trunc_lev,
+                 wDecay = wDecay, logNu = logNu, sigvMethod = sigvMethod,
+                 winsorize_eps = winsorize_eps)
+  # Determine nuisance parameters and bounds
+  if (errorType == "Gaussian") {
+    theta_0 <- c(mdl_alt$phi, mdl_alt$sigy, mdl_alt$sigv)
+    n_nuisance <- p + 2
+    n_mom <- p + 3
+    if (is.null(eps)) eps <- rep(0.3, n_nuisance)
+    lower <- c(pmax(theta_0[1:p] - eps[1:p], rep(-0.999, p)),
+               max(theta_0[p + 1] - eps[p + 1], 0.01),
+               max(theta_0[p + 2] - eps[p + 2], 0.01))
+    upper <- c(pmin(theta_0[1:p] + eps[1:p], rep(0.999, p)),
+               theta_0[p + 1] + eps[p + 1],
+               theta_0[p + 2] + eps[p + 2])
+  } else {
+    # Heavy-tail: nuisance includes nu
+    theta_0 <- c(mdl_alt$phi, mdl_alt$sigy, mdl_alt$sigv, mdl_alt$v)
+    n_nuisance <- p + 3
+    n_mom <- p + 4
+    if (is.null(eps)) eps <- rep(0.3, p + 2)  # eps for phi, sigy, sigv only
+    # Proportional bounds for nu
+    nu_hat <- mdl_alt$v
+    if (errorType == "Student-t") {
+      nu_lo <- max(2.01, nu_hat * 0.7)
+      nu_hi <- min(500, nu_hat * 1.3)
+    } else {
+      nu_lo <- max(0.1, nu_hat * 0.7)
+      nu_hi <- min(20, nu_hat * 1.3)
+    }
+    lower <- c(pmax(theta_0[1:p] - eps[1:p], rep(-0.999, p)),
+               max(theta_0[p + 1] - eps[p + 1], 0.01),
+               max(theta_0[p + 2] - eps[p + 2], 0.01),
+               nu_lo)
+    upper <- c(pmin(theta_0[1:p] + eps[1:p], rep(0.999, p)),
+               theta_0[p + 1] + eps[p + 1],
+               theta_0[p + 2] + eps[p + 2],
+               nu_hi)
   }
-  # Define search bounds
-  lower <- c(pmax(theta_0[1:p] - eps[1:p], rep(-0.999, p)),
-             max(theta_0[p + 1] - eps[p + 1], 0.01),
-             max(theta_0[p + 2] - eps[p + 2], 0.01))
-  upper <- c(pmin(theta_0[1:p] + eps[1:p], rep(0.999, p)),
-             theta_0[p + 1] + eps[p + 1],
-             theta_0[p + 2] + eps[p + 2])
   # Compute test statistic from observed data
   mdl_null <- mdl_alt
   mdl_null$rho <- rho_null
-  if (isTRUE(Bartlett)) {
-    s0_tmp <- Tsize * (LRT_moment_lev_svp_Amat(y_mat, mdl_null, rho_type, del, TRUE) -
-                         LRT_moment_lev_svp_Amat(y_mat, mdl_alt, rho_type, del, TRUE))
-  } else {
-    Amat <- diag(p + 3)
-    s0_tmp <- Tsize * (LRT_moment_lev_svp(y_mat, mdl_null, Amat, rho_type, del) -
-                         LRT_moment_lev_svp(y_mat, mdl_alt, Amat, rho_type, del))
+  if (errorType == "Gaussian") {
+    if (isTRUE(Bartlett)) {
+      s0_tmp <- Tsize * (LRT_moment_lev_svp_Amat(y_mat, mdl_null, rho_type, del, TRUE) -
+                           LRT_moment_lev_svp_Amat(y_mat, mdl_alt, rho_type, del, TRUE))
+    } else {
+      Amat <- diag(n_mom)
+      s0_tmp <- Tsize * (LRT_moment_lev_svp(y_mat, mdl_null, Amat, rho_type, del) -
+                           LRT_moment_lev_svp(y_mat, mdl_alt, Amat, rho_type, del))
+    }
+    pval_fn <- if (isTRUE(Bartlett)) .mmc_pval_lev_Amat else .mmc_pval_lev
+  } else if (errorType == "Student-t") {
+    if (isTRUE(Bartlett) && !is.null(mdl_alt$v) && mdl_alt$v <= 4) {
+      warning("HAC weighting may be unreliable for Student-t with nu <= 4.")
+    }
+    Amat <- diag(n_mom)
+    s0_tmp <- Tsize * (LRT_moment_lev_t(y_mat, mdl_null, Amat, rho_type, del) -
+                         LRT_moment_lev_t(y_mat, mdl_alt, Amat, rho_type, del))
+    pval_fn <- .mmc_pval_lev_t
+  } else if (errorType == "GED") {
+    Amat <- diag(n_mom)
+    s0_tmp <- Tsize * (LRT_moment_lev_ged(y_mat, mdl_null, Amat, rho_type, del) -
+                         LRT_moment_lev_ged(y_mat, mdl_alt, Amat, rho_type, del))
+    pval_fn <- .mmc_pval_lev_ged
   }
-  if (is.na(s0_tmp) || s0_tmp < 0) {
-    stop("Test statistic is not valid (NA or negative).")
-  }
-  # Choose p-value function based on Bartlett
-  if (isTRUE(Bartlett)) {
-    pval_fn <- .mmc_pval_lev_Amat
+  if (is.na(s0_tmp)) stop("Test statistic is NA.")
+  if (s0_tmp < 0) warning("Test statistic is negative (", round(s0_tmp, 4), "); capped at 1e-10.")
+  s0_tmp <- max(s0_tmp, 1e-10)
+  # Build extra args for optimizer
+  extra_args <- list(y = y_mat, j = J, N = N, mdl_alt = mdl_alt,
+                     rho_null = rho_null, ini = burnin,
+                     rho_type = rho_type, del = del,
+                     wDecay = wDecay, trunc_lev = trunc_lev)
+  if (errorType == "Gaussian") {
+    if (isTRUE(Bartlett)) extra_args$Bartlett <- TRUE
+    if (!isTRUE(Bartlett)) extra_args$Amat <- diag(n_mom)
   } else {
-    pval_fn <- .mmc_pval_lev
+    extra_args$Amat <- diag(n_mom)
+    if (errorType == "Student-t") {
+      extra_args$logNu <- logNu
+    }
+    extra_args$sigvMethod <- sigvMethod
+    extra_args$winsorize_eps <- winsorize_eps
+  }
+  # Pre-draw innovations for fixed-error MMC (Dufour 2006)
+  n_total <- burnin + Tsize
+  N_draw <- ceiling(N * 1.5) + 10L
+  if (errorType == "Student-t") {
+    # Student-t leverage: PIT for chi2 (nu varies in nuisance)
+    innov_lev <- list(
+      zeta   = matrix(rnorm(n_total * N_draw), nrow = n_total, ncol = N_draw),
+      aux    = matrix(rnorm(n_total * N_draw), nrow = n_total, ncol = N_draw),
+      U_chi2 = matrix(runif(n_total * N_draw), nrow = n_total, ncol = N_draw)
+    )
+  } else {
+    # Gaussian or GED leverage: just Gaussian primitives
+    innov_lev <- list(
+      zeta = matrix(rnorm(n_total * N_draw), nrow = n_total, ncol = N_draw),
+      aux  = matrix(rnorm(n_total * N_draw), nrow = n_total, ncol = N_draw)
+    )
   }
   # Optimize
-  if (method == "gridSearch") {
-    if (!requireNamespace("NMOF", quietly = TRUE)) {
-      stop("Package 'NMOF' required for gridSearch method. Install it or use method='pso'.")
-    }
-    if (is.null(maxit)) {
-      maxit <- as.list(rep(5, p + 2))
-    }
-    extra_args <- list(y = y_mat, j = J, N = N, mdl_alt = mdl_alt,
-                       rho_null = rho_null, ini = burnin,
-                       rho_type = rho_type, del = del,
-                       wDecay = wDecay, trunc_lev = trunc_lev)
-    if (isTRUE(Bartlett)) extra_args$Bartlett <- TRUE
-    if (!isTRUE(Bartlett)) extra_args$Amat <- diag(p + 3)
-    out <- do.call(NMOF::gridSearch,
-                   c(list(fun = pval_fn, lower = lower, upper = upper,
-                          npar = length(theta_0), n = maxit,
-                          printDetail = TRUE, asList = FALSE),
-                     extra_args))
-  } else if (method == "GenSA") {
-    if (!requireNamespace("GenSA", quietly = TRUE)) {
-      stop("Package 'GenSA' required. Install it or use method='pso'.")
-    }
-    if (is.null(maxit)) maxit <- 100
-    extra_args <- list(y = y_mat, j = J, N = N, mdl_alt = mdl_alt,
-                       rho_null = rho_null, ini = burnin,
-                       rho_type = rho_type, del = del,
-                       wDecay = wDecay, trunc_lev = trunc_lev)
-    if (isTRUE(Bartlett)) extra_args$Bartlett <- TRUE
-    if (!isTRUE(Bartlett)) extra_args$Amat <- diag(p + 3)
-    out <- do.call(GenSA::GenSA,
-                   c(list(par = theta_0, fn = pval_fn,
-                          lower = lower, upper = upper,
-                          control = list(threshold.stop = -threshold,
-                                         max.call = maxit, verbose = TRUE)),
-                     extra_args))
-  } else if (method == "pso") {
-    if (!requireNamespace("pso", quietly = TRUE)) {
-      stop("Package 'pso' required. Install it or use method='GenSA'.")
-    }
-    if (is.null(maxit)) maxit <- 100
-    extra_args <- list(y = y_mat, j = J, N = N, mdl_alt = mdl_alt,
-                       rho_null = rho_null, ini = burnin,
-                       rho_type = rho_type, del = del,
-                       wDecay = wDecay, trunc_lev = trunc_lev)
-    if (isTRUE(Bartlett)) extra_args$Bartlett <- TRUE
-    if (!isTRUE(Bartlett)) extra_args$Amat <- diag(p + 3)
-    out <- do.call(pso::psoptim,
-                   c(list(par = theta_0, fn = pval_fn,
-                          lower = lower, upper = upper,
-                          control = list(abstol = -threshold,
-                                         maxf = maxit, trace = 1,
-                                         REPORT = 1, trace.stats = TRUE)),
-                     extra_args))
-  } else {
-    stop("method must be 'pso', 'GenSA', or 'gridSearch'.")
-  }
+  out <- .run_mmc_optimizer(method, theta_0, pval_fn, lower, upper,
+                            threshold, maxit,
+                            y = y_mat, j = J, N = N, mdl_alt = mdl_alt,
+                              rho_null = rho_null, ini = burnin,
+                              rho_type = rho_type, del = del,
+                              wDecay = wDecay, trunc_lev = trunc_lev,
+                              Amat = diag(n_mom),
+                              logNu = logNu, sigvMethod = sigvMethod,
+                              winsorize_eps = winsorize_eps,
+                              innovations = innov_lev)
   out$value <- -out$value
+  out$s0 <- s0_tmp
   out$call <- cl
   return(out)
 }
@@ -421,6 +527,9 @@ mmc_lev <- function(y, p = 1, J = 10, N = 99, rho_null = 0,
 #' @param Amat Weighting matrix specification. \code{NULL} for identity,
 #'   \code{"Weighted"} for data-driven HAC, or a 4x4 matrix. Default \code{NULL}.
 #' @param logNu Logical. Use log-space for nu estimation. Default \code{TRUE}.
+#' @param direction Character. Test direction: \code{"two-sided"} (default),
+#'   \code{"less"} (H1: nu < nu_null), or \code{"greater"} (H1: nu > nu_null).
+#'   Uses signed root of the LR statistic for one-sided tests.
 #'
 #' @return An object of class \code{"svp_test"}.
 #'
@@ -434,8 +543,10 @@ mmc_lev <- function(y, p = 1, J = 10, N = 99, rho_null = 0,
 #' @export
 lmc_t <- function(y, J = 10, N = 99, nu_null, burnin = 500,
                   del = 1e-10, wDecay = FALSE, Bartlett = TRUE,
-                  Amat = NULL, logNu = TRUE) {
+                  Amat = NULL, logNu = TRUE,
+                  direction = c("two-sided", "less", "greater")) {
   cl <- match.call()
+  direction <- match.arg(direction)
   y_vec <- as.numeric(y)
   y_mat <- as.matrix(y_vec)
   Tsize <- length(y_vec)
@@ -452,19 +563,30 @@ lmc_t <- function(y, J = 10, N = 99, nu_null, burnin = 500,
   # Compute test statistic
   s0_tmp <- Tsize * (LRT_moment_t(y_mat, mdl_null, Amat_mat, WAmat, del, Bartlett) -
                        LRT_moment_t(y_mat, mdl_alt, Amat_mat, WAmat, del, Bartlett))
-  if (is.na(s0_tmp) || s0_tmp < 0) {
-    stop("Test statistic is not valid (NA or negative).")
-  }
-  s0 <- s0_tmp
+  if (is.na(s0_tmp)) stop("Test statistic is NA.")
+  if (s0_tmp < 0) warning("Test statistic is negative (", round(s0_tmp, 4), "); capped at 1e-10.")
+  s0 <- max(s0_tmp, 1e-10)
   # Simulate null distribution
   betasim_null <- c(mdl_alt$phi, mdl_alt$sigy, mdl_alt$sigv, nu_null)
-  sN <- .simnull_t(betasim_null, nu_null, J, Tsize, N, burnin,
-                   Amat_mat, del, WAmat, Bartlett, logNu,
-                   wDecay = wDecay)
-  pval <- (N + 1 - sum(s0 >= sN)) / (N + 1)
+
+  if (direction == "two-sided") {
+    sN <- .simnull_t(betasim_null, nu_null, J, Tsize, N, burnin,
+                     Amat_mat, del, WAmat, Bartlett, logNu,
+                     wDecay = wDecay, direction = "two-sided")
+    pval <- (N + 1 - sum(s0 >= sN)) / (N + 1)
+    S_T <- NULL
+  } else {
+    S_T <- .signed_root(s0, mdl_alt$v, nu_null)
+    sN <- .simnull_t(betasim_null, nu_null, J, Tsize, N, burnin,
+                     Amat_mat, del, WAmat, Bartlett, logNu,
+                     wDecay = wDecay, direction = direction)
+    pval <- .pvalue_directional(S_T, sN, direction)
+  }
+
   out <- list(s0 = s0, sN = as.numeric(sN), pval = pval,
               test_type = "LMC Student-t",
               null_param = "nu", null_value = nu_null,
+              direction = direction, S_T = S_T,
               call = cl)
   class(out) <- "svp_test"
   return(out)
@@ -491,8 +613,10 @@ lmc_t <- function(y, J = 10, N = 99, nu_null, burnin = 500,
 #' @export
 lmc_ged <- function(y, J = 10, N = 99, nu_null, burnin = 500,
                     del = 1e-10, wDecay = FALSE, Bartlett = TRUE,
-                    Amat = NULL) {
+                    Amat = NULL,
+                    direction = c("two-sided", "less", "greater")) {
   cl <- match.call()
+  direction <- match.arg(direction)
   y_vec <- as.numeric(y)
   y_mat <- as.matrix(y_vec)
   Tsize <- length(y_vec)
@@ -506,17 +630,29 @@ lmc_ged <- function(y, J = 10, N = 99, nu_null, burnin = 500,
   WAmat <- wa$WAmat
   s0_tmp <- Tsize * (LRT_moment_ged(y_mat, mdl_null, Amat_mat, WAmat, del, Bartlett) -
                        LRT_moment_ged(y_mat, mdl_alt, Amat_mat, WAmat, del, Bartlett))
-  if (is.na(s0_tmp) || s0_tmp < 0) {
-    stop("Test statistic is not valid (NA or negative).")
-  }
-  s0 <- s0_tmp
+  if (is.na(s0_tmp)) stop("Test statistic is NA.")
+  if (s0_tmp < 0) warning("Test statistic is negative (", round(s0_tmp, 4), "); capped at 1e-10.")
+  s0 <- max(s0_tmp, 1e-10)
   betasim_null <- c(mdl_alt$phi, mdl_alt$sigy, mdl_alt$sigv, nu_null)
-  sN <- .simnull_ged(betasim_null, nu_null, J, Tsize, N, burnin,
-                     Amat_mat, del, WAmat, Bartlett, wDecay = wDecay)
-  pval <- (N + 1 - sum(s0 >= sN)) / (N + 1)
+
+  if (direction == "two-sided") {
+    sN <- .simnull_ged(betasim_null, nu_null, J, Tsize, N, burnin,
+                       Amat_mat, del, WAmat, Bartlett, wDecay = wDecay,
+                       direction = "two-sided")
+    pval <- (N + 1 - sum(s0 >= sN)) / (N + 1)
+    S_T <- NULL
+  } else {
+    S_T <- .signed_root(s0, mdl_alt$v, nu_null)
+    sN <- .simnull_ged(betasim_null, nu_null, J, Tsize, N, burnin,
+                       Amat_mat, del, WAmat, Bartlett, wDecay = wDecay,
+                       direction = direction)
+    pval <- .pvalue_directional(S_T, sN, direction)
+  }
+
   out <- list(s0 = s0, sN = as.numeric(sN), pval = pval,
               test_type = "LMC GED",
               null_param = "nu", null_value = nu_null,
+              direction = direction, S_T = S_T,
               call = cl)
   class(out) <- "svp_test"
   return(out)
@@ -549,7 +685,9 @@ lmc_ged <- function(y, J = 10, N = 99, nu_null, burnin = 500,
 mmc_t <- function(y, J = 10, N = 99, nu_null, burnin = 500,
                   eps = NULL, threshold = 1, method = "pso", maxit = NULL,
                   del = 1e-10, wDecay = FALSE, Bartlett = TRUE,
-                  Amat = NULL, logNu = TRUE) {
+                  Amat = NULL, logNu = TRUE,
+                  direction = c("two-sided", "less", "greater")) {
+  direction <- match.arg(direction)
   cl <- match.call()
   y_vec <- as.numeric(y)
   y_mat <- as.matrix(y_vec)
@@ -572,17 +710,29 @@ mmc_t <- function(y, J = 10, N = 99, nu_null, burnin = 500,
   mdl_null$v <- nu_null
   s0_tmp <- Tsize * (LRT_moment_t(y_mat, mdl_null, Amat_mat, WAmat, del, Bartlett) -
                        LRT_moment_t(y_mat, mdl_alt, Amat_mat, WAmat, del, Bartlett))
-  if (!is.finite(s0_tmp) || s0_tmp < 0) {
-    stop("Test statistic is not valid (NA or negative).")
+  if (!is.finite(s0_tmp)) stop("Test statistic is not finite.")
+  if (s0_tmp < 0) warning("Test statistic is negative (", round(s0_tmp, 4), "); capped at 1e-10.")
+  s0_tmp <- max(s0_tmp, 1e-10)
+  # Pre-draw innovations ONCE for fixed-error MMC (Dufour 2006, eq 4.22)
+  n_total <- burnin + Tsize
+  N_draw <- ceiling(N * 1.5) + 10L
+  innov_t <- list(
+    eta = matrix(rnorm(n_total * N_draw), nrow = n_total, ncol = N_draw),
+    eps = matrix(NA_real_, nrow = n_total, ncol = N_draw)
+  )
+  for (b in seq_len(N_draw)) {
+    innov_t$eps[, b] <- rt(n_total, df = nu_null)
   }
   out <- .run_mmc_optimizer(method, theta_0, .mmc_pval_t, lower, upper,
                             threshold, maxit,
                             y = y_mat, j = J, N = N, mdl_alt = mdl_alt,
                             nu_null = nu_null, ini = burnin, Amat = Amat_mat,
                             del = del, Bartlett = Bartlett, logNu = logNu,
-                            wDecay = wDecay)
+                            wDecay = wDecay, direction = direction,
+                            innovations = innov_t)
   out$value <- -out$value
   out$s0 <- s0_tmp
+  out$direction <- direction
   out$call <- cl
   return(out)
 }
@@ -614,7 +764,9 @@ mmc_t <- function(y, J = 10, N = 99, nu_null, burnin = 500,
 mmc_ged <- function(y, J = 10, N = 99, nu_null, burnin = 500,
                     eps = NULL, threshold = 1, method = "pso", maxit = NULL,
                     del = 1e-10, wDecay = FALSE, Bartlett = TRUE,
-                    Amat = NULL) {
+                    Amat = NULL,
+                    direction = c("two-sided", "less", "greater")) {
+  direction <- match.arg(direction)
   cl <- match.call()
   y_vec <- as.numeric(y)
   y_mat <- as.matrix(y_vec)
@@ -637,15 +789,29 @@ mmc_ged <- function(y, J = 10, N = 99, nu_null, burnin = 500,
   mdl_null$v <- nu_null
   s0_tmp <- Tsize * (LRT_moment_ged(y_mat, mdl_null, Amat_mat, WAmat, del, Bartlett) -
                        LRT_moment_ged(y_mat, mdl_alt, Amat_mat, WAmat, del, Bartlett))
-  if (!is.finite(s0_tmp) || s0_tmp < 0) {
-    stop("Test statistic is not valid (NA or negative).")
+  if (!is.finite(s0_tmp)) stop("Test statistic is not finite.")
+  if (s0_tmp < 0) warning("Test statistic is negative (", round(s0_tmp, 4), "); capped at 1e-10.")
+  s0_tmp <- max(s0_tmp, 1e-10)
+  # Pre-draw innovations ONCE for fixed-error MMC (Dufour 2006, eq 4.22)
+  n_total <- burnin + Tsize
+  N_draw <- ceiling(N * 1.5) + 10L
+  a_ged <- exp(0.5 * (lgamma(1 / nu_null) - lgamma(3 / nu_null)))
+  innov_ged <- list(
+    eta = matrix(rnorm(n_total * N_draw), nrow = n_total, ncol = N_draw),
+    eps = matrix(NA_real_, nrow = n_total, ncol = N_draw)
+  )
+  for (b in seq_len(N_draw)) {
+    x_gam <- rgamma(n_total, shape = 1 / nu_null, rate = 1)
+    innov_ged$eps[, b] <- sign(runif(n_total) - 0.5) * a_ged * x_gam^(1 / nu_null)
   }
   out <- .run_mmc_optimizer(method, theta_0, .mmc_pval_ged, lower, upper,
                             threshold, maxit,
                             y = y_mat, j = J, N = N, mdl_alt = mdl_alt,
                             nu_null = nu_null, ini = burnin, Amat = Amat_mat,
-                            del = del, Bartlett = Bartlett, wDecay = wDecay)
+                            del = del, Bartlett = Bartlett, wDecay = wDecay,
+                            direction = direction, innovations = innov_ged)
   out$value <- -out$value
+  out$direction <- direction
   out$s0 <- s0_tmp
   out$call <- cl
   return(out)

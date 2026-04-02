@@ -14,8 +14,10 @@
 #' When \code{leverage = TRUE}, the correlation between \eqn{z_t} and
 #' \eqn{v_t} is estimated as \eqn{\rho}.
 #'
-#' Heavy-tailed errors (\code{errorType = "Student-t"} or \code{"GED"})
-#' with leverage effects are not yet supported.
+#' For Student-t errors with leverage, the correction factor
+#' \eqn{C_t(\nu)} from the scale-mixture representation is applied.
+#' For GED errors with leverage, the exact implicit equation is solved
+#' via 1D root-finding with Gauss-Hermite quadrature.
 #'
 #' @param y Numeric vector. Observed returns (e.g., de-meaned log returns).
 #' @param p Integer. Order of the volatility process. Default is 1.
@@ -76,6 +78,11 @@
 #' summary(fit3)
 #' }
 #'
+#' @param sigvMethod Method for sigma_v estimation: \code{"factored"} (default),
+#'   \code{"direct"}, or \code{"hybrid"}.
+#' @param winsorize_eps Number of extreme autocovariance lags to winsorize
+#'   (0 = none). Used in Student-t/GED sigma_eps estimation.
+#'
 #' @seealso \code{\link{svpSE}} for standard errors.
 #'
 #' @references
@@ -90,26 +97,27 @@
 svp <- function(y, p = 1, J = 10, leverage = FALSE, errorType = "Gaussian",
                 rho_type = "pearson", del = 1e-10, trunc_lev = TRUE,
                 wDecay = FALSE, logNu = FALSE,
-                sigvMethod = "hybrid", winsorize_eps = 0) {
+                sigvMethod = "factored", winsorize_eps = 0) {
   cl <- match.call()
   y <- as.numeric(y)
   errorType <- match.arg(errorType, c("Gaussian", "Student-t", "GED"))
-  # Validate combinations
-
-  if (errorType != "Gaussian" && leverage) {
-    stop("Leverage with heavy-tailed errors is not yet supported. ",
-         "Use errorType = 'Gaussian' with leverage = TRUE, or ",
-         "errorType = '", errorType, "' with leverage = FALSE.")
-  }
   sigvMethod <- match.arg(sigvMethod, c("hybrid", "direct", "factored"))
-  # Dispatch
+  # Dispatch: estimate base model (without leverage)
   if (errorType == "Gaussian") {
     out <- .svp_gaussian(y, p, J, leverage, rho_type, del, trunc_lev, wDecay,
                          sigvMethod)
   } else if (errorType == "Student-t") {
     out <- .svp_t(y, p, J, del, wDecay, logNu, sigvMethod, winsorize_eps)
+    if (leverage) {
+      out <- .add_leverage(out, y, as.integer(p), rho_type, del, trunc_lev,
+                           wDecay, "Student-t")
+    }
   } else if (errorType == "GED") {
     out <- .svp_ged(y, p, J, del, wDecay, sigvMethod, winsorize_eps)
+    if (leverage) {
+      out <- .add_leverage(out, y, as.integer(p), rho_type, del, trunc_lev,
+                           wDecay, "GED")
+    }
   }
   out$errorType <- errorType
   out$call <- cl

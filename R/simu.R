@@ -14,8 +14,10 @@
 #' When \code{leverage = TRUE}, the correlation between \eqn{z_t} and
 #' \eqn{v_t} is \eqn{\rho}.
 #'
-#' Heavy-tailed errors (\code{errorType = "Student-t"} or \code{"GED"})
-#' with leverage effects are not yet supported.
+#' For Student-t errors with leverage, the scale-mixture representation
+#' \eqn{u_t = z_t \lambda_t^{-1/2}} is used, where leverage operates through
+#' the Gaussian component \eqn{z_t}. For GED errors with leverage, a Gaussian
+#' copula construction \eqn{u_t = F_{GED}^{-1}(\Phi(z_t))} is used.
 #'
 #' @param n Integer. Length of the simulated series.
 #' @param phi Numeric vector. AR coefficients for log-volatility (length p).
@@ -77,10 +79,6 @@ sim_svp <- function(n, phi, sigy, sigv, errorType = "Gaussian",
   p <- length(phi)
   errorType <- match.arg(errorType, c("Gaussian", "Student-t", "GED"))
 
-  if (errorType != "Gaussian" && leverage) {
-    stop("Leverage with heavy-tailed errors is not yet supported.")
-  }
-
   if (errorType == "Gaussian") {
     if (leverage) {
       if (abs(rho) > 1) stop("rho must be in [-1, 1].")
@@ -99,17 +97,39 @@ sim_svp <- function(n, phi, sigy, sigv, errorType = "Gaussian",
   } else if (errorType == "Student-t") {
     if (is.null(nu)) stop("nu is required for Student-t errors.")
     if (nu <= 2) stop("nu must be > 2 for Student-t errors.")
-    beta <- c(phi, sigy, sigv, nu)
-    y <- sim_sv_t_cpp(beta, p, n, K, burnin)
-    if (K == 1) return(as.numeric(y))
-    return(y)
+    if (leverage) {
+      if (abs(rho) > 1) stop("rho must be in [-1, 1].")
+      beta <- c(phi, sigy, sigv, nu, rho)
+      out <- sim_svp_leverage_t_cpp(beta, p, n, burnin)
+      out$y <- as.numeric(out$y)
+      out$h <- as.numeric(out$h)
+      out$zeta <- as.numeric(out$zeta)
+      out$veta <- as.numeric(out$veta)
+      return(out)
+    } else {
+      beta <- c(phi, sigy, sigv, nu)
+      y <- sim_sv_t_cpp(beta, p, n, K, burnin)
+      if (K == 1) return(as.numeric(y))
+      return(y)
+    }
   } else if (errorType == "GED") {
     if (is.null(nu)) stop("nu is required for GED errors.")
     if (nu <= 0) stop("nu must be > 0 for GED errors.")
-    beta <- c(phi, sigy, sigv, nu)
-    y <- sim_sv_ged_cpp(beta, p, n, K, burnin)
-    if (K == 1) return(as.numeric(y))
-    return(y)
+    if (leverage) {
+      if (abs(rho) > 1) stop("rho must be in [-1, 1].")
+      beta <- c(phi, sigy, sigv, nu, rho)
+      out <- sim_svp_leverage_ged_cpp(beta, p, n, burnin)
+      out$y <- as.numeric(out$y)
+      out$h <- as.numeric(out$h)
+      out$zeta <- as.numeric(out$zeta)
+      out$veta <- as.numeric(out$veta)
+      return(out)
+    } else {
+      beta <- c(phi, sigy, sigv, nu)
+      y <- sim_sv_ged_cpp(beta, p, n, K, burnin)
+      if (K == 1) return(as.numeric(y))
+      return(y)
+    }
   }
 }
 

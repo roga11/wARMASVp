@@ -9,30 +9,30 @@ kalman_filter(y, model, del = 1e-10)
 \arguments{
 \item{y}{Numeric vector. Observed returns.}
 
-\item{model}{An \code{"svp"} object from \code{\link{svp}}. Accepts classes
-\code{"svp"}, \code{"svp_t"}, and \code{"svp_ged"}.}
+\item{model}{An \code{"svp"}, \code{"svp_t"}, or \code{"svp_ged"} object
+from \code{\link{svp}}.}
 
 \item{del}{Numeric. Small constant for log transformation. Default \code{1e-10}.}
 }
 \value{
 A list with:
 \describe{
-  \item{w_estimated}{Filtered log-volatility (Kalman filter output).}
-  \item{w_smoothed}{Smoothed log-volatility (Kalman smoother output).}
+  \item{w_estimated}{Filtered log-volatility.}
+  \item{w_smoothed}{Smoothed log-volatility.}
   \item{zt}{Filtered standardized residuals.}
   \item{zt_smoothed}{Smoothed standardized residuals.}
+  \item{P_filtered}{Filtered MSE (first state component).}
+  \item{P_predicted}{Predicted MSE (first state component).}
+  \item{xi_filtered}{Full filtered state vectors (p x T matrix).}
+  \item{xi_smoothed}{Full smoothed state vectors (p x T matrix).}
+  \item{loglik}{Approximate Gaussian log-likelihood.}
 }
 }
 \description{
-Applies Kalman filtering and Rauch-Tung-Striebel smoothing to estimate the
-latent log-volatility process from an estimated SV(p) model.
-}
-\note{
-The Kalman filter update uses a Gaussian approximation for the
-  measurement equation. For Student-t and GED models, the
-  distribution-specific measurement noise variance
-  \eqn{\sigma_\varepsilon^2(\nu)} is used in place of
-  \eqn{\pi^2/2}, but the filter update itself remains linear-Gaussian.
+Applies corrected Kalman filtering (CKF) and Rauch-Tung-Striebel smoothing
+to estimate the latent log-volatility process from an estimated SV(p) model.
+Uses distribution-specific measurement noise variance
+\eqn{\sigma_\varepsilon^2(\nu)}.
 }
 \examples{
 \donttest{

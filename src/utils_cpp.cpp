@@ -78,6 +78,22 @@ arma::cx_vec signR_cpp(arma::cx_vec vec) {
   }
 }
 
+// Quantile function for standardized GED(nu) with Var=1
+// Uses the relationship: F_GED^{-1}(p) = a * qgamma(2*(p-0.5), 1/nu, 1)^{1/nu}
+// where a = sqrt(Gamma(1/nu) / Gamma(3/nu)).
+// Input p is clamped to [1e-15, 1-1e-15].
+double qged_std_cpp(double p, double nu) {
+  // Clamp to avoid Inf from qgamma
+  if (p < 1e-15) p = 1e-15;
+  if (p > 1.0 - 1e-15) p = 1.0 - 1e-15;
+  double a = std::exp(0.5 * (R::lgammafn(1.0 / nu) - R::lgammafn(3.0 / nu)));
+  if (p >= 0.5) {
+    return a * std::pow(R::qgamma(2.0 * (p - 0.5), 1.0 / nu, 1.0, 1, 0), 1.0 / nu);
+  } else {
+    return -a * std::pow(R::qgamma(2.0 * (0.5 - p), 1.0 / nu, 1.0, 1, 0), 1.0 / nu);
+  }
+}
+
 // [[Rcpp::export]]
 arma::vec rged_cpp(int n, double mean = 0.0, double sd = 1.0, double nu = 2.0) {
   // Generalized Error Distribution random deviates

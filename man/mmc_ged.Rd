@@ -17,7 +17,8 @@ mmc_ged(
   del = 1e-10,
   wDecay = FALSE,
   Bartlett = TRUE,
-  Amat = NULL
+  Amat = NULL,
+  direction = c("two-sided", "less", "greater")
 )
 }
 \arguments{
@@ -49,6 +50,10 @@ Default \code{TRUE}.}
 
 \item{Amat}{Weighting matrix specification. \code{NULL} for identity,
 \code{"Weighted"} for data-driven HAC, or a 4x4 matrix. Default \code{NULL}.}
+
+\item{direction}{Character. Test direction: \code{"two-sided"} (default),
+\code{"less"} (H1: nu < nu_null), or \code{"greater"} (H1: nu > nu_null).
+Uses signed root of the LR statistic for one-sided tests.}
 }
 \value{
 A list with optimization output including \code{value} (maximized p-value)

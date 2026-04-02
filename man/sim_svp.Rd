@@ -71,8 +71,10 @@ where \eqn{z_t} follows a distribution specified by \code{errorType}
 When \code{leverage = TRUE}, the correlation between \eqn{z_t} and
 \eqn{v_t} is \eqn{\rho}.
 
-Heavy-tailed errors (\code{errorType = "Student-t"} or \code{"GED"})
-with leverage effects are not yet supported.
+For Student-t errors with leverage, the scale-mixture representation
+\eqn{u_t = z_t \lambda_t^{-1/2}} is used, where leverage operates through
+the Gaussian component \eqn{z_t}. For GED errors with leverage, a Gaussian
+copula construction \eqn{u_t = F_{GED}^{-1}(\Phi(z_t))} is used.
 }
 \examples{
 \donttest{

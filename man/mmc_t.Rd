@@ -18,7 +18,8 @@ mmc_t(
   wDecay = FALSE,
   Bartlett = TRUE,
   Amat = NULL,
-  logNu = TRUE
+  logNu = TRUE,
+  direction = c("two-sided", "less", "greater")
 )
 }
 \arguments{
@@ -52,6 +53,10 @@ Default \code{TRUE}.}
 \code{"Weighted"} for data-driven HAC, or a 4x4 matrix. Default \code{NULL}.}
 
 \item{logNu}{Logical. Use log-space for nu estimation. Default \code{TRUE}.}
+
+\item{direction}{Character. Test direction: \code{"two-sided"} (default),
+\code{"less"} (H1: nu < nu_null), or \code{"greater"} (H1: nu > nu_null).
+Uses signed root of the LR statistic for one-sided tests.}
 }
 \value{
 A list with optimization output including \code{value} (maximized p-value)

@@ -15,7 +15,11 @@ lmc_lev(
   del = 1e-10,
   trunc_lev = TRUE,
   wDecay = FALSE,
-  Bartlett = FALSE
+  Bartlett = FALSE,
+  errorType = "Gaussian",
+  logNu = FALSE,
+  sigvMethod = "factored",
+  winsorize_eps = 0
 )
 }
 \arguments{
@@ -42,6 +46,18 @@ lmc_lev(
 
 \item{Bartlett}{Logical. If \code{TRUE}, use Bartlett kernel HAC weighting
 matrix. If \code{FALSE}, use identity matrix. Default \code{FALSE}.}
+
+\item{errorType}{Character. Error distribution: \code{"Gaussian"} (default),
+\code{"Student-t"}, or \code{"GED"}.}
+
+\item{logNu}{Logical. Use log-space for nu estimation (Student-t only).
+Default \code{FALSE}.}
+
+\item{sigvMethod}{Method for sigma_v estimation: \code{"factored"} (default),
+\code{"direct"}, or \code{"hybrid"}.}
+
+\item{winsorize_eps}{Number of extreme autocovariance lags to winsorize
+(0 = none). Default 0.}
 }
 \value{
 An object of class \code{"svp_test"}, a list containing:
@@ -63,7 +79,6 @@ using a GMM likelihood-ratio type statistic.
 \examples{
 \donttest{
 y <- sim_svp(1000, phi = 0.95, sigy = 1, sigv = 0.2, leverage = TRUE, rho = -0.3)$y
-fit <- svp(y, p = 1, leverage = TRUE)
 test <- lmc_lev(y, p = 1, J = 10, N = 99)
 print(test)
 }

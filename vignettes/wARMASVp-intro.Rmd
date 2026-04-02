@@ -16,8 +16,8 @@ knitr::opts_chunk$set(
 ```
 
 The **wARMASVp** package provides closed-form estimation, simulation, hypothesis
-testing, and forecasting for higher-order stochastic volatility SV(p) models.
-It supports Gaussian, Student-t, and Generalized Error Distribution (GED)
+testing, filtering, and forecasting for higher-order stochastic volatility SV(p)
+models. It supports Gaussian, Student-t, and Generalized Error Distribution (GED)
 innovations, with optional leverage effects.
 
 ## The SV(p) Model
@@ -84,43 +84,94 @@ fit_lev <- svp(sim_lev$y, p = 1, leverage = TRUE)
 summary(fit_lev)
 ```
 
+Leverage is supported for all three distributions:
+
+```{r leverage-t}
+sim_lev_t <- sim_svp(2000, phi = 0.90, sigy = 1, sigv = 0.3,
+                     errorType = "Student-t", nu = 5,
+                     leverage = TRUE, rho = -0.5)
+fit_lev_t <- svp(sim_lev_t$y, p = 1, errorType = "Student-t", leverage = TRUE)
+summary(fit_lev_t)
+```
+
 ## Hypothesis Testing
 
 The package provides Local Monte Carlo (LMC) and Maximized Monte Carlo (MMC)
-tests. Here we test for AR order (is SV(1) sufficient vs SV(2)?):
+tests based on Dufour (2006).
+
+### AR Order Testing
+
+Test whether SV(1) is sufficient versus SV(2):
 
 ```{r test-ar}
-# Generate from SV(1)
 y_test <- sim_svp(2000, phi = 0.95, sigy = 1, sigv = 0.3)
 
-# Test H0: SV(1) vs H1: SV(2) — should not reject
+# H0: SV(1) vs H1: SV(2) — should not reject
 test_ar <- lmc_ar(y_test, p_null = 1, p_alt = 2, N = 49)
 print(test_ar)
 ```
 
-Test for leverage:
+### Leverage Testing
 
 ```{r test-lev}
 test_lev <- lmc_lev(y_test, p = 1, N = 49)
 print(test_lev)
 ```
 
+### Distribution Testing
+
+Test for heavy tails against a specific null value of the tail parameter:
+
+```{r test-dist}
+# Test H0: nu = 10 (mild tails) on Student-t data with true nu = 5
+test_t <- lmc_t(yt, nu_null = 10, N = 49)
+print(test_t)
+
+# Directional test: H1: nu < 10 (heavier tails than null)
+test_t_dir <- lmc_t(yt, nu_null = 10, N = 49, direction = "less")
+print(test_t_dir)
+```
+
+## Filtering
+
+Three methods are available via `filter_svp()`, which takes a fitted model:
+
+- **Corrected Kalman Filter (CKF)**: Gaussian approximation, fast.
+- **Gaussian Mixture Kalman Filter (GMKF)**: KSC (1998) 7-component mixture.
+  Recommended — dominates CKF even under Gaussianity.
+- **Bootstrap Particle Filter (BPF)**: Exact density weights. Gold-standard benchmark.
+
+```{r filtering}
+# Fit model
+fit_filt <- svp(y, p = 1, J = 10)
+
+# GMKF (recommended)
+filt <- filter_svp(fit_filt, method = "mixture")
+plot(filt)
+```
+
 ## Forecasting
 
-Multi-step ahead volatility forecasts using Kalman filtering:
+Multi-step ahead volatility forecasts using Kalman filtering. Pass a fitted
+model object from `svp()`:
 
 ```{r forecast}
-y_fc <- sim_svp(500, phi = 0.95, sigy = 1, sigv = 0.3,
-                leverage = TRUE, rho = -0.3)$y
-fc <- forecast_svp(y_fc, p = 1, H = 20)
+fit_fc <- svp(sim_lev$y, p = 1, leverage = TRUE)
+fc <- forecast_svp(fit_fc, H = 20)
 plot(fc)
 ```
+
+Output scales can be chosen: `"log-variance"` (default), `"variance"`, or
+`"volatility"`. All three are always computed and stored.
 
 ## References
 
 - Ahsan, N. and Dufour, J.-M. (2021). Simple estimators and inference for
   higher-order stochastic volatility models. *Journal of Econometrics*,
   224(1), 181-197.
-- Ahsan, N., Dufour, J.-M., and Rodriguez Rondon, G. (2025). Estimation and
-  inference for higher-order stochastic volatility models with leverage.
-  *Journal of Time Series Analysis*.
+- Ahsan, N., Dufour, J.-M., Rodriguez Rondon, G., and Romero, A. (2025).
+  Estimation and inference for higher-order stochastic volatility models with
+  leverage. *Journal of Time Series Analysis*.
+- Dufour, J.-M. (2006). Monte Carlo tests with nuisance parameters: A general
+  approach to finite-sample inference and nonstandard asymptotics.
+  *Journal of Econometrics*, 133(2), 443-477.

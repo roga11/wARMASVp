@@ -13,6 +13,94 @@ svpCpp_h_ahead <- function(u, p, J, h, del, wDecay = FALSE) {
     .Call(`_wARMASVp_svpCpp_h_ahead`, u, p, J, h, del, wDecay)
 }
 
+solve_lyapunov_discrete_cpp <- function(F_mat, Q) {
+    .Call(`_wARMASVp_solve_lyapunov_discrete_cpp`, F_mat, Q)
+}
+
+kalman_filter_cpp <- function(y_star, y_raw, phi, sigma_y, sigma_v, delta_p, sig_eps2, var_zt, P0) {
+    .Call(`_wARMASVp_kalman_filter_cpp`, y_star, y_raw, phi, sigma_y, sigma_v, delta_p, sig_eps2, var_zt, P0)
+}
+
+gmkf_filter_cpp <- function(y_star, y_raw, phi, sigma_y, sigma_v, delta_p, var_zt, mix_weights, mix_means, mix_vars, mu_intercept, P0) {
+    .Call(`_wARMASVp_gmkf_filter_cpp`, y_star, y_raw, phi, sigma_y, sigma_v, delta_p, var_zt, mix_weights, mix_means, mix_vars, mu_intercept, P0)
+}
+
+LRT_moment_lev_svp_cpp <- function(y, mdl_out, Amat, rho_type, del = 1e-10) {
+    .Call(`_wARMASVp_LRT_moment_lev_svp_cpp`, y, mdl_out, Amat, rho_type, del)
+}
+
+LRT_moment_lev_t_cpp <- function(y, mdl_out, Amat, rho_type, del = 1e-10) {
+    .Call(`_wARMASVp_LRT_moment_lev_t_cpp`, y, mdl_out, Amat, rho_type, del)
+}
+
+LRT_moment_lev_ged_cpp <- function(y, mdl_out, Amat, rho_type, del, gh_nodes, gh_weights) {
+    .Call(`_wARMASVp_LRT_moment_lev_ged_cpp`, y, mdl_out, Amat, rho_type, del, gh_nodes, gh_weights)
+}
+
+LRT_moment_t_cpp <- function(y, mdl_out, Amat, WAmat = FALSE, del = 1e-10, Bartlett = TRUE, pinv_fn = NULL) {
+    .Call(`_wARMASVp_LRT_moment_t_cpp`, y, mdl_out, Amat, WAmat, del, Bartlett, pinv_fn)
+}
+
+LRT_moment_ged_cpp <- function(y, mdl_out, Amat, WAmat = FALSE, del = 1e-10, Bartlett = TRUE, pinv_fn = NULL) {
+    .Call(`_wARMASVp_LRT_moment_ged_cpp`, y, mdl_out, Amat, WAmat, del, Bartlett, pinv_fn)
+}
+
+LRT_moment_lev_svp_Amat_cpp <- function(y, mdl_out, rho_type, del = 1e-10, Bartlett = TRUE, pinv_fn = NULL) {
+    .Call(`_wARMASVp_LRT_moment_lev_svp_Amat_cpp`, y, mdl_out, rho_type, del, Bartlett, pinv_fn)
+}
+
+LRT_moment_ar_Amat_cpp <- function(y, mdl_out, del = 1e-10, Bartlett = TRUE, pinv_fn = NULL) {
+    .Call(`_wARMASVp_LRT_moment_ar_Amat_cpp`, y, mdl_out, del, Bartlett, pinv_fn)
+}
+
+LRT_moment_lev_t_Amat_cpp <- function(y, mdl_out, rho_type, del = 1e-10, Bartlett = TRUE, pinv_fn = NULL) {
+    .Call(`_wARMASVp_LRT_moment_lev_t_Amat_cpp`, y, mdl_out, rho_type, del, Bartlett, pinv_fn)
+}
+
+LRT_moment_lev_ged_Amat_cpp <- function(y, mdl_out, rho_type, del, Bartlett, pinv_fn, gh_nodes, gh_weights) {
+    .Call(`_wARMASVp_LRT_moment_lev_ged_Amat_cpp`, y, mdl_out, rho_type, del, Bartlett, pinv_fn, gh_nodes, gh_weights)
+}
+
+particle_filter_svp_cpp <- function(y_raw, phi, sigma_y, sigma_v, nu, dist_code, delta, M, seed) {
+    .Call(`_wARMASVp_particle_filter_svp_cpp`, y_raw, phi, sigma_y, sigma_v, nu, dist_code, delta, M, seed)
+}
+
+find_nu_t_cpp <- function(se2b, nu_lower = 2.01, nu_upper = 500.0, logNu = FALSE, tol = 1e-6, maxiter = 1000L) {
+    .Call(`_wARMASVp_find_nu_t_cpp`, se2b, nu_lower, nu_upper, logNu, tol, maxiter)
+}
+
+find_nu_ged_cpp <- function(se2, lower, upper, tol = 1e-6, maxiter = 1000L) {
+    .Call(`_wARMASVp_find_nu_ged_cpp`, se2, lower, upper, tol, maxiter)
+}
+
+find_delta_ged_cpp <- function(target, sigv, nu, gh_nodes, gh_weights, tol = 1e-8) {
+    .Call(`_wARMASVp_find_delta_ged_cpp`, target, sigv, nu, gh_nodes, gh_weights, tol)
+}
+
+sim_from_innov_gaussian_cpp <- function(phi, sigma_y, sigma_v, eta_vec, eps_vec, p, T_out, burnin) {
+    .Call(`_wARMASVp_sim_from_innov_gaussian_cpp`, phi, sigma_y, sigma_v, eta_vec, eps_vec, p, T_out, burnin)
+}
+
+sim_from_innov_gaussian_lev_cpp <- function(phi, sigma_y, sigma_v, rho, zeta_vec, aux_vec, p, T_out, burnin) {
+    .Call(`_wARMASVp_sim_from_innov_gaussian_lev_cpp`, phi, sigma_y, sigma_v, rho, zeta_vec, aux_vec, p, T_out, burnin)
+}
+
+sim_from_innov_t_cpp <- function(phi, sigma_y, sigma_v, eta_vec, eps_vec, p, T_out, burnin) {
+    .Call(`_wARMASVp_sim_from_innov_t_cpp`, phi, sigma_y, sigma_v, eta_vec, eps_vec, p, T_out, burnin)
+}
+
+sim_from_innov_ged_cpp <- function(phi, sigma_y, sigma_v, eta_vec, eps_vec, p, T_out, burnin) {
+    .Call(`_wARMASVp_sim_from_innov_ged_cpp`, phi, sigma_y, sigma_v, eta_vec, eps_vec, p, T_out, burnin)
+}
+
+sim_from_innov_t_lev_cpp <- function(phi, sigma_y, sigma_v, nu, rho, zeta_vec, aux_vec, U_chi2_vec, p, T_out, burnin) {
+    .Call(`_wARMASVp_sim_from_innov_t_lev_cpp`, phi, sigma_y, sigma_v, nu, rho, zeta_vec, aux_vec, U_chi2_vec, p, T_out, burnin)
+}
+
+sim_from_innov_ged_lev_cpp <- function(phi, sigma_y, sigma_v, nu, rho, zeta_vec, aux_vec, p, T_out, burnin) {
+    .Call(`_wARMASVp_sim_from_innov_ged_lev_cpp`, phi, sigma_y, sigma_v, nu, rho, zeta_vec, aux_vec, p, T_out, burnin)
+}
+
 sim_svp_norm_cpp <- function(beta, p, N, burnin) {
     .Call(`_wARMASVp_sim_svp_norm_cpp`, beta, p, N, burnin)
 }
@@ -27,6 +115,14 @@ sim_sv_t_cpp <- function(beta, p, N, K, burnin) {
 
 sim_sv_ged_cpp <- function(beta, p, N, K, burnin) {
     .Call(`_wARMASVp_sim_sv_ged_cpp`, beta, p, N, K, burnin)
+}
+
+sim_svp_leverage_t_cpp <- function(beta, p, N, burnin) {
+    .Call(`_wARMASVp_sim_svp_leverage_t_cpp`, beta, p, N, burnin)
+}
+
+sim_svp_leverage_ged_cpp <- function(beta, p, N, burnin) {
+    .Call(`_wARMASVp_sim_svp_leverage_ged_cpp`, beta, p, N, burnin)
 }
 
 statPhi_cpp <- function(phiB) {

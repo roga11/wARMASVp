@@ -15,7 +15,7 @@ svp(
   trunc_lev = TRUE,
   wDecay = FALSE,
   logNu = FALSE,
-  sigvMethod = "hybrid",
+  sigvMethod = "factored",
   winsorize_eps = 0
 )
 }
@@ -49,6 +49,12 @@ Default is \code{FALSE}.}
 
 \item{logNu}{Logical. Solve for \eqn{\nu} in log-space for numerical
 stability (Student-t only). Default is \code{FALSE}.}
+
+\item{sigvMethod}{Method for sigma_v estimation: \code{"factored"} (default),
+\code{"direct"}, or \code{"hybrid"}.}
+
+\item{winsorize_eps}{Number of extreme autocovariance lags to winsorize
+(0 = none). Used in Student-t/GED sigma_eps estimation.}
 }
 \value{
 Depending on \code{errorType}:
@@ -86,8 +92,10 @@ where \eqn{z_t} follows a distribution specified by \code{errorType}
 When \code{leverage = TRUE}, the correlation between \eqn{z_t} and
 \eqn{v_t} is estimated as \eqn{\rho}.
 
-Heavy-tailed errors (\code{errorType = "Student-t"} or \code{"GED"})
-with leverage effects are not yet supported.
+For Student-t errors with leverage, the correction factor
+\eqn{C_t(\nu)} from the scale-mixture representation is applied.
+For GED errors with leverage, the exact implicit equation is solved
+via 1D root-finding with Gauss-Hermite quadrature.
 }
 \examples{
 \donttest{

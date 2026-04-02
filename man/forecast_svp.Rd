@@ -5,77 +5,60 @@
 \title{Multi-Step Ahead Volatility Forecast}
 \usage{
 forecast_svp(
-  y,
-  p = 1,
-  J = 10,
+  object,
   H = 1,
-  leverage = TRUE,
-  errorType = "Gaussian",
-  rho_type = "pearson",
-  del = 1e-10,
-  trunc_lev = TRUE,
-  wDecay = FALSE,
-  logNu = FALSE,
-  sigvMethod = "hybrid",
-  winsorize_eps = 0
+  output = c("log-variance", "variance", "volatility"),
+  filter_method = "corrected",
+  del = 1e-10
 )
 }
 \arguments{
-\item{y}{Numeric vector. Observed returns.}
-
-\item{p}{Integer. Order of the volatility process. Default 1.}
-
-\item{J}{Integer. Winsorizing parameter. Default 10.}
+\item{object}{An \code{"svp"}, \code{"svp_t"}, or \code{"svp_ged"} object
+from \code{\link{svp}}.}
 
 \item{H}{Integer. Maximum forecast horizon. Default 1.}
 
-\item{leverage}{Logical. Estimate leverage. Default \code{TRUE}.}
+\item{output}{Character. Primary output scale: \code{"log-variance"} (default,
+native log-volatility w_h), \code{"variance"} (conditional variance
+\eqn{\sigma^2_{T+h|T}}), or \code{"volatility"} (conditional std dev
+\eqn{\sigma_{T+h|T}}). All three are always computed and stored; this
+controls which is used by \code{print} and \code{plot} methods.}
 
-\item{errorType}{Character. Innovation distribution: \code{"Gaussian"},
-\code{"Student-t"}, or \code{"GED"}. Default \code{"Gaussian"}.}
-
-\item{rho_type}{Character. Correlation type for leverage. Default \code{"pearson"}.}
+\item{filter_method}{Character. Filter method: \code{"corrected"} (default)
+or \code{"mixture"} (GMKF).}
 
 \item{del}{Numeric. Small constant for log transformation. Default \code{1e-10}.}
-
-\item{trunc_lev}{Logical. Truncate leverage correlation estimate to
-\code{[-0.999, 0.999]}. Default \code{TRUE}.}
-
-\item{wDecay}{Logical. Use decaying weights. Default \code{FALSE}.}
-
-\item{logNu}{Logical. Solve for \eqn{\nu} in log-space for numerical
-stability (Student-t only). Default \code{FALSE}.}
 }
 \value{
 An object of class \code{"svp_forecast"}, a list containing:
 \describe{
+  \item{w_forecasted}{Primary forecast (scale determined by \code{output}).}
+  \item{log_var_forecast}{Log-volatility forecasts w_{T+h|T}.}
+  \item{var_forecast}{Conditional variance forecasts \eqn{\sigma^2_{T+h|T}}.}
+  \item{vol_forecast}{Conditional volatility forecasts \eqn{\sigma_{T+h|T}}.}
+  \item{P_forecast}{Forecast MSE P_{T+h|T} for each horizon.}
   \item{w_estimated}{Filtered log-volatility.}
   \item{w_smoothed}{Smoothed log-volatility.}
-  \item{w_forecasted}{Forecasted log-volatility for horizons 1 to H.}
   \item{zt}{Filtered standardized residuals.}
   \item{zt_smoothed}{Smoothed standardized residuals.}
   \item{ys}{Demeaned log-squared returns.}
-  \item{mdl}{The estimated \code{"svp"} model object.}
+  \item{mdl}{The estimated model object.}
   \item{H}{The forecast horizon.}
+  \item{output}{The chosen output scale.}
+  \item{filter_output}{The \code{"svp_filter"} object from filtering.}
 }
 }
 \description{
-Estimates an SV(p) model, applies Kalman filtering/smoothing, and produces
-multi-step ahead forecasts of log-volatility.
-}
-\note{
-The Kalman filter update step uses a Gaussian approximation for the
-  measurement equation regardless of \code{errorType}. When
-  \code{errorType} is \code{"Student-t"} or \code{"GED"}, the
-  distribution-specific measurement noise variance \eqn{\sigma_\varepsilon^2}
-  is used, but the filter update remains linear-Gaussian. This is standard
-  practice for non-Gaussian state-space models.
+Applies Kalman filtering/smoothing to an estimated SV(p) model and produces
+multi-step ahead volatility forecasts with uncertainty quantification.
 }
 \examples{
 \donttest{
-y <- sim_svp(1000, phi = 0.95, sigy = 1, sigv = 0.2, leverage = TRUE, rho = -0.3)$y
-fc <- forecast_svp(y, p = 1, H = 10)
-plot(fc$w_forecasted, type = "h", main = "Forecasted log-volatility")
+sim <- sim_svp(1000, phi = 0.95, sigy = 1, sigv = 0.2,
+               leverage = TRUE, rho = -0.3)
+fit <- svp(sim$y, p = 1, leverage = TRUE)
+fc <- forecast_svp(fit, H = 10)
+plot(fc)
 }
 
 }

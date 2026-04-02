@@ -19,7 +19,11 @@ mmc_lev(
   del = 1e-10,
   trunc_lev = TRUE,
   wDecay = FALSE,
-  Bartlett = FALSE
+  Bartlett = FALSE,
+  errorType = "Gaussian",
+  logNu = FALSE,
+  sigvMethod = "factored",
+  winsorize_eps = 0
 )
 }
 \arguments{
@@ -42,7 +46,7 @@ estimated nuisance parameters. Default \code{rep(0.3, p+2)}.}
 Default 1.}
 
 \item{method}{Character. Optimization method: \code{"pso"} (particle swarm),
-\code{"GenSA"} (generalized simulated annealing), or \code{"gridSearch"}.
+\code{"GenSA"} (generalized simulated annealing).
 Default \code{"pso"}.}
 
 \item{maxit}{Integer or list. Maximum iterations/evaluations for the
@@ -59,6 +63,18 @@ optimizer. Default depends on method.}
 
 \item{Bartlett}{Logical. If \code{TRUE}, use Bartlett kernel HAC weighting
 matrix. If \code{FALSE}, use identity matrix. Default \code{FALSE}.}
+
+\item{errorType}{Character. Error distribution: \code{"Gaussian"} (default),
+\code{"Student-t"}, or \code{"GED"}.}
+
+\item{logNu}{Logical. Use log-space for nu estimation (Student-t only).
+Default \code{FALSE}.}
+
+\item{sigvMethod}{Method for sigma_v estimation: \code{"factored"} (default),
+\code{"direct"}, or \code{"hybrid"}.}
+
+\item{winsorize_eps}{Number of extreme autocovariance lags to winsorize
+(0 = none). Default 0.}
 }
 \value{
 A list with the optimization output including:
