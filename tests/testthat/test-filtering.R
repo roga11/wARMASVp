@@ -276,3 +276,45 @@ test_that("plot.svp_filter runs without error", {
   filt <- filter_svp(m$fit)
   expect_silent(suppressWarnings(plot(filt)))
 })
+
+
+# =========================================================================== #
+# Regression tests: P_filt_T full matrix (Bug 3 fix) and pinv stability (Bug 4)
+# =========================================================================== #
+
+test_that("filter_svp returns P_filt_T as a p x p matrix (p=1)", {
+  set.seed(42)
+  y <- as.numeric(sim_svp(300, phi = 0.95, sigy = 1, sigv = 0.3))
+  fit <- svp(y, p = 1)
+  filt <- filter_svp(fit, method = "corrected")
+  expect_true("P_filt_T" %in% names(filt))
+  expect_equal(dim(filt$P_filt_T), c(1L, 1L))
+  expect_true(filt$P_filt_T[1, 1] > 0)
+})
+
+test_that("filter_svp returns full P_filt_T with non-zero off-diagonals (p=2)", {
+  set.seed(42)
+  y <- sim_svp(500, phi = c(0.20, 0.63), sigy = 1, sigv = 1)
+  fit <- svp(y, p = 2)
+  filt_ckf  <- filter_svp(fit, method = "corrected")
+  filt_gmkf <- filter_svp(fit, method = "mixture")
+  # Dimension check
+  expect_equal(dim(filt_ckf$P_filt_T),  c(2L, 2L))
+  expect_equal(dim(filt_gmkf$P_filt_T), c(2L, 2L))
+  # Off-diagonal should be non-zero for p=2 (was zero under diagonal approx)
+  expect_true(abs(filt_ckf$P_filt_T[1, 2])  > 1e-6)
+  expect_true(abs(filt_gmkf$P_filt_T[1, 2]) > 1e-6)
+  # Matrix should be symmetric and positive definite
+  expect_true(isSymmetric(filt_ckf$P_filt_T, tol = 1e-10))
+  expect_true(all(eigen(filt_ckf$P_filt_T, only.values = TRUE)$values > 0))
+})
+
+test_that("RTS smoother (pinv) produces no NaN/Inf on near-unit-root SV(2)", {
+  set.seed(42)
+  y <- sim_svp(400, phi = c(0.50, 0.49), sigy = 1, sigv = 0.5)
+  fit <- svp(y, p = 2)
+  filt_ckf  <- filter_svp(fit, method = "corrected")
+  filt_gmkf <- filter_svp(fit, method = "mixture")
+  expect_false(any(is.nan(filt_ckf$w_smoothed)  | is.infinite(filt_ckf$w_smoothed)))
+  expect_false(any(is.nan(filt_gmkf$w_smoothed) | is.infinite(filt_gmkf$w_smoothed)))
+})

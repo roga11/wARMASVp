@@ -121,7 +121,7 @@ List kalman_filter_cpp(const arma::vec& y_star,
   P_smooth_arr.slice(T - 1) = P_filt_arr.slice(T - 1);
 
   for (int t = T - 2; t >= 0; t--) {
-    arma::mat A = P_filt_arr.slice(t) * F_mat.t() * arma::inv(P_pred_arr.slice(t + 1));
+    arma::mat A = P_filt_arr.slice(t) * F_mat.t() * arma::pinv(P_pred_arr.slice(t + 1));
     xi_smooth.col(t) = xi_filt.col(t) + A * (xi_smooth.col(t + 1) - xi_pred.col(t + 1));
     P_smooth_arr.slice(t) = P_filt_arr.slice(t) +
       A * (P_smooth_arr.slice(t + 1) - P_pred_arr.slice(t + 1)) * A.t();
@@ -143,6 +143,7 @@ List kalman_filter_cpp(const arma::vec& y_star,
     Named("zt_smoothed") = zt_smooth,
     Named("P_filtered") = P_filt_11,
     Named("P_predicted") = P_pred_11,
+    Named("P_filt_T") = P_filt_arr.slice(T - 1),
     Named("xi_filtered") = xi_filt,
     Named("xi_smoothed") = xi_smooth,
     Named("loglik") = loglik
@@ -273,8 +274,7 @@ List gmkf_filter_cpp(const arma::vec& y_star,
   P_smooth_arr.slice(T - 1) = P_filt_arr.slice(T - 1);
 
   for (int t = T - 2; t >= 0; t--) {
-    arma::mat P_pred_inv = arma::inv(P_pred_arr.slice(t + 1));
-    arma::mat A = P_filt_arr.slice(t) * F_mat.t() * P_pred_inv;
+    arma::mat A = P_filt_arr.slice(t) * F_mat.t() * arma::pinv(P_pred_arr.slice(t + 1));
     xi_smooth.col(t) = xi_filt.col(t) + A * (xi_smooth.col(t + 1) - xi_pred.col(t + 1));
     P_smooth_arr.slice(t) = P_filt_arr.slice(t) +
       A * (P_smooth_arr.slice(t + 1) - P_pred_arr.slice(t + 1)) * A.t();
@@ -296,6 +296,7 @@ List gmkf_filter_cpp(const arma::vec& y_star,
     Named("zt_smoothed") = zt_smooth,
     Named("P_filtered") = P_filt_11,
     Named("P_predicted") = P_pred_11,
+    Named("P_filt_T") = P_filt_arr.slice(T - 1),
     Named("xi_filtered") = xi_filt,
     Named("xi_smoothed") = xi_smooth,
     Named("loglik") = loglik

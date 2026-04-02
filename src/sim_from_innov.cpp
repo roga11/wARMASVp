@@ -133,9 +133,11 @@ arma::vec sim_from_innov_t_lev_cpp(const arma::vec& phi,
   }
 
   // Chi-squared mixing via PIT: chi2 = qchisq(U, nu)
+  // Guard against U=0 (machine zero) which would give chi2=0 and sqrt(nu/0)=Inf
   arma::vec lambda_inv_sqrt(n);
   for (int i = 0; i < n; i++) {
     double chi2_val = R::qchisq(U_chi2_vec(i), nu, 1, 0);
+    chi2_val = std::max(chi2_val, 1e-300);
     lambda_inv_sqrt(i) = std::sqrt(nu / chi2_val);
   }
 

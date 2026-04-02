@@ -117,3 +117,21 @@ test_that("companionMat returns correct dimensions", {
   expect_equal(unname(C[1, 1]), 0.7)
   expect_equal(unname(C[1, 2]), 0.2)
 })
+
+
+# =========================================================================== #
+# Regression test: forecast MSE uses full P_filt_T matrix (Bug 3 fix)
+# =========================================================================== #
+
+test_that("forecast_svp p=2: P_forecast increases with horizon (full P_T)", {
+  set.seed(42)
+  y <- sim_svp(500, phi = c(0.20, 0.63), sigy = 1, sigv = 1)
+  fit <- svp(y, p = 2)
+  fc <- forecast_svp(fit, H = 5)
+  # MSE should be non-decreasing with horizon for a stationary AR
+  expect_true(all(diff(fc$P_forecast) >= -1e-10))
+  # All MSE values should be positive
+  expect_true(all(fc$P_forecast > 0))
+  # Var forecast should all be positive
+  expect_true(all(fc$var_forecast > 0))
+})

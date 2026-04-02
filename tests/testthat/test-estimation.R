@@ -77,6 +77,28 @@ test_that("svpSE returns CI and SE components", {
   expect_equal(ncol(se$CI), 3)
 })
 
+# =========================================================================== #
+# Regression test: nonstationary_ind propagated to svp_t and svp_ged (Bug 6 fix)
+# =========================================================================== #
+
+test_that("svp_t object contains nonstationary_ind field", {
+  set.seed(42)
+  y <- sim_svp(1000, phi = 0.90, sigy = 1, sigv = 0.3,
+               errorType = "Student-t", nu = 5)
+  fit <- suppressWarnings(svp(y, errorType = "Student-t"))
+  expect_true("nonstationary_ind" %in% names(fit))
+  expect_type(fit$nonstationary_ind, "logical")
+})
+
+test_that("svp_ged object contains nonstationary_ind field", {
+  set.seed(42)
+  y <- sim_svp(1000, phi = 0.90, sigy = 1, sigv = 0.3,
+               errorType = "GED", nu = 1.5)
+  fit <- suppressWarnings(svp(y, errorType = "GED"))
+  expect_true("nonstationary_ind" %in% names(fit))
+  expect_type(fit$nonstationary_ind, "logical")
+})
+
 test_that("coef method works for all model types", {
   set.seed(42)
   y <- sim_svp(1000, phi = 0.95, sigy = 1, sigv = 0.3)

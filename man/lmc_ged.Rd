@@ -6,6 +6,7 @@
 \usage{
 lmc_ged(
   y,
+  p = 1,
   J = 10,
   N = 99,
   nu_null,
@@ -19,6 +20,8 @@ lmc_ged(
 }
 \arguments{
 \item{y}{Numeric vector. Observed returns.}
+
+\item{p}{Integer. AR order of the volatility process. Default 1.}
 
 \item{J}{Integer. Winsorizing parameter. Default 10.}
 
@@ -36,7 +39,8 @@ lmc_ged(
 Default \code{TRUE}.}
 
 \item{Amat}{Weighting matrix specification. \code{NULL} for identity,
-\code{"Weighted"} for data-driven HAC, or a 4x4 matrix. Default \code{NULL}.}
+\code{"Weighted"} for data-driven HAC, or a \code{(p+3)x(p+3)} matrix.
+Default \code{NULL}.}
 
 \item{direction}{Character. Test direction: \code{"two-sided"} (default),
 \code{"less"} (H1: nu < nu_null), or \code{"greater"} (H1: nu > nu_null).
@@ -47,13 +51,13 @@ An object of class \code{"svp_test"}.
 }
 \description{
 Performs a Local Monte Carlo (LMC) test of the null hypothesis
-\eqn{H_0: \nu = \nu_0} for the shape parameter in an SV(1) model
+\eqn{H_0: \nu = \nu_0} for the shape parameter in an SV(p) model
 with GED errors. Testing \eqn{\nu_0 = 2} corresponds to testing normality.
 }
 \examples{
 \donttest{
 y <- sim_svp(1000, phi = 0.95, sigy = 1, sigv = 0.2, errorType = "GED", nu = 1.5)
-test <- lmc_ged(y, J = 10, N = 49, nu_null = 2)
+test <- lmc_ged(y, p = 1, J = 10, N = 49, nu_null = 2)
 print(test)
 }
 

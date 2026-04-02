@@ -88,9 +88,8 @@ forecast_svp <- function(object, H = 1,
   eta_T <- c(zT, rep(0, p_len - 1))
 
   # Get final filtered covariance for MSE recursion
-  # Reconstruct P_T from filter — use P_filtered as P_{T|T}^{(1,1)} approximation
-  # For full P_T matrix, we approximate with diagonal using P_filtered
-  P_T <- filt$P_filtered[Tsize] * diag(p_len)
+  # Use full p x p matrix from filter output (exact for p>=2)
+  P_T <- filt$P_filt_T
 
   log_var_fc <- numeric(H)
   P_fc <- numeric(H)

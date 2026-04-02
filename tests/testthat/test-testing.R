@@ -102,3 +102,80 @@ test_that("print.svp_test shows direction for directional tests", {
   expect_output(print(test), "less")
   expect_output(print(test), "Signed root")
 })
+
+
+# =========================================================================== #
+# SV(p>1) tests — tail distribution and leverage
+# =========================================================================== #
+
+test_that("lmc_t with p=2 runs and returns svp_test object", {
+  set.seed(42)
+  y <- sim_svp(1000, phi = c(0.20, 0.63), sigy = 1, sigv = 1,
+               errorType = "Student-t", nu = 3)
+  test <- suppressWarnings(lmc_t(y, p = 2, nu_null = 3, N = 19))
+  expect_s3_class(test, "svp_test")
+  expect_true(test$pval >= 0 && test$pval <= 1)
+})
+
+test_that("mmc_t with p=2 runs and returns valid p-value", {
+  set.seed(42)
+  y <- sim_svp(500, phi = c(0.20, 0.63), sigy = 1, sigv = 1,
+               errorType = "Student-t", nu = 3)
+  test <- suppressWarnings(mmc_t(y, p = 2, nu_null = 3, N = 9,
+                                  method = "pso", maxit = 5))
+  expect_true(test$value >= 0 && test$value <= 1)
+})
+
+test_that("lmc_ged with p=2 runs and returns svp_test object", {
+  set.seed(42)
+  y <- sim_svp(1000, phi = c(0.20, 0.63), sigy = 1, sigv = 1,
+               errorType = "GED", nu = 1.5)
+  test <- suppressWarnings(lmc_ged(y, p = 2, nu_null = 1.5, N = 19))
+  expect_s3_class(test, "svp_test")
+  expect_true(test$pval >= 0 && test$pval <= 1)
+})
+
+test_that("mmc_ged with p=2 runs and returns valid p-value", {
+  set.seed(42)
+  y <- sim_svp(500, phi = c(0.20, 0.63), sigy = 1, sigv = 1,
+               errorType = "GED", nu = 1.5)
+  test <- suppressWarnings(mmc_ged(y, p = 2, nu_null = 1.5, N = 9,
+                                    method = "pso", maxit = 5))
+  expect_true(test$value >= 0 && test$value <= 1)
+})
+
+test_that("lmc_lev with p=2 runs and returns svp_test object", {
+  set.seed(42)
+  y <- sim_svp(1000, phi = c(0.20, 0.63), sigy = 1, sigv = 1)
+  test <- suppressWarnings(lmc_lev(y, p = 2, N = 19))
+  expect_s3_class(test, "svp_test")
+  expect_true(test$pval >= 0 && test$pval <= 1)
+})
+
+test_that("mmc_lev with p=2 runs and returns svp_test object", {
+  set.seed(42)
+  y <- sim_svp(500, phi = c(0.20, 0.63), sigy = 1, sigv = 1)
+  test <- suppressWarnings(mmc_lev(y, p = 2, N = 9,
+                                    method = "pso", maxit = 5))
+  expect_true(test$value >= 0 && test$value <= 1)
+})
+
+test_that("mmc_t eps length validation works", {
+  set.seed(42)
+  y <- sim_svp(500, phi = c(0.20, 0.63), sigy = 1, sigv = 1,
+               errorType = "Student-t", nu = 3)
+  expect_error(
+    mmc_t(y, p = 2, nu_null = 3, N = 9, eps = c(0.3, 0.3, 0.3)),
+    "eps must have length 4"
+  )
+})
+
+test_that("mmc_ged eps length validation works", {
+  set.seed(42)
+  y <- sim_svp(500, phi = c(0.20, 0.63), sigy = 1, sigv = 1,
+               errorType = "GED", nu = 1.5)
+  expect_error(
+    mmc_ged(y, p = 2, nu_null = 1.5, N = 9, eps = c(0.3, 0.3, 0.3)),
+    "eps must have length 4"
+  )
+})

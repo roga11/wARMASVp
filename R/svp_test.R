@@ -135,6 +135,9 @@ mmc_ar <- function(y, p_null, p_alt, J = 10, N = 99, burnin = 500,
   theta_0 <- c(mdl_null_est$phi, mdl_null_est$sigy, mdl_null_est$sigv)
   n_nuisance <- p_null + 2
   if (is.null(eps)) eps <- rep(0.3, n_nuisance)
+  if (length(eps) != n_nuisance)
+    stop("eps must have length ", n_nuisance,
+         " (p_null+2: one entry per nuisance parameter phi_1,...,phi_p_null, sigma_y, sigma_v).")
   # Bounds for nuisance parameters
   lower <- c(pmax(theta_0[1:p_null] - eps[1:p_null], rep(-0.999, p_null)),
              max(theta_0[p_null + 1] - eps[p_null + 1], 0.01),
@@ -393,6 +396,9 @@ mmc_lev <- function(y, p = 1, J = 10, N = 99, rho_null = 0,
     n_nuisance <- p + 2
     n_mom <- p + 3
     if (is.null(eps)) eps <- rep(0.3, n_nuisance)
+    if (length(eps) != n_nuisance)
+      stop("eps must have length ", n_nuisance,
+           " (p+2: one entry per nuisance parameter phi_1,...,phi_p, sigma_y, sigma_v).")
     lower <- c(pmax(theta_0[1:p] - eps[1:p], rep(-0.999, p)),
                max(theta_0[p + 1] - eps[p + 1], 0.01),
                max(theta_0[p + 2] - eps[p + 2], 0.01))
@@ -405,6 +411,9 @@ mmc_lev <- function(y, p = 1, J = 10, N = 99, rho_null = 0,
     n_nuisance <- p + 3
     n_mom <- p + 4
     if (is.null(eps)) eps <- rep(0.3, p + 2)  # eps for phi, sigy, sigv only
+    if (length(eps) != p + 2)
+      stop("eps must have length ", p + 2,
+           " (p+2: one entry per nuisance parameter phi_1,...,phi_p, sigma_y, sigma_v; nu bounds are set proportionally).")
     # Proportional bounds for nu
     nu_hat <- mdl_alt$v
     if (errorType == "Student-t") {
@@ -512,10 +521,11 @@ mmc_lev <- function(y, p = 1, J = 10, N = 99, rho_null = 0,
 #'
 #' Performs a Local Monte Carlo (LMC) test of the null hypothesis
 #' \eqn{H_0: \nu = \nu_0} for the degrees of freedom parameter in an
-#' SV(1) model with Student-t errors. Testing \eqn{\nu_0 = \infty}
+#' SV(p) model with Student-t errors. Testing \eqn{\nu_0 = \infty}
 #' (or a large value) corresponds to testing for normality.
 #'
 #' @param y Numeric vector. Observed returns.
+#' @param p Integer. AR order of the volatility process. Default 1.
 #' @param J Integer. Winsorizing parameter. Default 10.
 #' @param N Integer. Number of Monte Carlo replications. Default 99.
 #' @param nu_null Numeric. Value of \eqn{\nu} under the null hypothesis.
@@ -525,7 +535,8 @@ mmc_lev <- function(y, p = 1, J = 10, N = 99, rho_null = 0,
 #' @param Bartlett Logical. Use Bartlett kernel HAC for weighting matrix.
 #'   Default \code{TRUE}.
 #' @param Amat Weighting matrix specification. \code{NULL} for identity,
-#'   \code{"Weighted"} for data-driven HAC, or a 4x4 matrix. Default \code{NULL}.
+#'   \code{"Weighted"} for data-driven HAC, or a \code{(p+3)x(p+3)} matrix.
+#'   Default \code{NULL}.
 #' @param logNu Logical. Use log-space for nu estimation. Default \code{TRUE}.
 #' @param direction Character. Test direction: \code{"two-sided"} (default),
 #'   \code{"less"} (H1: nu < nu_null), or \code{"greater"} (H1: nu > nu_null).
@@ -536,12 +547,12 @@ mmc_lev <- function(y, p = 1, J = 10, N = 99, rho_null = 0,
 #' @examples
 #' \donttest{
 #' y <- sim_svp(1000, phi = 0.95, sigy = 1, sigv = 0.2, errorType = "Student-t", nu = 5)
-#' test <- lmc_t(y, J = 10, N = 49, nu_null = 5)
+#' test <- lmc_t(y, p = 1, J = 10, N = 49, nu_null = 5)
 #' print(test)
 #' }
 #'
 #' @export
-lmc_t <- function(y, J = 10, N = 99, nu_null, burnin = 500,
+lmc_t <- function(y, p = 1, J = 10, N = 99, nu_null, burnin = 500,
                   del = 1e-10, wDecay = FALSE, Bartlett = TRUE,
                   Amat = NULL, logNu = TRUE,
                   direction = c("two-sided", "less", "greater")) {
@@ -550,9 +561,8 @@ lmc_t <- function(y, J = 10, N = 99, nu_null, burnin = 500,
   y_vec <- as.numeric(y)
   y_mat <- as.matrix(y_vec)
   Tsize <- length(y_vec)
-  p <- 1L
   # Estimate model under alternative
-  mdl_alt <- svp(y_vec, p = 1, J = J, errorType = "Student-t", del = del,
+  mdl_alt <- svp(y_vec, p = p, J = J, errorType = "Student-t", del = del,
                  logNu = logNu, wDecay = wDecay)
   mdl_null <- mdl_alt
   mdl_null$v <- nu_null
@@ -596,7 +606,7 @@ lmc_t <- function(y, J = 10, N = 99, nu_null, burnin = 500,
 #' LMC Test for GED Shape Parameter
 #'
 #' Performs a Local Monte Carlo (LMC) test of the null hypothesis
-#' \eqn{H_0: \nu = \nu_0} for the shape parameter in an SV(1) model
+#' \eqn{H_0: \nu = \nu_0} for the shape parameter in an SV(p) model
 #' with GED errors. Testing \eqn{\nu_0 = 2} corresponds to testing normality.
 #'
 #' @inheritParams lmc_t
@@ -606,12 +616,12 @@ lmc_t <- function(y, J = 10, N = 99, nu_null, burnin = 500,
 #' @examples
 #' \donttest{
 #' y <- sim_svp(1000, phi = 0.95, sigy = 1, sigv = 0.2, errorType = "GED", nu = 1.5)
-#' test <- lmc_ged(y, J = 10, N = 49, nu_null = 2)
+#' test <- lmc_ged(y, p = 1, J = 10, N = 49, nu_null = 2)
 #' print(test)
 #' }
 #'
 #' @export
-lmc_ged <- function(y, J = 10, N = 99, nu_null, burnin = 500,
+lmc_ged <- function(y, p = 1, J = 10, N = 99, nu_null, burnin = 500,
                     del = 1e-10, wDecay = FALSE, Bartlett = TRUE,
                     Amat = NULL,
                     direction = c("two-sided", "less", "greater")) {
@@ -620,8 +630,7 @@ lmc_ged <- function(y, J = 10, N = 99, nu_null, burnin = 500,
   y_vec <- as.numeric(y)
   y_mat <- as.matrix(y_vec)
   Tsize <- length(y_vec)
-  p <- 1L
-  mdl_alt <- svp(y_vec, p = 1, J = J, errorType = "GED", del = del,
+  mdl_alt <- svp(y_vec, p = p, J = J, errorType = "GED", del = del,
                  wDecay = wDecay)
   mdl_null <- mdl_alt
   mdl_null$v <- nu_null
@@ -665,7 +674,9 @@ lmc_ged <- function(y, J = 10, N = 99, nu_null, burnin = 500,
 #' by maximizing the MC p-value over nuisance parameters (phi, sigma_y, sigma_v).
 #'
 #' @inheritParams lmc_t
-#' @param eps Numeric vector. Half-width of search region. Default \code{rep(0.3, 3)}.
+#' @param eps Numeric vector. Half-width of search region around estimated nuisance
+#'   parameters. Must have length \code{p+2} (one entry per nuisance parameter:
+#'   \eqn{\phi_1,\ldots,\phi_p, \sigma_y, \sigma_v}). Default \code{rep(0.3, p+2)}.
 #' @param threshold Numeric. Target p-value. Default 1.
 #' @param method Character. Optimization method: \code{"pso"} or \code{"GenSA"}.
 #'   Default \code{"pso"}.
@@ -677,12 +688,12 @@ lmc_ged <- function(y, J = 10, N = 99, nu_null, burnin = 500,
 #' @examples
 #' \donttest{
 #' y <- sim_svp(1000, phi = 0.95, sigy = 1, sigv = 0.2, errorType = "Student-t", nu = 5)
-#' mmc <- mmc_t(y, J = 10, N = 19, nu_null = 5, method = "pso", maxit = 10)
+#' mmc <- mmc_t(y, p = 1, J = 10, N = 19, nu_null = 5, method = "pso", maxit = 10)
 #' mmc$value
 #' }
 #'
 #' @export
-mmc_t <- function(y, J = 10, N = 99, nu_null, burnin = 500,
+mmc_t <- function(y, p = 1, J = 10, N = 99, nu_null, burnin = 500,
                   eps = NULL, threshold = 1, method = "pso", maxit = NULL,
                   del = 1e-10, wDecay = FALSE, Bartlett = TRUE,
                   Amat = NULL, logNu = TRUE,
@@ -692,11 +703,14 @@ mmc_t <- function(y, J = 10, N = 99, nu_null, burnin = 500,
   y_vec <- as.numeric(y)
   y_mat <- as.matrix(y_vec)
   Tsize <- length(y_vec)
-  mdl_alt <- svp(y_vec, p = 1, J = J, errorType = "Student-t", del = del,
+  mdl_alt <- svp(y_vec, p = p, J = J, errorType = "Student-t", del = del,
                  logNu = logNu, wDecay = wDecay)
   p <- length(mdl_alt$phi)
   theta_0 <- c(mdl_alt$phi, mdl_alt$sigy, mdl_alt$sigv)
   if (is.null(eps)) eps <- rep(0.3, length(theta_0))
+  if (length(eps) != length(theta_0))
+    stop("eps must have length ", length(theta_0),
+         " (p+2: one entry per nuisance parameter phi_1,...,phi_p, sigma_y, sigma_v).")
   wa <- .parse_Amat(Amat, p)
   Amat_mat <- wa$Amat
   WAmat <- wa$WAmat
@@ -744,7 +758,9 @@ mmc_t <- function(y, J = 10, N = 99, nu_null, burnin = 500,
 #' for the GED shape parameter.
 #'
 #' @inheritParams lmc_ged
-#' @param eps Numeric vector. Half-width of search region. Default \code{rep(0.3, 3)}.
+#' @param eps Numeric vector. Half-width of search region around estimated nuisance
+#'   parameters. Must have length \code{p+2} (one entry per nuisance parameter:
+#'   \eqn{\phi_1,\ldots,\phi_p, \sigma_y, \sigma_v}). Default \code{rep(0.3, p+2)}.
 #' @param threshold Numeric. Target p-value. Default 1.
 #' @param method Character. Optimization method: \code{"pso"} or \code{"GenSA"}.
 #'   Default \code{"pso"}.
@@ -756,12 +772,12 @@ mmc_t <- function(y, J = 10, N = 99, nu_null, burnin = 500,
 #' @examples
 #' \donttest{
 #' y <- sim_svp(1000, phi = 0.95, sigy = 1, sigv = 0.2, errorType = "GED", nu = 1.5)
-#' mmc <- mmc_ged(y, J = 10, N = 19, nu_null = 2, method = "pso", maxit = 10)
+#' mmc <- mmc_ged(y, p = 1, J = 10, N = 19, nu_null = 2, method = "pso", maxit = 10)
 #' mmc$value
 #' }
 #'
 #' @export
-mmc_ged <- function(y, J = 10, N = 99, nu_null, burnin = 500,
+mmc_ged <- function(y, p = 1, J = 10, N = 99, nu_null, burnin = 500,
                     eps = NULL, threshold = 1, method = "pso", maxit = NULL,
                     del = 1e-10, wDecay = FALSE, Bartlett = TRUE,
                     Amat = NULL,
@@ -771,11 +787,14 @@ mmc_ged <- function(y, J = 10, N = 99, nu_null, burnin = 500,
   y_vec <- as.numeric(y)
   y_mat <- as.matrix(y_vec)
   Tsize <- length(y_vec)
-  mdl_alt <- svp(y_vec, p = 1, J = J, errorType = "GED", del = del,
+  mdl_alt <- svp(y_vec, p = p, J = J, errorType = "GED", del = del,
                  wDecay = wDecay)
   p <- length(mdl_alt$phi)
   theta_0 <- c(mdl_alt$phi, mdl_alt$sigy, mdl_alt$sigv)
   if (is.null(eps)) eps <- rep(0.3, length(theta_0))
+  if (length(eps) != length(theta_0))
+    stop("eps must have length ", length(theta_0),
+         " (p+2: one entry per nuisance parameter phi_1,...,phi_p, sigma_y, sigma_v).")
   wa <- .parse_Amat(Amat, p)
   Amat_mat <- wa$Amat
   WAmat <- wa$WAmat

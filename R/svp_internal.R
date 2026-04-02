@@ -377,7 +377,8 @@ correction_factor_ged_approx <- function(nu, n_nodes = 200L) {
               sigvMethod = sigvMethod, winsorize_eps = winsorize_eps,
               rho = NA_real_, gammatilde = NA_real_,
               leverage = FALSE, rho_type = NA_character_,
-              trunc_lev = TRUE)
+              trunc_lev = TRUE,
+              nonstationary_ind = isTRUE(para_base$nonstationary_ind))
   class(out) <- "svp_t"
   return(out)
 }
@@ -466,7 +467,8 @@ correction_factor_ged_approx <- function(nu, n_nodes = 200L) {
               sigvMethod = sigvMethod, winsorize_eps = winsorize_eps,
               rho = NA_real_, gammatilde = NA_real_,
               leverage = FALSE, rho_type = NA_character_,
-              trunc_lev = TRUE)
+              trunc_lev = TRUE,
+              nonstationary_ind = isTRUE(para_base$nonstationary_ind))
   class(out) <- "svp_ged"
   return(out)
 }

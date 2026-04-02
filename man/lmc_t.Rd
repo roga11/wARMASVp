@@ -6,6 +6,7 @@
 \usage{
 lmc_t(
   y,
+  p = 1,
   J = 10,
   N = 99,
   nu_null,
@@ -20,6 +21,8 @@ lmc_t(
 }
 \arguments{
 \item{y}{Numeric vector. Observed returns.}
+
+\item{p}{Integer. AR order of the volatility process. Default 1.}
 
 \item{J}{Integer. Winsorizing parameter. Default 10.}
 
@@ -37,7 +40,8 @@ lmc_t(
 Default \code{TRUE}.}
 
 \item{Amat}{Weighting matrix specification. \code{NULL} for identity,
-\code{"Weighted"} for data-driven HAC, or a 4x4 matrix. Default \code{NULL}.}
+\code{"Weighted"} for data-driven HAC, or a \code{(p+3)x(p+3)} matrix.
+Default \code{NULL}.}
 
 \item{logNu}{Logical. Use log-space for nu estimation. Default \code{TRUE}.}
 
@@ -51,13 +55,13 @@ An object of class \code{"svp_test"}.
 \description{
 Performs a Local Monte Carlo (LMC) test of the null hypothesis
 \eqn{H_0: \nu = \nu_0} for the degrees of freedom parameter in an
-SV(1) model with Student-t errors. Testing \eqn{\nu_0 = \infty}
+SV(p) model with Student-t errors. Testing \eqn{\nu_0 = \infty}
 (or a large value) corresponds to testing for normality.
 }
 \examples{
 \donttest{
 y <- sim_svp(1000, phi = 0.95, sigy = 1, sigv = 0.2, errorType = "Student-t", nu = 5)
-test <- lmc_t(y, J = 10, N = 49, nu_null = 5)
+test <- lmc_t(y, p = 1, J = 10, N = 49, nu_null = 5)
 print(test)
 }
 

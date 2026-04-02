@@ -6,6 +6,7 @@
 \usage{
 mmc_ged(
   y,
+  p = 1,
   J = 10,
   N = 99,
   nu_null,
@@ -24,6 +25,8 @@ mmc_ged(
 \arguments{
 \item{y}{Numeric vector. Observed returns.}
 
+\item{p}{Integer. AR order of the volatility process. Default 1.}
+
 \item{J}{Integer. Winsorizing parameter. Default 10.}
 
 \item{N}{Integer. Number of Monte Carlo replications. Default 99.}
@@ -32,7 +35,9 @@ mmc_ged(
 
 \item{burnin}{Integer. Burn-in for simulation. Default 500.}
 
-\item{eps}{Numeric vector. Half-width of search region. Default \code{rep(0.3, 3)}.}
+\item{eps}{Numeric vector. Half-width of search region around estimated nuisance
+parameters. Must have length \code{p+2} (one entry per nuisance parameter:
+\eqn{\phi_1,\ldots,\phi_p, \sigma_y, \sigma_v}). Default \code{rep(0.3, p+2)}.}
 
 \item{threshold}{Numeric. Target p-value. Default 1.}
 
@@ -49,7 +54,8 @@ Default \code{"pso"}.}
 Default \code{TRUE}.}
 
 \item{Amat}{Weighting matrix specification. \code{NULL} for identity,
-\code{"Weighted"} for data-driven HAC, or a 4x4 matrix. Default \code{NULL}.}
+\code{"Weighted"} for data-driven HAC, or a \code{(p+3)x(p+3)} matrix.
+Default \code{NULL}.}
 
 \item{direction}{Character. Test direction: \code{"two-sided"} (default),
 \code{"less"} (H1: nu < nu_null), or \code{"greater"} (H1: nu > nu_null).
@@ -66,7 +72,7 @@ for the GED shape parameter.
 \examples{
 \donttest{
 y <- sim_svp(1000, phi = 0.95, sigy = 1, sigv = 0.2, errorType = "GED", nu = 1.5)
-mmc <- mmc_ged(y, J = 10, N = 19, nu_null = 2, method = "pso", maxit = 10)
+mmc <- mmc_ged(y, p = 1, J = 10, N = 19, nu_null = 2, method = "pso", maxit = 10)
 mmc$value
 }
 

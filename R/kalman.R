@@ -484,6 +484,14 @@ filter_svp <- function(object, method = c("corrected", "mixture", "particle"),
   }
 
   # Build output
+  p_out <- params$p
+  # Full p x p filtered covariance at T (for forecast MSE recursion)
+  if (!is.null(result$P_filt_T)) {
+    P_filt_T_mat <- matrix(result$P_filt_T, nrow = p_out, ncol = p_out)
+  } else {
+    # BPF fallback: diagonal approximation
+    P_filt_T_mat <- result$P_filtered[length(result$P_filtered)] * diag(p_out)
+  }
   out <- list(
     w_filtered  = as.numeric(result$w_filtered),
     w_smoothed  = as.numeric(result$w_smoothed),
@@ -492,6 +500,7 @@ filter_svp <- function(object, method = c("corrected", "mixture", "particle"),
     zt_smoothed = as.numeric(result$zt_smoothed),
     P_filtered  = as.numeric(result$P_filtered),
     P_predicted = as.numeric(result$P_predicted),
+    P_filt_T    = P_filt_T_mat,
     xi_filtered = result$xi_filtered,
     xi_smoothed = result$xi_smoothed,
     loglik      = result$loglik,

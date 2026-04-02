@@ -19,8 +19,8 @@ arma::mat sim_svp_norm_cpp(arma::vec beta, int p, int N, int burnin) {
   arma::mat h(n, 1, arma::fill::zeros);
   arma::mat u(n, 1, arma::fill::zeros);
 
-  arma::mat veta = rnorm(n + 1);
-  arma::mat epst = rnorm(n + 1);
+  arma::mat veta = rnorm(n);
+  arma::mat epst = rnorm(n);
 
   arma::mat v(p, 1, arma::fill::zeros);
   h.rows(0, p - 1) = v.rows(0, p - 1);
@@ -29,7 +29,7 @@ arma::mat sim_svp_norm_cpp(arma::vec beta, int p, int N, int burnin) {
     h.row(i) = v(0) + trans(phi) * flipud(h.rows(i - p, i - 1)) + veta.row(i) * sv;
   }
   for (int i = 1; i < n; i++) {
-    u.row(i) = epst.row(i - 1) * exp(h.row(i) / 2) * sy;
+    u.row(i) = epst.row(i) * exp(h.row(i) / 2) * sy;
   }
   u = u.rows(burnin, n - 1);
   return(u);
