@@ -38,3 +38,4 @@ Uses EM algorithm to approximate the measurement noise density with a
 Gaussian mixture. For Gaussian SV, returns the pre-computed KSC (1998)
 7-component table.
 }
+\keyword{internal}

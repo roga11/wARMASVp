@@ -43,7 +43,7 @@ se <- svpSE(fit, n_sim = 99)
 se$CI
 
 # Forecast
-fc <- forecast_svp(y, p = 1, H = 10)
+fc <- forecast_svp(fit, H = 10)
 plot(fc)
 ```
 

@@ -6,26 +6,38 @@ Initial release.
 
 * `svp()`: Closed-form W-ARMA-SV estimation for SV(p) models of any order.
 * Gaussian, Student-t, and GED innovation distributions supported for all p.
-* Leverage estimation (Gaussian only) via Pearson or Kendall correlation.
+* Leverage estimation for all distributions: closed-form for Gaussian and
+  Student-t, exact root-finding for GED.
 * `svpSE()`: Simulation-based standard errors and confidence intervals.
 
 ## Simulation
 
 * `sim_svp()`: Simulate SV(p) processes with Gaussian, Student-t, or GED
-  innovations, with optional leverage effects (Gaussian).
+  innovations, with optional leverage effects for all distributions.
 
 ## Hypothesis Testing
 
-* Local Monte Carlo (LMC) and Maximized Monte Carlo (MMC) tests:
+* Local Monte Carlo (LMC) and Maximized Monte Carlo (MMC) tests based on
+  Dufour (2006), with fixed-innovation MMC for exact finite-sample inference:
   - `lmc_ar()` / `mmc_ar()`: AR order selection.
-  - `lmc_lev()` / `mmc_lev()`: Leverage effects.
-  - `lmc_t()` / `mmc_t()`: Student-t vs. Gaussian.
-  - `lmc_ged()` / `mmc_ged()`: GED vs. Gaussian.
+  - `lmc_lev()` / `mmc_lev()`: Leverage effects (all distributions).
+  - `lmc_t()` / `mmc_t()`: Student-t vs. Gaussian (with directional testing).
+  - `lmc_ged()` / `mmc_ged()`: GED vs. Gaussian (with directional testing).
+* All test procedures support general SV(p) (any order).
+
+## Filtering
+
+* `filter_svp()`: Kalman filtering and smoothing with three methods:
+  - Corrected Kalman Filter (CKF): Gaussian approximation, fast.
+  - Gaussian Mixture Kalman Filter (GMKF): KSC (1998) 7-component mixture,
+    recommended.
+  - Bootstrap Particle Filter (BPF): exact density weights, benchmark.
 
 ## Forecasting
 
-* `kalman_filter()`: Kalman filtering and smoothing for SV(p) state-space form.
-* `forecast_svp()`: h-step-ahead volatility forecasts with confidence bands.
+* `forecast_svp()`: Multi-step ahead volatility forecasts with MSE-based
+  confidence bands. Supports log-variance, variance, and volatility output
+  scales.
 
 ## Convention Changes
 

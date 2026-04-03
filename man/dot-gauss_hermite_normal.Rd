@@ -3,7 +3,7 @@
 \name{.gauss_hermite_normal}
 \alias{.gauss_hermite_normal}
 \title{Gauss-Hermite quadrature nodes and weights for N(0,1) integration
-Computes nodes z_i and weights w_i such that sum(w_i * f(z_i)) ≈ E[f(Z)]
+Computes nodes z_i and weights w_i such that sum(w_i * f(z_i)) approximates E[f(Z)]
 where Z ~ N(0,1). Uses the Golub-Welsch algorithm.}
 \usage{
 .gauss_hermite_normal(n = 200L)
@@ -16,7 +16,7 @@ List with components nodes and weights
 }
 \description{
 Gauss-Hermite quadrature nodes and weights for N(0,1) integration
-Computes nodes z_i and weights w_i such that sum(w_i * f(z_i)) ≈ E[f(Z)]
+Computes nodes z_i and weights w_i such that sum(w_i * f(z_i)) approximates E[f(Z)]
 where Z ~ N(0,1). Uses the Golub-Welsch algorithm.
 }
 \keyword{internal}

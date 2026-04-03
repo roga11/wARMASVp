@@ -1,8 +1,10 @@
 # =========================================================================== #
 # Tests for Bootstrap Particle Filter (BPF)
+# These tests are slow due to particle filter simulations
 # =========================================================================== #
 
 test_that("PF returns correct class and components (Gaussian)", {
+  skip_on_cran()
   set.seed(42)
   y <- as.numeric(sim_svp(300, phi = 0.95, sigy = 1, sigv = 0.3))
   fit <- svp(y, p = 1)
@@ -16,6 +18,7 @@ test_that("PF returns correct class and components (Gaussian)", {
 })
 
 test_that("PF: ESS doesn't collapse (Gaussian)", {
+  skip_on_cran()
   set.seed(42)
   y <- as.numeric(sim_svp(300, phi = 0.95, sigy = 1, sigv = 0.3))
   fit <- svp(y, p = 1)
@@ -25,6 +28,7 @@ test_that("PF: ESS doesn't collapse (Gaussian)", {
 })
 
 test_that("PF: filtered states close to CKF (Gaussian)", {
+  skip_on_cran()
   set.seed(42)
   y <- as.numeric(sim_svp(500, phi = 0.95, sigy = 1, sigv = 0.3))
   fit <- svp(y, p = 1)
@@ -35,6 +39,7 @@ test_that("PF: filtered states close to CKF (Gaussian)", {
 })
 
 test_that("PF: no NaN/Inf in output (all distributions)", {
+  skip_on_cran()
   # Gaussian
   set.seed(42)
   y <- as.numeric(sim_svp(200, phi = 0.95, sigy = 1, sigv = 0.3))
@@ -61,6 +66,7 @@ test_that("PF: no NaN/Inf in output (all distributions)", {
 })
 
 test_that("PF: ESS doesn't collapse (Student-t)", {
+  skip_on_cran()
   set.seed(42)
   y <- as.numeric(sim_svp(300, phi = 0.95, sigy = 1, sigv = 0.3,
                            errorType = "Student-t", nu = 5))
@@ -70,6 +76,7 @@ test_that("PF: ESS doesn't collapse (Student-t)", {
 })
 
 test_that("PF: leverage (Gaussian)", {
+  skip_on_cran()
   set.seed(42)
   sim <- sim_svp(300, phi = 0.95, sigy = 1, sigv = 0.3,
                  leverage = TRUE, rho = -0.5)
@@ -80,6 +87,7 @@ test_that("PF: leverage (Gaussian)", {
 })
 
 test_that("PF: leverage (Student-t, exact z recovery via lambda sampling)", {
+  skip_on_cran()
   set.seed(42)
   sim <- sim_svp(300, phi = 0.95, sigy = 1, sigv = 0.3,
                  errorType = "Student-t", nu = 5,
@@ -91,6 +99,7 @@ test_that("PF: leverage (Student-t, exact z recovery via lambda sampling)", {
 })
 
 test_that("PF: leverage (GED, exact z via copula inversion)", {
+  skip_on_cran()
   set.seed(42)
   sim <- sim_svp(300, phi = 0.95, sigy = 1, sigv = 0.3,
                  errorType = "GED", nu = 1.5,
@@ -102,6 +111,7 @@ test_that("PF: leverage (GED, exact z via copula inversion)", {
 })
 
 test_that("PF: SV(2) companion form works", {
+  skip_on_cran()
   set.seed(77)
   y <- as.numeric(sim_svp(300, phi = c(0.2, 0.63), sigy = 1, sigv = 0.5))
   fit <- svp(y, p = 2)
@@ -111,6 +121,7 @@ test_that("PF: SV(2) companion form works", {
 })
 
 test_that("PF: reproducibility with same seed", {
+  skip_on_cran()
   set.seed(42)
   y <- as.numeric(sim_svp(200, phi = 0.95, sigy = 1, sigv = 0.3))
   fit <- svp(y, p = 1)
@@ -121,6 +132,7 @@ test_that("PF: reproducibility with same seed", {
 })
 
 test_that("print.svp_filter works for particle filter", {
+  skip_on_cran()
   set.seed(42)
   y <- as.numeric(sim_svp(200, phi = 0.95, sigy = 1, sigv = 0.3))
   fit <- svp(y, p = 1)

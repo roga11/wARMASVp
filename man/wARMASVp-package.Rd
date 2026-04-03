@@ -15,10 +15,14 @@ Estimation, simulation, hypothesis testing, and forecasting for
 The main user-facing functions are:
 \itemize{
   \item \code{\link{svp}} -- Estimate SV(p) model with optional leverage
+  \item \code{\link{svpSE}} -- Simulation-based standard errors
   \item \code{\link{sim_svp}} -- Simulate SV(p) processes
-  \item \code{\link{lmc_lev}}, \code{\link{mmc_lev}} -- Test for leverage
-  \item \code{\link{kalman_filter}}, \code{\link{forecast_svp}} --
-    Filter and forecast volatility
+  \item \code{\link{filter_svp}} -- Kalman/mixture/particle filtering
+  \item \code{\link{forecast_svp}} -- Multi-step volatility forecasts
+  \item \code{\link{lmc_ar}}, \code{\link{mmc_ar}} -- AR order tests
+  \item \code{\link{lmc_lev}}, \code{\link{mmc_lev}} -- Leverage tests
+  \item \code{\link{lmc_t}}, \code{\link{mmc_t}} -- Student-t tail tests
+  \item \code{\link{lmc_ged}}, \code{\link{mmc_ged}} -- GED tail tests
 }
 }
 \references{

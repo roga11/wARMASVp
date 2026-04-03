@@ -9,10 +9,6 @@ svpCpp_nolev <- function(u, p, J, del, wDecay = FALSE) {
     .Call(`_wARMASVp_svpCpp_nolev`, u, p, J, del, wDecay)
 }
 
-svpCpp_h_ahead <- function(u, p, J, h, del, wDecay = FALSE) {
-    .Call(`_wARMASVp_svpCpp_h_ahead`, u, p, J, h, del, wDecay)
-}
-
 solve_lyapunov_discrete_cpp <- function(F_mat, Q) {
     .Call(`_wARMASVp_solve_lyapunov_discrete_cpp`, F_mat, Q)
 }
@@ -125,24 +121,8 @@ sim_svp_leverage_ged_cpp <- function(beta, p, N, burnin) {
     .Call(`_wARMASVp_sim_svp_leverage_ged_cpp`, beta, p, N, burnin)
 }
 
-statPhi_cpp <- function(phiB) {
-    .Call(`_wARMASVp_statPhi_cpp`, phiB)
-}
-
 kendall_corr <- function(x, y) {
     .Call(`_wARMASVp_kendall_corr`, x, y)
-}
-
-acov_g <- function(y, k) {
-    .Call(`_wARMASVp_acov_g`, y, k)
-}
-
-acov_symmetric <- function(y, k) {
-    .Call(`_wARMASVp_acov_symmetric`, y, k)
-}
-
-signR_cpp <- function(vec) {
-    .Call(`_wARMASVp_signR_cpp`, vec)
 }
 
 rged_cpp <- function(n, mean = 0.0, sd = 1.0, nu = 2.0) {

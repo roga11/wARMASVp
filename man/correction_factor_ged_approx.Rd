@@ -2,9 +2,7 @@
 % Please edit documentation in R/svp_internal.R
 \name{correction_factor_ged_approx}
 \alias{correction_factor_ged_approx}
-\title{Approximate correction factor C_g(nu) for GED leverage (diagnostic use only)
-C_g(nu) = E[|u|] * Cov(z, F_GED^{-1}(Phi(z))) / sqrt(2/pi)
-This is a first-order approximation; estimation uses the exact implicit equation.}
+\title{Approximate correction factor C_g(nu) for GED leverage (diagnostic use only)}
 \usage{
 correction_factor_ged_approx(nu, n_nodes = 200L)
 }
@@ -17,8 +15,7 @@ correction_factor_ged_approx(nu, n_nodes = 200L)
 Approximate C_g(nu)
 }
 \description{
-Approximate correction factor C_g(nu) for GED leverage (diagnostic use only)
-C_g(nu) = E[|u|] * Cov(z, F_GED^{-1}(Phi(z))) / sqrt(2/pi)
+\eqn{C_g(\nu) = E[|u|] \cdot \textrm{Cov}(z, F_{GED}^{-1}(\Phi(z))) / \sqrt{2/\pi}}.
 This is a first-order approximation; estimation uses the exact implicit equation.
 }
 \keyword{internal}

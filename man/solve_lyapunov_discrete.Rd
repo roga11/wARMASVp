@@ -17,3 +17,4 @@ Solution matrix \code{X}.
 \description{
 Solves X = F X t(F) + Q for X using the vectorization approach.
 }
+\keyword{internal}

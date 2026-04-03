@@ -7,6 +7,15 @@ test_that("lmc_ar runs and returns svp_test object", {
   expect_true(test$pval >= 0 && test$pval <= 1)
 })
 
+test_that("mmc_ar runs and returns valid p-value", {
+  skip_on_cran()
+  set.seed(42)
+  y <- sim_svp(500, phi = 0.95, sigy = 1, sigv = 0.3)
+  test <- mmc_ar(y, p_null = 1, p_alt = 2, N = 9,
+                 method = "pso", maxit = 5)
+  expect_true(test$value >= 0 && test$value <= 1)
+})
+
 test_that("lmc_lev runs and returns svp_test object", {
   set.seed(42)
   y <- sim_svp(1000, phi = 0.95, sigy = 1, sigv = 0.3)
@@ -118,6 +127,7 @@ test_that("lmc_t with p=2 runs and returns svp_test object", {
 })
 
 test_that("mmc_t with p=2 runs and returns valid p-value", {
+  skip_on_cran()
   set.seed(42)
   y <- sim_svp(500, phi = c(0.20, 0.63), sigy = 1, sigv = 1,
                errorType = "Student-t", nu = 3)
@@ -136,6 +146,7 @@ test_that("lmc_ged with p=2 runs and returns svp_test object", {
 })
 
 test_that("mmc_ged with p=2 runs and returns valid p-value", {
+  skip_on_cran()
   set.seed(42)
   y <- sim_svp(500, phi = c(0.20, 0.63), sigy = 1, sigv = 1,
                errorType = "GED", nu = 1.5)
@@ -153,6 +164,7 @@ test_that("lmc_lev with p=2 runs and returns svp_test object", {
 })
 
 test_that("mmc_lev with p=2 runs and returns svp_test object", {
+  skip_on_cran()
   set.seed(42)
   y <- sim_svp(500, phi = c(0.20, 0.63), sigy = 1, sigv = 1)
   test <- suppressWarnings(mmc_lev(y, p = 2, N = 9,
@@ -160,7 +172,65 @@ test_that("mmc_lev with p=2 runs and returns svp_test object", {
   expect_true(test$value >= 0 && test$value <= 1)
 })
 
+# =========================================================================== #
+# Bartlett/WAmat forwarding tests (Bugs A-D fix, 2026-04-03)
+# =========================================================================== #
+
+test_that("mmc_t with Amat='Weighted' (WAmat) runs without error", {
+  skip_on_cran()
+  set.seed(42)
+  y <- sim_svp(500, phi = 0.90, sigy = 1, sigv = 0.3,
+               errorType = "Student-t", nu = 5)
+  test <- suppressWarnings(mmc_t(y, nu_null = 5, N = 9,
+                                  Amat = "Weighted",
+                                  method = "pso", maxit = 5))
+  expect_true(test$value >= 0 && test$value <= 1)
+})
+
+test_that("mmc_ged with Amat='Weighted' (WAmat) runs without error", {
+  skip_on_cran()
+  set.seed(42)
+  y <- sim_svp(500, phi = 0.90, sigy = 1, sigv = 0.3,
+               errorType = "GED", nu = 1.5)
+  test <- suppressWarnings(mmc_ged(y, nu_null = 1.5, N = 9,
+                                    Amat = "Weighted",
+                                    method = "pso", maxit = 5))
+  expect_true(test$value >= 0 && test$value <= 1)
+})
+
+test_that("mmc_lev Gaussian Bartlett=TRUE runs without error", {
+  skip_on_cran()
+  set.seed(42)
+  y <- sim_svp(500, phi = 0.95, sigy = 1, sigv = 0.3)
+  test <- suppressWarnings(mmc_lev(y, N = 9, Bartlett = TRUE,
+                                    method = "pso", maxit = 5))
+  expect_true(test$value >= 0 && test$value <= 1)
+})
+
+test_that("mmc_lev Student-t Bartlett=TRUE runs without error", {
+  skip_on_cran()
+  set.seed(42)
+  y <- sim_svp(500, phi = 0.90, sigy = 1, sigv = 0.3,
+               errorType = "Student-t", nu = 5)
+  test <- suppressWarnings(mmc_lev(y, N = 9, Bartlett = TRUE,
+                                    errorType = "Student-t",
+                                    method = "pso", maxit = 5))
+  expect_true(test$value >= 0 && test$value <= 1)
+})
+
+test_that("mmc_lev GED Bartlett=TRUE runs without error", {
+  skip_on_cran()
+  set.seed(42)
+  y <- sim_svp(500, phi = 0.90, sigy = 1, sigv = 0.3,
+               errorType = "GED", nu = 1.5)
+  test <- suppressWarnings(mmc_lev(y, N = 9, Bartlett = TRUE,
+                                    errorType = "GED",
+                                    method = "pso", maxit = 5))
+  expect_true(test$value >= 0 && test$value <= 1)
+})
+
 test_that("mmc_t eps length validation works", {
+  skip_on_cran()
   set.seed(42)
   y <- sim_svp(500, phi = c(0.20, 0.63), sigy = 1, sigv = 1,
                errorType = "Student-t", nu = 3)
@@ -171,6 +241,7 @@ test_that("mmc_t eps length validation works", {
 })
 
 test_that("mmc_ged eps length validation works", {
+  skip_on_cran()
   set.seed(42)
   y <- sim_svp(500, phi = c(0.20, 0.63), sigy = 1, sigv = 1,
                errorType = "GED", nu = 1.5)

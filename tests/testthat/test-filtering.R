@@ -318,3 +318,21 @@ test_that("RTS smoother (pinv) produces no NaN/Inf on near-unit-root SV(2)", {
   expect_false(any(is.nan(filt_ckf$w_smoothed)  | is.infinite(filt_ckf$w_smoothed)))
   expect_false(any(is.nan(filt_gmkf$w_smoothed) | is.infinite(filt_gmkf$w_smoothed)))
 })
+
+# =========================================================================== #
+# Regression: BPF xi_filtered dimensions for p>=2 (Bug F fix, 2026-04-03)
+# =========================================================================== #
+
+test_that("BPF xi_filtered has correct p x T dimensions for p=2", {
+  skip_on_cran()
+  set.seed(42)
+  y <- sim_svp(300, phi = c(0.20, 0.63), sigy = 1, sigv = 1)
+  fit <- svp(y, p = 2)
+  filt <- filter_svp(fit, method = "particle", M = 100)
+  expect_equal(nrow(filt$xi_filtered), 2L)
+  expect_equal(ncol(filt$xi_filtered), 300L)
+  # Row 1 should match w_filtered
+  expect_equal(filt$xi_filtered[1, ], filt$w_filtered)
+  # Row 2 is lagged: xi[2,t] = w_filtered[t-1]
+  expect_equal(filt$xi_filtered[2, 2:300], filt$w_filtered[1:299])
+})

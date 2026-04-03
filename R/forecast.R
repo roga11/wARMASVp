@@ -18,10 +18,10 @@
 #' @return An object of class \code{"svp_forecast"}, a list containing:
 #' \describe{
 #'   \item{w_forecasted}{Primary forecast (scale determined by \code{output}).}
-#'   \item{log_var_forecast}{Log-volatility forecasts w_{T+h|T}.}
+#'   \item{log_var_forecast}{Log-volatility forecasts \eqn{w_{T+h|T}}.}
 #'   \item{var_forecast}{Conditional variance forecasts \eqn{\sigma^2_{T+h|T}}.}
 #'   \item{vol_forecast}{Conditional volatility forecasts \eqn{\sigma_{T+h|T}}.}
-#'   \item{P_forecast}{Forecast MSE P_{T+h|T} for each horizon.}
+#'   \item{P_forecast}{Forecast MSE \eqn{P_{T+h|T}} for each horizon.}
 #'   \item{w_estimated}{Filtered log-volatility.}
 #'   \item{w_smoothed}{Smoothed log-volatility.}
 #'   \item{zt}{Filtered standardized residuals.}
@@ -52,6 +52,7 @@ forecast_svp <- function(object, H = 1,
          "Usage: fit <- svp(y, ...); fc <- forecast_svp(fit, H = 10)")
   }
   output <- match.arg(output)
+  filter_method <- match.arg(filter_method, c("corrected", "mixture"))
 
   mdl <- object
   y_vec <- as.numeric(mdl$y)

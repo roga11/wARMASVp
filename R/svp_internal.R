@@ -8,8 +8,10 @@
 # =========================================================================== #
 
 #' Correction factor C_t(nu) for Student-t leverage estimation
-#' Under scale mixture u_t = z_t * lambda_t^{-1/2}, C_t(nu) = [E[lambda^{-1/2}]]^2
-#' = (nu/2) * [Gamma((nu-1)/2) / Gamma(nu/2)]^2.  Exact, parameter-free.
+#'
+#' Under scale mixture \eqn{u_t = z_t \lambda_t^{-1/2}},
+#' \eqn{C_t(\nu) = [E[\lambda^{-1/2}]]^2 = (\nu/2) [\Gamma((\nu-1)/2) / \Gamma(\nu/2)]^2}.
+#' Exact, parameter-free.
 #' @param nu Degrees of freedom (nu > 1)
 #' @return C_t(nu), always > 1 for finite nu (approaches 1 as nu -> Inf)
 #' @keywords internal
@@ -49,7 +51,7 @@ qged_std <- function(p, nu) {
 }
 
 #' Gauss-Hermite quadrature nodes and weights for N(0,1) integration
-#' Computes nodes z_i and weights w_i such that sum(w_i * f(z_i)) ≈ E[f(Z)]
+#' Computes nodes z_i and weights w_i such that sum(w_i * f(z_i)) approximates E[f(Z)]
 #' where Z ~ N(0,1). Uses the Golub-Welsch algorithm.
 #' @param n Number of quadrature points (default 200)
 #' @return List with components nodes and weights
@@ -92,7 +94,8 @@ qged_std <- function(p, nu) {
 }
 
 #' Approximate correction factor C_g(nu) for GED leverage (diagnostic use only)
-#' C_g(nu) = E[|u|] * Cov(z, F_GED^{-1}(Phi(z))) / sqrt(2/pi)
+#'
+#' \eqn{C_g(\nu) = E[|u|] \cdot \textrm{Cov}(z, F_{GED}^{-1}(\Phi(z))) / \sqrt{2/\pi}}.
 #' This is a first-order approximation; estimation uses the exact implicit equation.
 #' @param nu GED shape parameter (nu > 0)
 #' @param n_nodes Number of GH quadrature nodes (default 200)
@@ -112,7 +115,8 @@ correction_factor_ged_approx <- function(nu, n_nodes = 200L) {
 # =========================================================================== #
 
 #' Compute EH cross-moment for leverage estimation
-#' EH = demeaned sample cross-moment (1/(T-2)) * sum((|y_t| - mean|y|)(y_{t-1} - mean(y)))
+#'
+#' EH = demeaned sample cross-moment \eqn{(1/(T-2)) \sum(|y_t| - \bar{|y|})(y_{t-1} - \bar{y})}.
 #' @param y Numeric vector of observations
 #' @param rho_type "pearson" or "kendall"
 #' @return EH value
@@ -514,7 +518,7 @@ rged <- function(n, mean = 0, sd = 1, nu = 2) {
       u <- sim_svp(Tsize, phi = object$phi, sigy = object$sigy,
                    sigv = object$sigv, burnin = burnin)
     }
-    sigvMethod_g <- if (is.null(object$sigvMethod)) "hybrid" else object$sigvMethod
+    sigvMethod_g <- if (is.null(object$sigvMethod)) "factored" else object$sigvMethod
     out_tmp <- tryCatch(
       svp(u, p = p, J = object$J, leverage = has_lev,
           rho_type = rho_type, del = object$del, trunc_lev = trunc_lev,
@@ -691,7 +695,7 @@ rged <- function(n, mean = 0, sd = 1, nu = 2) {
 
 # MMC p-value for leverage test (identity Amat)
 .mmc_pval_lev <- function(theta, y, j, N, mdl_alt, rho_null, ini,
-                          Amat, rho_type, del = 1e-10,
+                          Amat, rho_type, del = 1e-10, Bartlett = FALSE,
                           wDecay = FALSE, trunc_lev = TRUE,
                           logNu = FALSE, sigvMethod = "factored",
                           winsorize_eps = 0,
@@ -728,7 +732,7 @@ rged <- function(n, mean = 0, sd = 1, nu = 2) {
 
 # MMC p-value for leverage test (Bartlett kernel Amat)
 .mmc_pval_lev_Amat <- function(theta, y, j, N, mdl_alt, rho_null, ini, innovations = NULL,
-                               rho_type, del = 1e-10, Bartlett = TRUE,
+                               Amat = NULL, rho_type, del = 1e-10, Bartlett = TRUE,
                                wDecay = FALSE, trunc_lev = TRUE,
                                logNu = FALSE, sigvMethod = "factored",
                                winsorize_eps = 0) {
@@ -765,7 +769,7 @@ rged <- function(n, mean = 0, sd = 1, nu = 2) {
 # MMC p-value for Student-t leverage test (returns negative for minimization)
 # theta = (phi_1,...,phi_p, sigy, sigv, nu) — nuisance under H0: rho = rho_null
 .mmc_pval_lev_t <- function(theta, y, j, N, mdl_alt, rho_null, ini, innovations = NULL,
-                             Amat, rho_type, del = 1e-10,
+                             Amat, rho_type, del = 1e-10, Bartlett = FALSE,
                              wDecay = FALSE, trunc_lev = TRUE,
                              logNu = FALSE, sigvMethod = "factored",
                              winsorize_eps = FALSE) {
@@ -787,20 +791,34 @@ rged <- function(n, mean = 0, sd = 1, nu = 2) {
   gt_cand <- gamma_w0_cand * (1 + rho_w_cand[1])
   out_lev_null <- list(phi = phi_cand, sigy = sigy_cand, sigv = sigv_cand,
                        v = nu_cand, rho = rho_null, gammatilde = gt_cand)
-  s0_tmp <- tryCatch(
-    Tsize * (LRT_moment_lev_t(y, out_lev_null, Amat, rho_type, del) -
-               LRT_moment_lev_t(y, mdl_alt, Amat, rho_type, del)),
+  s0_tmp <- tryCatch({
+    if (isTRUE(Bartlett)) {
+      Tsize * (LRT_moment_lev_t_Amat(y, out_lev_null, rho_type, del, TRUE) -
+                 LRT_moment_lev_t_Amat(y, mdl_alt, rho_type, del, TRUE))
+    } else {
+      Tsize * (LRT_moment_lev_t(y, out_lev_null, Amat, rho_type, del) -
+                 LRT_moment_lev_t(y, mdl_alt, Amat, rho_type, del))
+    }},
     error = function(e) NA
   )
   s0_tmp <- max(s0_tmp, 1e-10)
   if (is.finite(s0_tmp) && stationary) {
     betasim_null <- c(phi_cand, sigy_cand, sigv_cand, nu_cand, rho_null)
-    sN <- .simnull_lev_t(betasim_null, rho_null, p, j, Tsize, N, ini,
-                          Amat, rho_type, del, wDecay = wDecay,
-                          trunc_lev = trunc_lev, logNu = logNu,
-                          sigvMethod = sigvMethod,
-                          winsorize_eps = winsorize_eps,
-                          innovations = innovations)
+    if (isTRUE(Bartlett)) {
+      sN <- .simnull_lev_t_Amat(betasim_null, rho_null, p, j, Tsize, N, ini,
+                                 rho_type, del, TRUE, wDecay = wDecay,
+                                 trunc_lev = trunc_lev, logNu = logNu,
+                                 sigvMethod = sigvMethod,
+                                 winsorize_eps = winsorize_eps,
+                                 innovations = innovations)
+    } else {
+      sN <- .simnull_lev_t(betasim_null, rho_null, p, j, Tsize, N, ini,
+                            Amat, rho_type, del, wDecay = wDecay,
+                            trunc_lev = trunc_lev, logNu = logNu,
+                            sigvMethod = sigvMethod,
+                            winsorize_eps = winsorize_eps,
+                            innovations = innovations)
+    }
     pval <- -((N + 1 - sum(s0_tmp >= sN)) / (N + 1))
   } else {
     pval <- 9999999999999
@@ -811,7 +829,7 @@ rged <- function(n, mean = 0, sd = 1, nu = 2) {
 # MMC p-value for GED leverage test (returns negative for minimization)
 # theta = (phi_1,...,phi_p, sigy, sigv, nu) — nuisance under H0: rho = rho_null
 .mmc_pval_lev_ged <- function(theta, y, j, N, mdl_alt, rho_null, ini, innovations = NULL,
-                               Amat, rho_type, del = 1e-10,
+                               Amat, rho_type, del = 1e-10, Bartlett = FALSE,
                                wDecay = FALSE, trunc_lev = TRUE,
                                sigvMethod = "factored",
                                winsorize_eps = FALSE) {
@@ -833,20 +851,34 @@ rged <- function(n, mean = 0, sd = 1, nu = 2) {
   gt_cand <- gamma_w0_cand * (1 + rho_w_cand[1])
   out_lev_null <- list(phi = phi_cand, sigy = sigy_cand, sigv = sigv_cand,
                        v = nu_cand, rho = rho_null, gammatilde = gt_cand)
-  s0_tmp <- tryCatch(
-    Tsize * (LRT_moment_lev_ged(y, out_lev_null, Amat, rho_type, del) -
-               LRT_moment_lev_ged(y, mdl_alt, Amat, rho_type, del)),
+  s0_tmp <- tryCatch({
+    if (isTRUE(Bartlett)) {
+      Tsize * (LRT_moment_lev_ged_Amat(y, out_lev_null, rho_type, del, TRUE) -
+                 LRT_moment_lev_ged_Amat(y, mdl_alt, rho_type, del, TRUE))
+    } else {
+      Tsize * (LRT_moment_lev_ged(y, out_lev_null, Amat, rho_type, del) -
+                 LRT_moment_lev_ged(y, mdl_alt, Amat, rho_type, del))
+    }},
     error = function(e) NA
   )
   s0_tmp <- max(s0_tmp, 1e-10)
   if (is.finite(s0_tmp) && stationary) {
     betasim_null <- c(phi_cand, sigy_cand, sigv_cand, nu_cand, rho_null)
-    sN <- .simnull_lev_ged(betasim_null, rho_null, p, j, Tsize, N, ini,
-                            Amat, rho_type, del, wDecay = wDecay,
-                            trunc_lev = trunc_lev,
-                            sigvMethod = sigvMethod,
-                            winsorize_eps = winsorize_eps,
-                            innovations = innovations)
+    if (isTRUE(Bartlett)) {
+      sN <- .simnull_lev_ged_Amat(betasim_null, rho_null, p, j, Tsize, N, ini,
+                                   rho_type, del, TRUE, wDecay = wDecay,
+                                   trunc_lev = trunc_lev,
+                                   sigvMethod = sigvMethod,
+                                   winsorize_eps = winsorize_eps,
+                                   innovations = innovations)
+    } else {
+      sN <- .simnull_lev_ged(betasim_null, rho_null, p, j, Tsize, N, ini,
+                              Amat, rho_type, del, wDecay = wDecay,
+                              trunc_lev = trunc_lev,
+                              sigvMethod = sigvMethod,
+                              winsorize_eps = winsorize_eps,
+                              innovations = innovations)
+    }
     pval <- -((N + 1 - sum(s0_tmp >= sN)) / (N + 1))
   } else {
     pval <- 9999999999999
@@ -856,7 +888,7 @@ rged <- function(n, mean = 0, sd = 1, nu = 2) {
 
 # MMC p-value for Student-t (returns negative for minimization)
 .mmc_pval_t <- function(theta, y, j, N, mdl_alt, nu_null, ini,
-                        Amat, del = 1e-10, Bartlett = TRUE,
+                        Amat, WAmat = FALSE, del = 1e-10, Bartlett = TRUE,
                         logNu = TRUE, wDecay = FALSE,
                         direction = "two-sided",
                         innovations = NULL) {
@@ -866,18 +898,18 @@ rged <- function(n, mean = 0, sd = 1, nu = 2) {
   out_lev_null <- list(phi = theta[1:p], sigy = theta[p + 1],
                        sigv = theta[p + 2], v = nu_null)
   s0_tmp <- tryCatch(
-    Tsize * (LRT_moment_t(y, out_lev_null, Amat, FALSE, del, Bartlett) -
-               LRT_moment_t(y, mdl_alt, Amat, FALSE, del, Bartlett)),
+    Tsize * (LRT_moment_t(y, out_lev_null, Amat, WAmat, del, Bartlett) -
+               LRT_moment_t(y, mdl_alt, Amat, WAmat, del, Bartlett)),
     error = function(e) NA
   )
   stationary <- all(Mod(polyroot(c(1, -theta[1:p]))) > 1)
   s0_tmp <- max(s0_tmp, 1e-10)
   if (is.finite(s0_tmp) && stationary) {
     betasim_null <- c(theta[1:p], theta[p + 1], theta[p + 2], nu_null)
-    sigvMethod_mt <- if (is.null(mdl_alt$sigvMethod)) "hybrid" else mdl_alt$sigvMethod
+    sigvMethod_mt <- if (is.null(mdl_alt$sigvMethod)) "factored" else mdl_alt$sigvMethod
     winsorize_eps_mt <- if (is.null(mdl_alt$winsorize_eps)) FALSE else mdl_alt$winsorize_eps
     sN <- .simnull_t(betasim_null, nu_null, j, Tsize, N, ini,
-                     Amat, del, FALSE, Bartlett, logNu,
+                     Amat, del, WAmat, Bartlett, logNu,
                      wDecay = wDecay, sigvMethod = sigvMethod_mt,
                      winsorize_eps = winsorize_eps_mt,
                      direction = direction,
@@ -896,7 +928,7 @@ rged <- function(n, mean = 0, sd = 1, nu = 2) {
 
 # MMC p-value for GED (returns negative for minimization)
 .mmc_pval_ged <- function(theta, y, j, N, mdl_alt, nu_null, ini,
-                          Amat, del = 1e-10, Bartlett = TRUE,
+                          Amat, WAmat = FALSE, del = 1e-10, Bartlett = TRUE,
                           wDecay = FALSE, innovations = NULL,
                           direction = "two-sided") {
   y <- as.matrix(as.numeric(y))
@@ -905,18 +937,18 @@ rged <- function(n, mean = 0, sd = 1, nu = 2) {
   out_lev_null <- list(phi = theta[1:p], sigy = theta[p + 1],
                        sigv = theta[p + 2], v = nu_null)
   s0_tmp <- tryCatch(
-    Tsize * (LRT_moment_ged(y, out_lev_null, Amat, FALSE, del, Bartlett) -
-               LRT_moment_ged(y, mdl_alt, Amat, FALSE, del, Bartlett)),
+    Tsize * (LRT_moment_ged(y, out_lev_null, Amat, WAmat, del, Bartlett) -
+               LRT_moment_ged(y, mdl_alt, Amat, WAmat, del, Bartlett)),
     error = function(e) NA
   )
   stationary <- all(Mod(polyroot(c(1, -theta[1:p]))) > 1)
   s0_tmp <- max(s0_tmp, 1e-10)
   if (is.finite(s0_tmp) && stationary) {
     betasim_null <- c(theta[1:p], theta[p + 1], theta[p + 2], nu_null)
-    sigvMethod_mg <- if (is.null(mdl_alt$sigvMethod)) "hybrid" else mdl_alt$sigvMethod
+    sigvMethod_mg <- if (is.null(mdl_alt$sigvMethod)) "factored" else mdl_alt$sigvMethod
     winsorize_eps_mg <- if (is.null(mdl_alt$winsorize_eps)) FALSE else mdl_alt$winsorize_eps
     sN <- .simnull_ged(betasim_null, nu_null, j, Tsize, N, ini,
-                       Amat, del, FALSE, Bartlett, wDecay = wDecay,
+                       Amat, del, WAmat, Bartlett, wDecay = wDecay,
                        sigvMethod = sigvMethod_mg,
                        winsorize_eps = winsorize_eps_mg,
                        direction = direction,

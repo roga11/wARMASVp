@@ -43,22 +43,6 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
-// svpCpp_h_ahead
-List svpCpp_h_ahead(arma::vec u, int p, int J, int h, double del, bool wDecay);
-RcppExport SEXP _wARMASVp_svpCpp_h_ahead(SEXP uSEXP, SEXP pSEXP, SEXP JSEXP, SEXP hSEXP, SEXP delSEXP, SEXP wDecaySEXP) {
-BEGIN_RCPP
-    Rcpp::RObject rcpp_result_gen;
-    Rcpp::RNGScope rcpp_rngScope_gen;
-    Rcpp::traits::input_parameter< arma::vec >::type u(uSEXP);
-    Rcpp::traits::input_parameter< int >::type p(pSEXP);
-    Rcpp::traits::input_parameter< int >::type J(JSEXP);
-    Rcpp::traits::input_parameter< int >::type h(hSEXP);
-    Rcpp::traits::input_parameter< double >::type del(delSEXP);
-    Rcpp::traits::input_parameter< bool >::type wDecay(wDecaySEXP);
-    rcpp_result_gen = Rcpp::wrap(svpCpp_h_ahead(u, p, J, h, del, wDecay));
-    return rcpp_result_gen;
-END_RCPP
-}
 // solve_lyapunov_discrete_cpp
 arma::mat solve_lyapunov_discrete_cpp(const arma::mat& F_mat, const arma::mat& Q);
 RcppExport SEXP _wARMASVp_solve_lyapunov_discrete_cpp(SEXP F_matSEXP, SEXP QSEXP) {
@@ -524,17 +508,6 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
-// statPhi_cpp
-arma::mat statPhi_cpp(arma::mat phiB);
-RcppExport SEXP _wARMASVp_statPhi_cpp(SEXP phiBSEXP) {
-BEGIN_RCPP
-    Rcpp::RObject rcpp_result_gen;
-    Rcpp::RNGScope rcpp_rngScope_gen;
-    Rcpp::traits::input_parameter< arma::mat >::type phiB(phiBSEXP);
-    rcpp_result_gen = Rcpp::wrap(statPhi_cpp(phiB));
-    return rcpp_result_gen;
-END_RCPP
-}
 // kendall_corr
 double kendall_corr(arma::vec x, arma::vec y);
 RcppExport SEXP _wARMASVp_kendall_corr(SEXP xSEXP, SEXP ySEXP) {
@@ -544,41 +517,6 @@ BEGIN_RCPP
     Rcpp::traits::input_parameter< arma::vec >::type x(xSEXP);
     Rcpp::traits::input_parameter< arma::vec >::type y(ySEXP);
     rcpp_result_gen = Rcpp::wrap(kendall_corr(x, y));
-    return rcpp_result_gen;
-END_RCPP
-}
-// acov_g
-arma::mat acov_g(arma::mat y, int k);
-RcppExport SEXP _wARMASVp_acov_g(SEXP ySEXP, SEXP kSEXP) {
-BEGIN_RCPP
-    Rcpp::RObject rcpp_result_gen;
-    Rcpp::RNGScope rcpp_rngScope_gen;
-    Rcpp::traits::input_parameter< arma::mat >::type y(ySEXP);
-    Rcpp::traits::input_parameter< int >::type k(kSEXP);
-    rcpp_result_gen = Rcpp::wrap(acov_g(y, k));
-    return rcpp_result_gen;
-END_RCPP
-}
-// acov_symmetric
-arma::mat acov_symmetric(arma::mat y, int k);
-RcppExport SEXP _wARMASVp_acov_symmetric(SEXP ySEXP, SEXP kSEXP) {
-BEGIN_RCPP
-    Rcpp::RObject rcpp_result_gen;
-    Rcpp::RNGScope rcpp_rngScope_gen;
-    Rcpp::traits::input_parameter< arma::mat >::type y(ySEXP);
-    Rcpp::traits::input_parameter< int >::type k(kSEXP);
-    rcpp_result_gen = Rcpp::wrap(acov_symmetric(y, k));
-    return rcpp_result_gen;
-END_RCPP
-}
-// signR_cpp
-arma::cx_vec signR_cpp(arma::cx_vec vec);
-RcppExport SEXP _wARMASVp_signR_cpp(SEXP vecSEXP) {
-BEGIN_RCPP
-    Rcpp::RObject rcpp_result_gen;
-    Rcpp::RNGScope rcpp_rngScope_gen;
-    Rcpp::traits::input_parameter< arma::cx_vec >::type vec(vecSEXP);
-    rcpp_result_gen = Rcpp::wrap(signR_cpp(vec));
     return rcpp_result_gen;
 END_RCPP
 }
@@ -600,7 +538,6 @@ END_RCPP
 static const R_CallMethodDef CallEntries[] = {
     {"_wARMASVp_svpCpp", (DL_FUNC) &_wARMASVp_svpCpp, 7},
     {"_wARMASVp_svpCpp_nolev", (DL_FUNC) &_wARMASVp_svpCpp_nolev, 5},
-    {"_wARMASVp_svpCpp_h_ahead", (DL_FUNC) &_wARMASVp_svpCpp_h_ahead, 6},
     {"_wARMASVp_solve_lyapunov_discrete_cpp", (DL_FUNC) &_wARMASVp_solve_lyapunov_discrete_cpp, 2},
     {"_wARMASVp_kalman_filter_cpp", (DL_FUNC) &_wARMASVp_kalman_filter_cpp, 9},
     {"_wARMASVp_gmkf_filter_cpp", (DL_FUNC) &_wARMASVp_gmkf_filter_cpp, 12},
@@ -629,11 +566,7 @@ static const R_CallMethodDef CallEntries[] = {
     {"_wARMASVp_sim_sv_ged_cpp", (DL_FUNC) &_wARMASVp_sim_sv_ged_cpp, 5},
     {"_wARMASVp_sim_svp_leverage_t_cpp", (DL_FUNC) &_wARMASVp_sim_svp_leverage_t_cpp, 4},
     {"_wARMASVp_sim_svp_leverage_ged_cpp", (DL_FUNC) &_wARMASVp_sim_svp_leverage_ged_cpp, 4},
-    {"_wARMASVp_statPhi_cpp", (DL_FUNC) &_wARMASVp_statPhi_cpp, 1},
     {"_wARMASVp_kendall_corr", (DL_FUNC) &_wARMASVp_kendall_corr, 2},
-    {"_wARMASVp_acov_g", (DL_FUNC) &_wARMASVp_acov_g, 2},
-    {"_wARMASVp_acov_symmetric", (DL_FUNC) &_wARMASVp_acov_symmetric, 2},
-    {"_wARMASVp_signR_cpp", (DL_FUNC) &_wARMASVp_signR_cpp, 1},
     {"_wARMASVp_rged_cpp", (DL_FUNC) &_wARMASVp_rged_cpp, 4},
     {NULL, NULL, 0}
 };

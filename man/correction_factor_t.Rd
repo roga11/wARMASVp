@@ -2,9 +2,7 @@
 % Please edit documentation in R/svp_internal.R
 \name{correction_factor_t}
 \alias{correction_factor_t}
-\title{Correction factor C_t(nu) for Student-t leverage estimation
-Under scale mixture u_t = z_t * lambda_t^{-1/2}, C_t(nu) = [E[lambda^{-1/2}]]^2
-= (nu/2) * [Gamma((nu-1)/2) / Gamma(nu/2)]^2.  Exact, parameter-free.}
+\title{Correction factor C_t(nu) for Student-t leverage estimation}
 \usage{
 correction_factor_t(nu)
 }
@@ -15,8 +13,8 @@ correction_factor_t(nu)
 C_t(nu), always > 1 for finite nu (approaches 1 as nu -> Inf)
 }
 \description{
-Correction factor C_t(nu) for Student-t leverage estimation
-Under scale mixture u_t = z_t * lambda_t^{-1/2}, C_t(nu) = [E[lambda^{-1/2}]]^2
-= (nu/2) * [Gamma((nu-1)/2) / Gamma(nu/2)]^2.  Exact, parameter-free.
+Under scale mixture \eqn{u_t = z_t \lambda_t^{-1/2}},
+\eqn{C_t(\nu) = [E[\lambda^{-1/2}]]^2 = (\nu/2) [\Gamma((\nu-1)/2) / \Gamma(\nu/2)]^2}.
+Exact, parameter-free.
 }
 \keyword{internal}

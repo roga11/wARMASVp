@@ -135,3 +135,14 @@ test_that("forecast_svp p=2: P_forecast increases with horizon (full P_T)", {
   # Var forecast should all be positive
   expect_true(all(fc$var_forecast > 0))
 })
+
+# =========================================================================== #
+# Regression: forecast_svp blocks particle filter method (Bug F fix, 2026-04-03)
+# =========================================================================== #
+
+test_that("forecast_svp rejects filter_method='particle'", {
+  set.seed(42)
+  y <- sim_svp(300, phi = 0.95, sigy = 1, sigv = 0.3)
+  fit <- svp(y, p = 1)
+  expect_error(forecast_svp(fit, H = 3, filter_method = "particle"))
+})

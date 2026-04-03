@@ -2,8 +2,7 @@
 % Please edit documentation in R/svp_internal.R
 \name{.compute_EH}
 \alias{.compute_EH}
-\title{Compute EH cross-moment for leverage estimation
-EH = demeaned sample cross-moment (1/(T-2)) * sum((|y_t| - mean|y|)(y_{t-1} - mean(y)))}
+\title{Compute EH cross-moment for leverage estimation}
 \usage{
 .compute_EH(y, rho_type = "pearson")
 }
@@ -16,7 +15,6 @@ EH = demeaned sample cross-moment (1/(T-2)) * sum((|y_t| - mean|y|)(y_{t-1} - me
 EH value
 }
 \description{
-Compute EH cross-moment for leverage estimation
-EH = demeaned sample cross-moment (1/(T-2)) * sum((|y_t| - mean|y|)(y_{t-1} - mean(y)))
+EH = demeaned sample cross-moment \eqn{(1/(T-2)) \sum(|y_t| - \bar{|y|})(y_{t-1} - \bar{y})}.
 }
 \keyword{internal}

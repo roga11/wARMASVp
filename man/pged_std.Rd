@@ -18,3 +18,4 @@ Numeric vector of probabilities.
 Computes the CDF of the standardized GED(\eqn{\nu}) distribution with
 unit variance.
 }
+\keyword{internal}

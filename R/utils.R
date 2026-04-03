@@ -22,26 +22,3 @@ companionMat <- function(phi, p, q) {
   }
   return(compMat)
 }
-
-#' Create Lagged Matrix from a Time Series
-#'
-#' @param y Numeric vector. The time series.
-#' @param lags Integer. Number of lags to include.
-#' @param balance Logical. If \code{TRUE}, remove rows with NAs.
-#'
-#' @return A matrix with columns \code{y(t), y(t-1), ..., y(t-lags)}.
-#'
-#' @keywords internal
-laggedMat <- function(y, lags, balance = TRUE) {
-  Tsize <- length(y)
-  lagged_matrix <- matrix(NA, nrow = Tsize, ncol = lags + 1)
-  for (i in 0:lags) {
-    lagged_matrix[(i + 1):Tsize, i + 1] <- y[1:(Tsize - i)]
-  }
-  colnames(lagged_matrix) <- c("y.lag(0)", paste0("y.lag(", 1:lags, ")"))
-  if (balance) {
-    lagged_matrix <- lagged_matrix[stats::complete.cases(lagged_matrix), ]
-    rownames(lagged_matrix) <- NULL
-  }
-  return(lagged_matrix)
-}

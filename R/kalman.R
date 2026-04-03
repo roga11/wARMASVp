@@ -14,7 +14,7 @@
 #' @param F_mat Square matrix.
 #' @param Q Square matrix (same dimensions as \code{F_mat}).
 #' @return Solution matrix \code{X}.
-#' @export
+#' @keywords internal
 solve_lyapunov_discrete <- function(F_mat, Q) {
   solve_lyapunov_discrete_cpp(F_mat, Q)
 }
@@ -27,7 +27,7 @@ solve_lyapunov_discrete <- function(F_mat, Q) {
 #' @param u Numeric vector. Evaluation points.
 #' @param nu Numeric. GED shape parameter (\eqn{\nu > 0}).
 #' @return Numeric vector of probabilities.
-#' @export
+#' @keywords internal
 pged_std <- function(u, nu) {
   a <- exp(0.5 * (lgamma(1 / nu) - lgamma(3 / nu)))
   ifelse(u >= 0,
@@ -90,7 +90,7 @@ density_eps_ged <- function(y, nu) {
 #' @param tol Numeric. Convergence tolerance. Default 1e-8.
 #' @param seed Integer. Random seed. Default 42.
 #' @return List with \code{weights}, \code{means}, \code{vars}, \code{KL_div}.
-#' @export
+#' @keywords internal
 fit_ksc_mixture <- function(distribution = c("gaussian", "student_t", "ged"),
                             nu = NULL, K = 7, n_sample = 100000,
                             max_iter = 500, tol = 1e-8, seed = 42) {
@@ -479,8 +479,17 @@ filter_svp <- function(object, method = c("corrected", "mixture", "particle"),
     result$zt <- y_vec / (params$sigma_y * exp(result$w_filtered / 2))
     result$zt_smoothed <- result$zt
     result$P_predicted <- rep(NA_real_, T_obs)
-    result$xi_filtered <- matrix(result$w_filtered, nrow = 1)
-    result$xi_smoothed <- result$xi_filtered
+    # Construct full p x T state matrix from BPF w_filtered
+    # Companion state: xi_t = [w_t, w_{t-1}, ..., w_{t-p+1}]'
+    xi_mat <- matrix(NA_real_, nrow = p, ncol = T_obs)
+    xi_mat[1, ] <- result$w_filtered
+    if (p > 1) {
+      for (j in 2:p) {
+        xi_mat[j, j:T_obs] <- result$w_filtered[1:(T_obs - j + 1)]
+      }
+    }
+    result$xi_filtered <- xi_mat
+    result$xi_smoothed <- xi_mat
   }
 
   # Build output

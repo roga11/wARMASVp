@@ -12,8 +12,7 @@ double kendall_corr(arma::vec x, arma::vec y);
 
 // [[Rcpp::export]]
 List svpCpp(arma::vec u, int p, int J, bool trunc_lev, double del, int rho_type = 1, bool wDecay = false) {
-  Rcpp::Environment gsignal("package:gsignal");
-  Rcpp::Function polyR = gsignal["poly"];
+  Rcpp::Function polyR = Rcpp::Environment::namespace_env("gsignal")["poly"];
 
   // ----- get y*
   int N = u.n_elem;
@@ -114,8 +113,7 @@ List svpCpp(arma::vec u, int p, int J, bool trunc_lev, double del, int rho_type 
 
 // [[Rcpp::export]]
 List svpCpp_nolev(arma::vec u, int p, int J, double del, bool wDecay = false) {
-  Rcpp::Environment gsignal("package:gsignal");
-  Rcpp::Function polyR = gsignal["poly"];
+  Rcpp::Function polyR = Rcpp::Environment::namespace_env("gsignal")["poly"];
 
   // ----- get y*
   arma::vec u2 = square(u) + del;
@@ -190,77 +188,3 @@ List svpCpp_nolev(arma::vec u, int p, int J, double del, bool wDecay = false) {
 }
 
 
-// [[Rcpp::export]]
-List svpCpp_h_ahead(arma::vec u, int p, int J, int h, double del, bool wDecay = false) {
-  Rcpp::Environment gsignal("package:gsignal");
-  Rcpp::Function polyR = gsignal["poly"];
-
-  int K_min = std::max(p, h + 1);
-
-  // ----- get y*
-  arma::vec u2 = square(u) + del;
-  double mu = mean(log(u2));
-  arma::mat y = log(u2) - mu;
-  int T = y.n_elem;
-
-  // ----- compute sigma_y
-  double s_yh = sqrt(exp(mu + 1.2704));
-
-  // ----- compute phi
-  arma::mat xMM1(J * p, p, arma::fill::zeros);
-  arma::mat yVM1(J * p, 1, arma::fill::zeros);
-  arma::mat wDec(J * p, 1, arma::fill::zeros);
-
-  for (int jj = 0; jj < J; ++jj) {
-    arma::mat xM(p, p, arma::fill::zeros);
-    arma::mat yV(p, 1, arma::fill::zeros);
-    for (int i = 0; i < p; ++i) {
-      arma::rowvec xMv(p, arma::fill::zeros);
-      for (int j = 0; j < p; ++j) {
-        int lag = jj + K_min + i - j + 1;
-        xMv(j) = acov_g(y, lag)(0, 0);
-      }
-      xM.row(i) = xMv;
-      int yLag = jj + K_min + i - h + 1;
-      yV(i) = acov_g(y, yLag)(0, 0);
-    }
-    xMM1.rows(jj * p, (jj + 1) * p - 1) = xM;
-    yVM1.rows(jj * p, (jj + 1) * p - 1) = yV;
-    wDec.rows(jj * p, (jj + 1) * p - 1).fill((2.0 / J) * (1.0 - (double(jj + 1) / (J + 1))));
-  }
-
-  arma::mat phiB = pinv(trans(xMM1) * xMM1) * trans(xMM1) * yVM1;
-
-  if (wDecay == true) {
-    arma::mat rowones(1, p, arma::fill::ones);
-    arma::mat wolsDec = arma::sqrt(wDec);
-    arma::mat wolsDecX = arma::sqrt(wDec) * rowones;
-    phiB = pinv(trans(wolsDecX % xMM1) * (wolsDecX % xMM1)) * trans(wolsDecX % xMM1) * (wolsDec % yVM1);
-  }
-
-  // ----- compute sigma_v
-  double sigma2_eps = arma::datum::pi * arma::datum::pi / 2.0;
-  double phi_sq_sum = arma::dot(phiB, phiB);
-
-  arma::vec resids(T - h, arma::fill::zeros);
-  for (int t = h; t < T; ++t) {
-    double pred = 0.0;
-    for (int j = 0; j < p; ++j) {
-      if ((t - j - 1) >= 0) {
-        pred += phiB(j) * y(t - j - 1);
-      }
-    }
-    resids(t - h) = y(t) - pred;
-  }
-  double Vhat = arma::mean(arma::square(resids));
-  double s_vh2_ols = Vhat - sigma2_eps * (1.0 + phi_sq_sum);
-  double s_vh_ols = (s_vh2_ols < 0) ? sqrt(sqrt(pow(s_vh2_ols, 2))) : sqrt(s_vh2_ols);
-
-  List para = List::create(
-    Named("mu") = mu,
-    Named("phi") = phiB,
-    Named("sigv") = s_vh_ols,
-    Named("sigy") = s_yh
-  );
-  return para;
-}

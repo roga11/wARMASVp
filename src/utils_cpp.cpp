@@ -8,20 +8,6 @@
 using namespace Rcpp;
 
 // [[Rcpp::export]]
-arma::mat statPhi_cpp(arma::mat phiB) {
-  Rcpp::Environment gsignal("package:gsignal");
-  Rcpp::Function polyR = gsignal["poly"];
-  double Del = 1 - 0.0001;
-  arma::vec pl = arma::join_cols(arma::vec{1}, -phiB);
-  arma::cx_vec r = roots(pl);
-  arma::uvec indices = find(abs(r) >= 1);
-  r.elem(indices) = sign(r.elem(indices)) * Del;
-  arma::vec polyc = real(as<arma::vec>(polyR(r)));
-  phiB = -polyc.subvec(1, polyc.n_elem - 1);
-  return(phiB);
-}
-
-// [[Rcpp::export]]
 double kendall_corr(arma::vec x, arma::vec y) {
   int n = x.n_elem;
   if (n != (int)y.n_elem) {
@@ -51,31 +37,10 @@ double kendall_corr(arma::vec x, arma::vec y) {
   return tau;
 }
 
-// [[Rcpp::export]]
 arma::mat acov_g(arma::mat y, int k) {
   int Tsize = y.n_rows;
   arma::mat gamma = (1.0 / (Tsize - k)) * trans(y.rows(k, Tsize - 1)) * y.rows(0, Tsize - k - 1);
   return gamma;
-}
-
-// [[Rcpp::export]]
-arma::mat acov_symmetric(arma::mat y, int k) {
-  int Tsize = y.n_rows;
-  if (k >= 0) {
-    return (1.0 / (Tsize - k)) * trans(y.rows(k, Tsize - 1)) * y.rows(0, Tsize - k - 1);
-  } else {
-    int kp = -k;
-    return (1.0 / (Tsize - kp)) * trans(y.rows(0, Tsize - kp - 1)) * y.rows(kp, Tsize - 1);
-  }
-}
-
-// [[Rcpp::export]]
-arma::cx_vec signR_cpp(arma::cx_vec vec) {
-  if (std::is_same<arma::cx_vec::elem_type, std::complex<double>>::value) {
-    return vec / arma::abs(vec);
-  } else {
-    return arma::sign(vec);
-  }
 }
 
 // Quantile function for standardized GED(nu) with Var=1

@@ -449,35 +449,29 @@ mmc_lev <- function(y, p = 1, J = 10, N = 99, rho_null = 0,
     if (isTRUE(Bartlett) && !is.null(mdl_alt$v) && mdl_alt$v <= 4) {
       warning("HAC weighting may be unreliable for Student-t with nu <= 4.")
     }
-    Amat <- diag(n_mom)
-    s0_tmp <- Tsize * (LRT_moment_lev_t(y_mat, mdl_null, Amat, rho_type, del) -
-                         LRT_moment_lev_t(y_mat, mdl_alt, Amat, rho_type, del))
+    if (isTRUE(Bartlett)) {
+      s0_tmp <- Tsize * (LRT_moment_lev_t_Amat(y_mat, mdl_null, rho_type, del, TRUE) -
+                           LRT_moment_lev_t_Amat(y_mat, mdl_alt, rho_type, del, TRUE))
+    } else {
+      Amat <- diag(n_mom)
+      s0_tmp <- Tsize * (LRT_moment_lev_t(y_mat, mdl_null, Amat, rho_type, del) -
+                           LRT_moment_lev_t(y_mat, mdl_alt, Amat, rho_type, del))
+    }
     pval_fn <- .mmc_pval_lev_t
   } else if (errorType == "GED") {
-    Amat <- diag(n_mom)
-    s0_tmp <- Tsize * (LRT_moment_lev_ged(y_mat, mdl_null, Amat, rho_type, del) -
-                         LRT_moment_lev_ged(y_mat, mdl_alt, Amat, rho_type, del))
+    if (isTRUE(Bartlett)) {
+      s0_tmp <- Tsize * (LRT_moment_lev_ged_Amat(y_mat, mdl_null, rho_type, del, TRUE) -
+                           LRT_moment_lev_ged_Amat(y_mat, mdl_alt, rho_type, del, TRUE))
+    } else {
+      Amat <- diag(n_mom)
+      s0_tmp <- Tsize * (LRT_moment_lev_ged(y_mat, mdl_null, Amat, rho_type, del) -
+                           LRT_moment_lev_ged(y_mat, mdl_alt, Amat, rho_type, del))
+    }
     pval_fn <- .mmc_pval_lev_ged
   }
   if (is.na(s0_tmp)) stop("Test statistic is NA.")
   if (s0_tmp < 0) warning("Test statistic is negative (", round(s0_tmp, 4), "); capped at 1e-10.")
   s0_tmp <- max(s0_tmp, 1e-10)
-  # Build extra args for optimizer
-  extra_args <- list(y = y_mat, j = J, N = N, mdl_alt = mdl_alt,
-                     rho_null = rho_null, ini = burnin,
-                     rho_type = rho_type, del = del,
-                     wDecay = wDecay, trunc_lev = trunc_lev)
-  if (errorType == "Gaussian") {
-    if (isTRUE(Bartlett)) extra_args$Bartlett <- TRUE
-    if (!isTRUE(Bartlett)) extra_args$Amat <- diag(n_mom)
-  } else {
-    extra_args$Amat <- diag(n_mom)
-    if (errorType == "Student-t") {
-      extra_args$logNu <- logNu
-    }
-    extra_args$sigvMethod <- sigvMethod
-    extra_args$winsorize_eps <- winsorize_eps
-  }
   # Pre-draw innovations for fixed-error MMC (Dufour 2006)
   n_total <- burnin + Tsize
   N_draw <- ceiling(N * 1.5) + 10L
@@ -495,17 +489,25 @@ mmc_lev <- function(y, p = 1, J = 10, N = 99, rho_null = 0,
       aux  = matrix(rnorm(n_total * N_draw), nrow = n_total, ncol = N_draw)
     )
   }
-  # Optimize
-  out <- .run_mmc_optimizer(method, theta_0, pval_fn, lower, upper,
-                            threshold, maxit,
-                            y = y_mat, j = J, N = N, mdl_alt = mdl_alt,
-                              rho_null = rho_null, ini = burnin,
-                              rho_type = rho_type, del = del,
-                              wDecay = wDecay, trunc_lev = trunc_lev,
-                              Amat = diag(n_mom),
-                              logNu = logNu, sigvMethod = sigvMethod,
-                              winsorize_eps = winsorize_eps,
-                              innovations = innov_lev)
+  # Optimize — pass Bartlett and Amat appropriately per error type
+  opt_args <- list(method = method, theta_0 = theta_0, fn = pval_fn,
+                   lower = lower, upper = upper,
+                   threshold = threshold, maxit = maxit,
+                   y = y_mat, j = J, N = N, mdl_alt = mdl_alt,
+                   rho_null = rho_null, ini = burnin,
+                   rho_type = rho_type, del = del,
+                   wDecay = wDecay, trunc_lev = trunc_lev,
+                   Bartlett = Bartlett,
+                   innovations = innov_lev)
+  opt_args$Amat <- diag(n_mom)
+  if (errorType == "Student-t") {
+    opt_args$logNu <- logNu
+  }
+  if (errorType != "Gaussian") {
+    opt_args$sigvMethod <- sigvMethod
+    opt_args$winsorize_eps <- winsorize_eps
+  }
+  out <- do.call(.run_mmc_optimizer, opt_args)
   out$value <- -out$value
   out$s0 <- s0_tmp
   out$call <- cl
@@ -741,6 +743,7 @@ mmc_t <- function(y, p = 1, J = 10, N = 99, nu_null, burnin = 500,
                             threshold, maxit,
                             y = y_mat, j = J, N = N, mdl_alt = mdl_alt,
                             nu_null = nu_null, ini = burnin, Amat = Amat_mat,
+                            WAmat = WAmat,
                             del = del, Bartlett = Bartlett, logNu = logNu,
                             wDecay = wDecay, direction = direction,
                             innovations = innov_t)
@@ -827,6 +830,7 @@ mmc_ged <- function(y, p = 1, J = 10, N = 99, nu_null, burnin = 500,
                             threshold, maxit,
                             y = y_mat, j = J, N = N, mdl_alt = mdl_alt,
                             nu_null = nu_null, ini = burnin, Amat = Amat_mat,
+                            WAmat = WAmat,
                             del = del, Bartlett = Bartlett, wDecay = wDecay,
                             direction = direction, innovations = innov_ged)
   out$value <- -out$value
