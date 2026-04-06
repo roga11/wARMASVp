@@ -3,7 +3,6 @@
 // Authors: Nazmul Ahsan, Jean-Marie Dufour, Gabriel Rodriguez Rondon
 // ============================================================================ //
 #include <RcppArmadillo.h>
-#include <RcppArmadilloExtensions/sample.h>
 // [[Rcpp::depends(RcppArmadillo)]]
 using namespace Rcpp;
 

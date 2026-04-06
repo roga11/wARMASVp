@@ -32,8 +32,8 @@
 #'
 #' @useDynLib wARMASVp, .registration = TRUE
 #' @importFrom Rcpp sourceCpp
+#' @importFrom gsignal poly
 #' @importFrom stats qnorm quantile var rnorm uniroot dnorm pgamma qgamma
 #'   rchisq rf rgamma rt runif
-#' @importFrom gsignal poly
 #' @keywords internal
 "_PACKAGE"

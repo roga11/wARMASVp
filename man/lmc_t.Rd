@@ -16,7 +16,9 @@ lmc_t(
   Bartlett = TRUE,
   Amat = NULL,
   logNu = TRUE,
-  direction = c("two-sided", "less", "greater")
+  direction = c("two-sided", "less", "greater"),
+  sigvMethod = "factored",
+  winsorize_eps = 0
 )
 }
 \arguments{
@@ -48,6 +50,12 @@ Default \code{NULL}.}
 \item{direction}{Character. Test direction: \code{"two-sided"} (default),
 \code{"less"} (H1: nu < nu_null), or \code{"greater"} (H1: nu > nu_null).
 Uses signed root of the LR statistic for one-sided tests.}
+
+\item{sigvMethod}{Character. Method for \eqn{\sigma_v} estimation:
+\code{"factored"} (default), \code{"hybrid"}, or \code{"direct"}.}
+
+\item{winsorize_eps}{Numeric. Winsorization threshold for moment conditions.
+Default 0 (no winsorization).}
 }
 \value{
 An object of class \code{"svp_test"}.

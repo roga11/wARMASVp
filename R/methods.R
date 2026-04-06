@@ -246,7 +246,6 @@ print.svp_forecast <- function(x, ...) {
 plot.svp_forecast <- function(x, ...) {
   Tsize <- length(x$w_smoothed)
   H <- x$H
-  out_label <- if (!is.null(x$output)) x$output else "log-variance"
   # For plot, always show log-variance (smoothed + forecast)
   fc_vals <- if (!is.null(x$log_var_forecast)) x$log_var_forecast else x$w_forecasted
   all_w <- c(x$w_smoothed, fc_vals)

@@ -249,90 +249,6 @@ fit_ksc_mixture <- function(distribution = c("gaussian", "student_t", "ged"),
 
 
 # --------------------------------------------------------------------------- #
-# Kalman Filter (CKF) — backward-compatible, enriched output
-# --------------------------------------------------------------------------- #
-
-#' Kalman Filter and Smoother for SV(p) Models
-#'
-#' Applies corrected Kalman filtering (CKF) and Rauch-Tung-Striebel smoothing
-#' to estimate the latent log-volatility process from an estimated SV(p) model.
-#' Uses distribution-specific measurement noise variance
-#' \eqn{\sigma_\varepsilon^2(\nu)}.
-#'
-#' @param y Numeric vector. Observed returns.
-#' @param model An \code{"svp"}, \code{"svp_t"}, or \code{"svp_ged"} object
-#'   from \code{\link{svp}}.
-#' @param del Numeric. Small constant for log transformation. Default \code{1e-10}.
-#'
-#' @return A list with:
-#' \describe{
-#'   \item{w_estimated}{Filtered log-volatility.}
-#'   \item{w_smoothed}{Smoothed log-volatility.}
-#'   \item{zt}{Filtered standardized residuals.}
-#'   \item{zt_smoothed}{Smoothed standardized residuals.}
-#'   \item{P_filtered}{Filtered MSE (first state component).}
-#'   \item{P_predicted}{Predicted MSE (first state component).}
-#'   \item{xi_filtered}{Full filtered state vectors (p x T matrix).}
-#'   \item{xi_smoothed}{Full smoothed state vectors (p x T matrix).}
-#'   \item{loglik}{Approximate Gaussian log-likelihood.}
-#' }
-#'
-#' @examples
-#' \donttest{
-#' sim <- sim_svp(1000, phi = 0.95, sigy = 1, sigv = 0.2, leverage = TRUE, rho = -0.3)
-#' fit <- svp(sim$y, p = 1)
-#' kf <- kalman_filter(sim$y, fit)
-#' plot(kf$w_smoothed, type = "l", main = "Smoothed log-volatility")
-#' }
-#'
-#' @export
-kalman_filter <- function(y, model, del = 1e-10) {
-  if (!inherits(model, c("svp", "svp_t", "svp_ged"))) {
-    stop("model must be of class 'svp', 'svp_t', or 'svp_ged'.")
-  }
-  y_vec <- as.numeric(y)
-  params <- .get_filter_params(model)
-
-  # Log-squared observations (centered)
-  y_star <- log(y_vec^2 + del) - params$mu
-
-  # Build companion matrix F for Lyapunov
-  p <- params$p
-  F_mat <- matrix(0, p, p)
-  F_mat[1, ] <- params$phi
-  if (p > 1) for (j in 1:(p - 1)) F_mat[j + 1, j] <- 1
-
-  # Lyapunov initialization: P0 = F P0 F' + sigma_v^2 * r r'
-  r_vec <- c(1, rep(0, p - 1))
-  Q_init <- params$sigma_v^2 * (r_vec %*% t(r_vec))
-  P0 <- tryCatch(
-    solve_lyapunov_discrete(F_mat, Q_init),
-    error = function(e) diag(p) * params$sigma_v^2  # fallback
-  )
-
-  # Call C++ filter
-  result <- kalman_filter_cpp(
-    y_star = as.numeric(y_star),
-    y_raw = y_vec,
-    phi = params$phi,
-    sigma_y = params$sigma_y,
-    sigma_v = params$sigma_v,
-    delta_p = params$delta_p,
-    sig_eps2 = params$sig_eps2,
-    var_zt = params$var_zt,
-    P0 = P0
-  )
-
-  # Backward compatibility: return w_estimated as matrix
-  result$w_estimated <- matrix(result$w_filtered, ncol = 1)
-  result$w_smoothed <- matrix(result$w_smoothed, ncol = 1)
-  result$zt <- matrix(result$zt, ncol = 1)
-  result$zt_smoothed <- matrix(result$zt_smoothed, ncol = 1)
-  result
-}
-
-
-# --------------------------------------------------------------------------- #
 # filter_svp() — Main user-facing filter function
 # --------------------------------------------------------------------------- #
 
@@ -417,7 +333,7 @@ filter_svp <- function(object, method = c("corrected", "mixture", "particle"),
 
   } else if (method == "mixture") {
     # GMKF: Gaussian Mixture Kalman Filter
-    mixture <- fit_ksc_mixture(params$dist_name, params$nu, K)
+    mixture <- fit_ksc_mixture(params$dist_name, params$nu, K, seed = seed)
 
     # For GMKF, y_star is raw log(y^2) (NOT centered by mu).
     # The intercept depends on whether mixture means are raw or centered:
@@ -469,7 +385,8 @@ filter_svp <- function(object, method = c("corrected", "mixture", "particle"),
       dist_code = dist_code,
       delta = params$delta_p,
       M = as.integer(M),
-      seed = as.integer(seed)
+      seed = as.integer(seed),
+      del = del
     )
 
     # BPF doesn't produce smoothed states — use filtered as placeholder

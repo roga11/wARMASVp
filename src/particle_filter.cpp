@@ -81,7 +81,8 @@ List particle_filter_svp_cpp(
     int dist_code,       // 0 = gaussian, 1 = student_t, 2 = ged
     double delta,
     int M,
-    int seed) {
+    int seed,
+    double del) {
 
   int T_obs = y_raw.n_elem;
   int p = phi.n_elem;
@@ -141,10 +142,14 @@ List particle_filter_svp_cpp(
   arma::vec w_filt(T_obs), P_filt(T_obs), ess_vec(T_obs);
   double loglik = 0.0;
 
+  // Full p x p filtered state and covariance at final time step (for forecasting)
+  arma::vec xi_filt_T(p, arma::fill::zeros);
+  arma::mat P_filt_T_mat(p, p, arma::fill::zeros);
+
   // Log-squared observations
   arma::vec y_star(T_obs);
   for (int t = 0; t < T_obs; t++) {
-    y_star(t) = std::log(y_raw(t) * y_raw(t));
+    y_star(t) = std::log(y_raw(t) * y_raw(t) + del);
   }
 
   // --- Main filter loop ---
@@ -202,6 +207,19 @@ List particle_filter_svp_cpp(
     w_filt(t) = w_mean;
     P_filt(t) = w_var;
 
+    // At final time step, compute full p x p filtered state and covariance
+    if (t == T_obs - 1) {
+      xi_filt_T.zeros();
+      P_filt_T_mat.zeros();
+      for (int i = 0; i < M; i++) {
+        xi_filt_T += weights(i) * particles.col(i);
+      }
+      for (int i = 0; i < M; i++) {
+        arma::vec diff = particles.col(i) - xi_filt_T;
+        P_filt_T_mat += weights(i) * (diff * diff.t());
+      }
+    }
+
     // RESAMPLE (systematic)
     arma::uvec idx = systematic_resample(weights, M);
     arma::mat new_particles(p, M);
@@ -239,6 +257,8 @@ List particle_filter_svp_cpp(
     Named("w_filtered") = w_filt,
     Named("P_filtered") = P_filt,
     Named("ESS") = ess_vec,
-    Named("loglik") = loglik
+    Named("loglik") = loglik,
+    Named("xi_filt_T") = xi_filt_T,
+    Named("P_filt_T") = P_filt_T_mat
   );
 }

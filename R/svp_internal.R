@@ -298,7 +298,7 @@ correction_factor_ged_approx <- function(nu, n_nodes = 200L) {
 
 # --- Student-t SV(p) estimation ---
 .svp_t <- function(y, p, J, del, wDecay, logNu,
-                   sigvMethod = "hybrid", winsorize_eps = FALSE) {
+                   sigvMethod = "factored", winsorize_eps = 0) {
   y <- as.matrix(as.numeric(y))
   N <- nrow(y)
   ly2 <- log(y^2 + del)
@@ -389,7 +389,7 @@ correction_factor_ged_approx <- function(nu, n_nodes = 200L) {
 
 # --- GED SV(p) estimation ---
 .svp_ged <- function(y, p, J, del, wDecay,
-                     sigvMethod = "hybrid", winsorize_eps = FALSE) {
+                     sigvMethod = "factored", winsorize_eps = 0) {
   y <- as.matrix(as.numeric(y))
   N <- nrow(y)
   ly2 <- log(y^2 + del)
@@ -480,11 +480,6 @@ correction_factor_ged_approx <- function(nu, n_nodes = 200L) {
 
 
 
-
-#' @noRd
-rged <- function(n, mean = 0, sd = 1, nu = 2) {
-  as.numeric(rged_cpp(as.integer(n), mean, sd, nu))
-}
 
 
 
@@ -677,6 +672,7 @@ rged <- function(n, mean = 0, sd = 1, nu = 2) {
 # MMC p-value for AR test
 .mmc_pval_ar <- function(theta, y, p_null, p_alt, j, N, s0, ini,
                          del = 1e-10, wDecay = FALSE, Bartlett = FALSE,
+                         sigvMethod = "factored",
                          innovations = NULL) {
   Tsize <- length(y)
   phi_null <- theta[1:p_null]
@@ -688,7 +684,8 @@ rged <- function(n, mean = 0, sd = 1, nu = 2) {
   }
   betasim_null <- c(phi_null, sigy_null, sigv_null)
   sN <- .simnull_ar(betasim_null, p_null, p_alt, j, Tsize, N, ini,
-                    del, wDecay, Bartlett, innovations = innovations)
+                    del, wDecay, Bartlett, sigvMethod = sigvMethod,
+                    innovations = innovations)
   pval <- -((N + 1 - sum(s0 >= sN)) / (N + 1))
   return(pval)
 }
@@ -722,7 +719,8 @@ rged <- function(n, mean = 0, sd = 1, nu = 2) {
     betasim_null <- c(theta[1:p], theta[p + 1], theta[p + 2], rho_null)
     sN <- .simnull(betasim_null, rho_null, p, j, Tsize, N, ini,
                    Amat, rho_type, del, wDecay = wDecay,
-                   trunc_lev = trunc_lev, innovations = innovations)
+                   trunc_lev = trunc_lev, sigvMethod = sigvMethod,
+                   innovations = innovations)
     pval <- -((N + 1 - sum(s0_tmp >= sN)) / (N + 1))
   } else {
     pval <- 9999999999999
@@ -758,7 +756,8 @@ rged <- function(n, mean = 0, sd = 1, nu = 2) {
     betasim_null <- c(theta[1:p], theta[p + 1], theta[p + 2], rho_null)
     sN <- .simnull_Amat(betasim_null, rho_null, p, j, Tsize, N, ini,
                         rho_type, del, Bartlett, wDecay = wDecay,
-                        trunc_lev = trunc_lev, innovations = innovations)
+                        trunc_lev = trunc_lev, sigvMethod = sigvMethod,
+                        innovations = innovations)
     pval <- -((N + 1 - sum(s0_tmp >= sN)) / (N + 1))
   } else {
     pval <- 9999999999999
@@ -890,6 +889,7 @@ rged <- function(n, mean = 0, sd = 1, nu = 2) {
 .mmc_pval_t <- function(theta, y, j, N, mdl_alt, nu_null, ini,
                         Amat, WAmat = FALSE, del = 1e-10, Bartlett = TRUE,
                         logNu = TRUE, wDecay = FALSE,
+                        sigvMethod = "factored", winsorize_eps = 0,
                         direction = "two-sided",
                         innovations = NULL) {
   y <- as.matrix(as.numeric(y))
@@ -906,12 +906,10 @@ rged <- function(n, mean = 0, sd = 1, nu = 2) {
   s0_tmp <- max(s0_tmp, 1e-10)
   if (is.finite(s0_tmp) && stationary) {
     betasim_null <- c(theta[1:p], theta[p + 1], theta[p + 2], nu_null)
-    sigvMethod_mt <- if (is.null(mdl_alt$sigvMethod)) "factored" else mdl_alt$sigvMethod
-    winsorize_eps_mt <- if (is.null(mdl_alt$winsorize_eps)) FALSE else mdl_alt$winsorize_eps
     sN <- .simnull_t(betasim_null, nu_null, j, Tsize, N, ini,
                      Amat, del, WAmat, Bartlett, logNu,
-                     wDecay = wDecay, sigvMethod = sigvMethod_mt,
-                     winsorize_eps = winsorize_eps_mt,
+                     wDecay = wDecay, sigvMethod = sigvMethod,
+                     winsorize_eps = winsorize_eps,
                      direction = direction,
                      innovations = innovations)
     if (direction == "two-sided") {
@@ -929,7 +927,9 @@ rged <- function(n, mean = 0, sd = 1, nu = 2) {
 # MMC p-value for GED (returns negative for minimization)
 .mmc_pval_ged <- function(theta, y, j, N, mdl_alt, nu_null, ini,
                           Amat, WAmat = FALSE, del = 1e-10, Bartlett = TRUE,
-                          wDecay = FALSE, innovations = NULL,
+                          wDecay = FALSE, sigvMethod = "factored",
+                          winsorize_eps = 0,
+                          innovations = NULL,
                           direction = "two-sided") {
   y <- as.matrix(as.numeric(y))
   Tsize <- nrow(y)
@@ -945,12 +945,10 @@ rged <- function(n, mean = 0, sd = 1, nu = 2) {
   s0_tmp <- max(s0_tmp, 1e-10)
   if (is.finite(s0_tmp) && stationary) {
     betasim_null <- c(theta[1:p], theta[p + 1], theta[p + 2], nu_null)
-    sigvMethod_mg <- if (is.null(mdl_alt$sigvMethod)) "factored" else mdl_alt$sigvMethod
-    winsorize_eps_mg <- if (is.null(mdl_alt$winsorize_eps)) FALSE else mdl_alt$winsorize_eps
     sN <- .simnull_ged(betasim_null, nu_null, j, Tsize, N, ini,
                        Amat, del, WAmat, Bartlett, wDecay = wDecay,
-                       sigvMethod = sigvMethod_mg,
-                       winsorize_eps = winsorize_eps_mg,
+                       sigvMethod = sigvMethod,
+                       winsorize_eps = winsorize_eps,
                        direction = direction,
                        innovations = innovations)
     if (direction == "two-sided") {
@@ -1100,6 +1098,7 @@ LRT_moment_lev_ged_Amat <- function(y, mdl_out, rho_type, del = 1e-10,
 # Simulate null distribution for AR test
 .simnull_ar <- function(betasim_null, p_null, p_alt, j, Tsize, N, ini,
                         del = 1e-10, wDecay = FALSE, Bartlett = FALSE,
+                        sigvMethod = "factored",
                         innovations = NULL) {
   phi_sim <- betasim_null[seq_len(p_null)]
   sigy_sim <- betasim_null[p_null + 1]
@@ -1124,14 +1123,16 @@ LRT_moment_lev_ged_Amat <- function(y, mdl_out, rho_type, del = 1e-10,
       p = p_null, T_out = Tsize, burnin = ini
     ))
     mdl_alt_tmp <- tryCatch(
-      svp(u, p = p_alt, J = j, leverage = FALSE, del = del, wDecay = wDecay),
+      svp(u, p = p_alt, J = j, leverage = FALSE, del = del, wDecay = wDecay,
+          sigvMethod = sigvMethod),
       error = function(e) NULL
     )
     b <- b + 1
     if (is.null(mdl_alt_tmp) || isTRUE(mdl_alt_tmp$nonstationary_ind)) next
     if (isTRUE(Bartlett)) {
       mdl_null_tmp <- tryCatch(
-        svp(u, p = p_null, J = j, leverage = FALSE, del = del, wDecay = wDecay),
+        svp(u, p = p_null, J = j, leverage = FALSE, del = del, wDecay = wDecay,
+            sigvMethod = sigvMethod),
         error = function(e) NULL
       )
       if (is.null(mdl_null_tmp) || isTRUE(mdl_null_tmp$nonstationary_ind)) next
@@ -1153,13 +1154,15 @@ LRT_moment_lev_ged_Amat <- function(y, mdl_out, rho_type, del = 1e-10,
       p = p_null, T_out = Tsize, burnin = ini
     ))
     mdl_alt_tmp <- tryCatch(
-      svp(u, p = p_alt, J = j, leverage = FALSE, del = del, wDecay = wDecay),
+      svp(u, p = p_alt, J = j, leverage = FALSE, del = del, wDecay = wDecay,
+          sigvMethod = sigvMethod),
       error = function(e) NULL
     )
     if (is.null(mdl_alt_tmp) || isTRUE(mdl_alt_tmp$nonstationary_ind)) next
     if (isTRUE(Bartlett)) {
       mdl_null_tmp <- tryCatch(
-        svp(u, p = p_null, J = j, leverage = FALSE, del = del, wDecay = wDecay),
+        svp(u, p = p_null, J = j, leverage = FALSE, del = del, wDecay = wDecay,
+            sigvMethod = sigvMethod),
         error = function(e) NULL
       )
       if (is.null(mdl_null_tmp) || isTRUE(mdl_null_tmp$nonstationary_ind)) next
@@ -1181,6 +1184,7 @@ LRT_moment_lev_ged_Amat <- function(y, mdl_out, rho_type, del = 1e-10,
 .simnull <- function(betasim_null, rho_null, p, j, Tsize, N, ini,
                      Amat, rho_type, del = 1e-10,
                      wDecay = FALSE, trunc_lev = TRUE,
+                     sigvMethod = "factored",
                      innovations = NULL) {
   phi_sim <- betasim_null[seq_len(p)]
   sigy_sim <- betasim_null[p + 1]
@@ -1209,7 +1213,7 @@ LRT_moment_lev_ged_Amat <- function(y, mdl_out, rho_type, del = 1e-10,
     b <- b + 1
     out_tmp <- tryCatch(
       svp(u, p, j, leverage = TRUE, rho_type = rho_type, del = del,
-          trunc_lev = trunc_lev, wDecay = wDecay),
+          trunc_lev = trunc_lev, wDecay = wDecay, sigvMethod = sigvMethod),
       error = function(e) NULL
     )
     if (!is.null(out_tmp) && abs(out_tmp$rho) <= 1 &&
@@ -1234,7 +1238,7 @@ LRT_moment_lev_ged_Amat <- function(y, mdl_out, rho_type, del = 1e-10,
     ))
     out_tmp <- tryCatch(
       svp(u, p, j, leverage = TRUE, rho_type = rho_type, del = del,
-          trunc_lev = trunc_lev, wDecay = wDecay),
+          trunc_lev = trunc_lev, wDecay = wDecay, sigvMethod = sigvMethod),
       error = function(e) NULL
     )
     if (!is.null(out_tmp) && abs(out_tmp$rho) <= 1 &&
@@ -1258,6 +1262,7 @@ LRT_moment_lev_ged_Amat <- function(y, mdl_out, rho_type, del = 1e-10,
 .simnull_Amat <- function(betasim_null, rho_null, p, j, Tsize, N, ini,
                           rho_type, del = 1e-10, Bartlett = TRUE,
                           wDecay = FALSE, trunc_lev = TRUE,
+                          sigvMethod = "factored",
                           innovations = NULL) {
   phi_sim <- betasim_null[seq_len(p)]
   sigy_sim <- betasim_null[p + 1]
@@ -1286,7 +1291,7 @@ LRT_moment_lev_ged_Amat <- function(y, mdl_out, rho_type, del = 1e-10,
     b <- b + 1
     out_tmp <- tryCatch(
       svp(u, p, j, leverage = TRUE, rho_type = rho_type, del = del,
-          trunc_lev = trunc_lev, wDecay = wDecay),
+          trunc_lev = trunc_lev, wDecay = wDecay, sigvMethod = sigvMethod),
       error = function(e) NULL
     )
     if (!is.null(out_tmp) && abs(out_tmp$rho) <= 1 &&
@@ -1310,7 +1315,7 @@ LRT_moment_lev_ged_Amat <- function(y, mdl_out, rho_type, del = 1e-10,
     ))
     out_tmp <- tryCatch(
       svp(u, p, j, leverage = TRUE, rho_type = rho_type, del = del,
-          trunc_lev = trunc_lev, wDecay = wDecay),
+          trunc_lev = trunc_lev, wDecay = wDecay, sigvMethod = sigvMethod),
       error = function(e) NULL
     )
     if (!is.null(out_tmp) && abs(out_tmp$rho) <= 1 &&
@@ -1348,8 +1353,8 @@ LRT_moment_lev_ged_Amat <- function(y, mdl_out, rho_type, del = 1e-10,
 .simnull_t <- function(betasim_null, nu_null, j, Tsize, N, ini,
                        Amat, del = 1e-10, WAmat = FALSE,
                        Bartlett = TRUE, logNu = TRUE,
-                       wDecay = FALSE, sigvMethod = "hybrid",
-                       winsorize_eps = FALSE,
+                       wDecay = FALSE, sigvMethod = "factored",
+                       winsorize_eps = 0,
                        direction = "two-sided",
                        innovations = NULL) {
   p <- length(betasim_null) - 3
@@ -1444,7 +1449,7 @@ LRT_moment_lev_ged_Amat <- function(y, mdl_out, rho_type, del = 1e-10,
 .simnull_ged <- function(betasim_null, nu_null, j, Tsize, N, ini,
                          Amat, del = 1e-10, WAmat = FALSE,
                          Bartlett = TRUE, wDecay = FALSE,
-                         sigvMethod = "hybrid", winsorize_eps = FALSE,
+                         sigvMethod = "factored", winsorize_eps = 0,
                          direction = "two-sided",
                          innovations = NULL) {
   p <- length(betasim_null) - 3

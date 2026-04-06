@@ -11,8 +11,11 @@
 #'   \eqn{\sigma^2_{T+h|T}}), or \code{"volatility"} (conditional std dev
 #'   \eqn{\sigma_{T+h|T}}). All three are always computed and stored; this
 #'   controls which is used by \code{print} and \code{plot} methods.
-#' @param filter_method Character. Filter method: \code{"corrected"} (default)
-#'   or \code{"mixture"} (GMKF).
+#' @param filter_method Character. Filter method: \code{"corrected"} (default),
+#'   \code{"mixture"} (GMKF), or \code{"particle"} (BPF).
+#' @param K Integer. Number of mixture components for GMKF. Default 7.
+#' @param M Integer. Number of particles for BPF. Default 1000.
+#' @param seed Integer. Random seed for BPF. Default 42.
 #' @param del Numeric. Small constant for log transformation. Default \code{1e-10}.
 #'
 #' @return An object of class \code{"svp_forecast"}, a list containing:
@@ -42,17 +45,17 @@
 #' plot(fc)
 #' }
 #'
-#' @importFrom expm %^%
 #' @export
 forecast_svp <- function(object, H = 1,
                          output = c("log-variance", "variance", "volatility"),
-                         filter_method = "corrected", del = 1e-10) {
+                         filter_method = "corrected",
+                         K = 7, M = 1000, seed = 42, del = 1e-10) {
   if (!inherits(object, c("svp", "svp_t", "svp_ged"))) {
     stop("object must be an svp/svp_t/svp_ged model from svp(). ",
          "Usage: fit <- svp(y, ...); fc <- forecast_svp(fit, H = 10)")
   }
   output <- match.arg(output)
-  filter_method <- match.arg(filter_method, c("corrected", "mixture"))
+  filter_method <- match.arg(filter_method, c("corrected", "mixture", "particle"))
 
   mdl <- object
   y_vec <- as.numeric(mdl$y)
@@ -63,7 +66,8 @@ forecast_svp <- function(object, H = 1,
   sigma_v <- mdl$sigv
 
   # Filter
-  filt <- filter_svp(mdl, method = filter_method, del = del)
+  filt <- filter_svp(mdl, method = filter_method, K = K, M = M, seed = seed,
+                     del = del)
   Tsize <- length(filt$w_filtered)
 
   # Extract final state and residual
@@ -75,8 +79,17 @@ forecast_svp <- function(object, H = 1,
   h_vec <- c(1, rep(0, p_len - 1))
   r_vec <- h_vec
 
-  # State noise covariance (for forecast MSE recursion — no leverage component)
-  Q <- sigma_v^2 * (r_vec %*% t(r_vec))
+  # State noise covariance (with leverage component for Student-t)
+  # For Gaussian/GED: var_zt=1, so Q = sigma_v^2 (unchanged)
+  # For Student-t leverage: var_zt=nu/(nu-2), Q > sigma_v^2
+  var_zt_fc <- 1.0
+  if (inherits(mdl, "svp_t") && delta_p != 0 &&
+      !is.null(mdl$v) && is.finite(mdl$v) && mdl$v > 2) {
+    var_zt_fc <- mdl$v / (mdl$v - 2)
+  }
+  Q_scalar <- if (delta_p == 0) sigma_v^2
+              else sigma_v^2 * (1 - delta_p^2 + delta_p^2 * var_zt_fc)
+  Q <- Q_scalar * (r_vec %*% t(r_vec))
 
   # E[u^2] for variance forecast
   Eu2 <- 1.0

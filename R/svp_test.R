@@ -24,6 +24,8 @@
 #' @param Bartlett Logical. If \code{TRUE}, use Bartlett kernel HAC weighting
 #'   matrix for a GMM-LRT-type test statistic. If \code{FALSE} (default), use
 #'   the sum of squared extra AR coefficients.
+#' @param sigvMethod Character. Method for \eqn{\sigma_v} estimation:
+#'   \code{"factored"} (default), \code{"hybrid"}, or \code{"direct"}.
 #'
 #' @return An object of class \code{"svp_test"}, a list containing:
 #' \describe{
@@ -56,15 +58,16 @@
 #'
 #' @export
 lmc_ar <- function(y, p_null, p_alt, J = 10, N = 99, burnin = 500,
-                   del = 1e-10, wDecay = FALSE, Bartlett = FALSE) {
+                   del = 1e-10, wDecay = FALSE, Bartlett = FALSE,
+                   sigvMethod = "factored") {
   cl <- match.call()
   y_vec <- as.numeric(y)
   Tsize <- length(y_vec)
   if (p_null >= p_alt) stop("p_alt must be greater than p_null.")
   if (p_null < 1) stop("p_null must be >= 1.")
   # Estimate models
-  mdl_alt <- svp(y_vec, p = p_alt, J = J, leverage = FALSE, del = del, wDecay = wDecay)
-  mdl_null_est <- svp(y_vec, p = p_null, J = J, leverage = FALSE, del = del, wDecay = wDecay)
+  mdl_alt <- svp(y_vec, p = p_alt, J = J, leverage = FALSE, del = del, wDecay = wDecay, sigvMethod = sigvMethod)
+  mdl_null_est <- svp(y_vec, p = p_null, J = J, leverage = FALSE, del = del, wDecay = wDecay, sigvMethod = sigvMethod)
   # Compute test statistic
   if (isTRUE(Bartlett)) {
     M_null <- LRT_moment_ar_Amat(y_vec, mdl_null_est, del = del, Bartlett = TRUE)
@@ -77,7 +80,7 @@ lmc_ar <- function(y, p_null, p_alt, J = 10, N = 99, burnin = 500,
   # Simulate null distribution
   betasim_null <- c(mdl_null_est$phi, mdl_null_est$sigy, mdl_null_est$sigv)
   sN <- .simnull_ar(betasim_null, p_null, p_alt, J, Tsize, N, burnin,
-                    del, wDecay, Bartlett)
+                    del, wDecay, Bartlett, sigvMethod = sigvMethod)
   pval <- (N + 1 - sum(s0 >= sN)) / (N + 1)
   test_label <- if (isTRUE(Bartlett)) {
     sprintf("LMC AR Order Bartlett (p0=%d vs p=%d)", p_null, p_alt)
@@ -123,15 +126,16 @@ lmc_ar <- function(y, p_null, p_alt, J = 10, N = 99, burnin = 500,
 #' @export
 mmc_ar <- function(y, p_null, p_alt, J = 10, N = 99, burnin = 500,
                    eps = NULL, threshold = 1, method = "pso", maxit = NULL,
-                   del = 1e-10, wDecay = FALSE, Bartlett = FALSE) {
+                   del = 1e-10, wDecay = FALSE, Bartlett = FALSE,
+                   sigvMethod = "factored") {
   cl <- match.call()
   y_vec <- as.numeric(y)
   Tsize <- length(y_vec)
   if (p_null >= p_alt) stop("p_alt must be greater than p_null.")
   if (p_null < 1) stop("p_null must be >= 1.")
   # Estimate under alternative for test statistic
-  mdl_alt <- svp(y_vec, p = p_alt, J = J, leverage = FALSE, del = del, wDecay = wDecay)
-  mdl_null_est <- svp(y_vec, p = p_null, J = J, leverage = FALSE, del = del, wDecay = wDecay)
+  mdl_alt <- svp(y_vec, p = p_alt, J = J, leverage = FALSE, del = del, wDecay = wDecay, sigvMethod = sigvMethod)
+  mdl_null_est <- svp(y_vec, p = p_null, J = J, leverage = FALSE, del = del, wDecay = wDecay, sigvMethod = sigvMethod)
   theta_0 <- c(mdl_null_est$phi, mdl_null_est$sigy, mdl_null_est$sigv)
   n_nuisance <- p_null + 2
   if (is.null(eps)) eps <- rep(0.3, n_nuisance)
@@ -166,6 +170,7 @@ mmc_ar <- function(y, p_null, p_alt, J = 10, N = 99, burnin = 500,
                             y = y_vec, p_null = p_null, p_alt = p_alt,
                             j = J, N = N, s0 = s0, ini = burnin,
                             del = del, wDecay = wDecay, Bartlett = Bartlett,
+                            sigvMethod = sigvMethod,
                             innovations = innov_ar)
   out$value <- -out$value
   out$s0 <- s0
@@ -261,11 +266,13 @@ lmc_lev <- function(y, p = 1, J = 10, N = 99, rho_null = 0,
     if (isTRUE(Bartlett)) {
       sN <- .simnull_Amat(betasim_null, rho_null, p, J, Tsize, N, burnin,
                           rho_type, del, TRUE, wDecay = wDecay,
-                          trunc_lev = trunc_lev)
+                          trunc_lev = trunc_lev,
+                          sigvMethod = sigvMethod)
     } else {
       sN <- .simnull(betasim_null, rho_null, p, J, Tsize, N, burnin,
                      Amat, rho_type, del, wDecay = wDecay,
-                     trunc_lev = trunc_lev)
+                     trunc_lev = trunc_lev,
+                     sigvMethod = sigvMethod)
     }
   } else if (errorType == "Student-t") {
     # --- Student-t leverage test (p+4 moments) ---
@@ -503,8 +510,8 @@ mmc_lev <- function(y, p = 1, J = 10, N = 99, rho_null = 0,
   if (errorType == "Student-t") {
     opt_args$logNu <- logNu
   }
+  opt_args$sigvMethod <- sigvMethod
   if (errorType != "Gaussian") {
-    opt_args$sigvMethod <- sigvMethod
     opt_args$winsorize_eps <- winsorize_eps
   }
   out <- do.call(.run_mmc_optimizer, opt_args)
@@ -543,6 +550,10 @@ mmc_lev <- function(y, p = 1, J = 10, N = 99, rho_null = 0,
 #' @param direction Character. Test direction: \code{"two-sided"} (default),
 #'   \code{"less"} (H1: nu < nu_null), or \code{"greater"} (H1: nu > nu_null).
 #'   Uses signed root of the LR statistic for one-sided tests.
+#' @param sigvMethod Character. Method for \eqn{\sigma_v} estimation:
+#'   \code{"factored"} (default), \code{"hybrid"}, or \code{"direct"}.
+#' @param winsorize_eps Numeric. Winsorization threshold for moment conditions.
+#'   Default 0 (no winsorization).
 #'
 #' @return An object of class \code{"svp_test"}.
 #'
@@ -557,7 +568,8 @@ mmc_lev <- function(y, p = 1, J = 10, N = 99, rho_null = 0,
 lmc_t <- function(y, p = 1, J = 10, N = 99, nu_null, burnin = 500,
                   del = 1e-10, wDecay = FALSE, Bartlett = TRUE,
                   Amat = NULL, logNu = TRUE,
-                  direction = c("two-sided", "less", "greater")) {
+                  direction = c("two-sided", "less", "greater"),
+                  sigvMethod = "factored", winsorize_eps = 0) {
   cl <- match.call()
   direction <- match.arg(direction)
   y_vec <- as.numeric(y)
@@ -565,7 +577,8 @@ lmc_t <- function(y, p = 1, J = 10, N = 99, nu_null, burnin = 500,
   Tsize <- length(y_vec)
   # Estimate model under alternative
   mdl_alt <- svp(y_vec, p = p, J = J, errorType = "Student-t", del = del,
-                 logNu = logNu, wDecay = wDecay)
+                 logNu = logNu, wDecay = wDecay, sigvMethod = sigvMethod,
+                 winsorize_eps = winsorize_eps)
   mdl_null <- mdl_alt
   mdl_null$v <- nu_null
   # Handle Amat specification
@@ -584,14 +597,16 @@ lmc_t <- function(y, p = 1, J = 10, N = 99, nu_null, burnin = 500,
   if (direction == "two-sided") {
     sN <- .simnull_t(betasim_null, nu_null, J, Tsize, N, burnin,
                      Amat_mat, del, WAmat, Bartlett, logNu,
-                     wDecay = wDecay, direction = "two-sided")
+                     wDecay = wDecay, direction = "two-sided",
+                     sigvMethod = sigvMethod, winsorize_eps = winsorize_eps)
     pval <- (N + 1 - sum(s0 >= sN)) / (N + 1)
     S_T <- NULL
   } else {
     S_T <- .signed_root(s0, mdl_alt$v, nu_null)
     sN <- .simnull_t(betasim_null, nu_null, J, Tsize, N, burnin,
                      Amat_mat, del, WAmat, Bartlett, logNu,
-                     wDecay = wDecay, direction = direction)
+                     wDecay = wDecay, direction = direction,
+                     sigvMethod = sigvMethod, winsorize_eps = winsorize_eps)
     pval <- .pvalue_directional(S_T, sN, direction)
   }
 
@@ -626,14 +641,16 @@ lmc_t <- function(y, p = 1, J = 10, N = 99, nu_null, burnin = 500,
 lmc_ged <- function(y, p = 1, J = 10, N = 99, nu_null, burnin = 500,
                     del = 1e-10, wDecay = FALSE, Bartlett = TRUE,
                     Amat = NULL,
-                    direction = c("two-sided", "less", "greater")) {
+                    direction = c("two-sided", "less", "greater"),
+                    sigvMethod = "factored", winsorize_eps = 0) {
   cl <- match.call()
   direction <- match.arg(direction)
   y_vec <- as.numeric(y)
   y_mat <- as.matrix(y_vec)
   Tsize <- length(y_vec)
   mdl_alt <- svp(y_vec, p = p, J = J, errorType = "GED", del = del,
-                 wDecay = wDecay)
+                 wDecay = wDecay, sigvMethod = sigvMethod,
+                 winsorize_eps = winsorize_eps)
   mdl_null <- mdl_alt
   mdl_null$v <- nu_null
   wa <- .parse_Amat(Amat, p)
@@ -649,14 +666,16 @@ lmc_ged <- function(y, p = 1, J = 10, N = 99, nu_null, burnin = 500,
   if (direction == "two-sided") {
     sN <- .simnull_ged(betasim_null, nu_null, J, Tsize, N, burnin,
                        Amat_mat, del, WAmat, Bartlett, wDecay = wDecay,
-                       direction = "two-sided")
+                       direction = "two-sided",
+                       sigvMethod = sigvMethod, winsorize_eps = winsorize_eps)
     pval <- (N + 1 - sum(s0 >= sN)) / (N + 1)
     S_T <- NULL
   } else {
     S_T <- .signed_root(s0, mdl_alt$v, nu_null)
     sN <- .simnull_ged(betasim_null, nu_null, J, Tsize, N, burnin,
                        Amat_mat, del, WAmat, Bartlett, wDecay = wDecay,
-                       direction = direction)
+                       direction = direction,
+                       sigvMethod = sigvMethod, winsorize_eps = winsorize_eps)
     pval <- .pvalue_directional(S_T, sN, direction)
   }
 
@@ -699,14 +718,16 @@ mmc_t <- function(y, p = 1, J = 10, N = 99, nu_null, burnin = 500,
                   eps = NULL, threshold = 1, method = "pso", maxit = NULL,
                   del = 1e-10, wDecay = FALSE, Bartlett = TRUE,
                   Amat = NULL, logNu = TRUE,
-                  direction = c("two-sided", "less", "greater")) {
+                  direction = c("two-sided", "less", "greater"),
+                  sigvMethod = "factored", winsorize_eps = 0) {
   direction <- match.arg(direction)
   cl <- match.call()
   y_vec <- as.numeric(y)
   y_mat <- as.matrix(y_vec)
   Tsize <- length(y_vec)
   mdl_alt <- svp(y_vec, p = p, J = J, errorType = "Student-t", del = del,
-                 logNu = logNu, wDecay = wDecay)
+                 logNu = logNu, wDecay = wDecay, sigvMethod = sigvMethod,
+                 winsorize_eps = winsorize_eps)
   p <- length(mdl_alt$phi)
   theta_0 <- c(mdl_alt$phi, mdl_alt$sigy, mdl_alt$sigv)
   if (is.null(eps)) eps <- rep(0.3, length(theta_0))
@@ -746,6 +767,8 @@ mmc_t <- function(y, p = 1, J = 10, N = 99, nu_null, burnin = 500,
                             WAmat = WAmat,
                             del = del, Bartlett = Bartlett, logNu = logNu,
                             wDecay = wDecay, direction = direction,
+                            sigvMethod = sigvMethod,
+                            winsorize_eps = winsorize_eps,
                             innovations = innov_t)
   out$value <- -out$value
   out$s0 <- s0_tmp
@@ -784,14 +807,16 @@ mmc_ged <- function(y, p = 1, J = 10, N = 99, nu_null, burnin = 500,
                     eps = NULL, threshold = 1, method = "pso", maxit = NULL,
                     del = 1e-10, wDecay = FALSE, Bartlett = TRUE,
                     Amat = NULL,
-                    direction = c("two-sided", "less", "greater")) {
+                    direction = c("two-sided", "less", "greater"),
+                    sigvMethod = "factored", winsorize_eps = 0) {
   direction <- match.arg(direction)
   cl <- match.call()
   y_vec <- as.numeric(y)
   y_mat <- as.matrix(y_vec)
   Tsize <- length(y_vec)
   mdl_alt <- svp(y_vec, p = p, J = J, errorType = "GED", del = del,
-                 wDecay = wDecay)
+                 wDecay = wDecay, sigvMethod = sigvMethod,
+                 winsorize_eps = winsorize_eps)
   p <- length(mdl_alt$phi)
   theta_0 <- c(mdl_alt$phi, mdl_alt$sigy, mdl_alt$sigv)
   if (is.null(eps)) eps <- rep(0.3, length(theta_0))
@@ -832,7 +857,10 @@ mmc_ged <- function(y, p = 1, J = 10, N = 99, nu_null, burnin = 500,
                             nu_null = nu_null, ini = burnin, Amat = Amat_mat,
                             WAmat = WAmat,
                             del = del, Bartlett = Bartlett, wDecay = wDecay,
-                            direction = direction, innovations = innov_ged)
+                            direction = direction,
+                            sigvMethod = sigvMethod,
+                            winsorize_eps = winsorize_eps,
+                            innovations = innov_ged)
   out$value <- -out$value
   out$direction <- direction
   out$s0 <- s0_tmp

@@ -359,7 +359,7 @@ double LRT_moment_t_cpp(arma::vec y, Rcpp::List mdl_out,
     g_t.col(p + 2) = var_log_sq_t - gam0_t + gamk_t.col(0) / rho_w1;
 
     // Trim initial p rows
-    g_t = g_t.rows(p, Tsize - 1);
+    g_t = g_t.rows(2 * p, Tsize - 1);
 
     // HAC
     Rcpp::Function pinv_f(pinv_fn.get());
@@ -428,7 +428,7 @@ double LRT_moment_ged_cpp(arma::vec y, Rcpp::List mdl_out,
 
     g_t.col(p + 2) = var_log_sq_ged - gam0_t + gamk_t.col(0) / rho_w1;
 
-    g_t = g_t.rows(p, Tsize - 1);
+    g_t = g_t.rows(2 * p, Tsize - 1);
 
     Rcpp::Function pinv_f(pinv_fn.get());
     Amat_use = hac_estimate(g_t, Tsize, Bartlett, pinv_f);
@@ -519,7 +519,7 @@ double LRT_moment_lev_svp_Amat_cpp(arma::vec y, Rcpp::List mdl_out,
   }
 
   // Trim initial p rows
-  g_t = g_t.rows(p, Tsize - 1);
+  g_t = g_t.rows(2 * p, Tsize - 1);
 
   arma::vec g(n_mom);
   g(0) = m1;
@@ -570,7 +570,7 @@ double LRT_moment_ar_Amat_cpp(arma::vec y, Rcpp::List mdl_out,
   arma::mat mk_t_mat = build_mk_t(phi, gamk_t, p);
   g_t.cols(2, p + 1) = mk_t_mat;
 
-  g_t = g_t.rows(p, Tsize - 1);
+  g_t = g_t.rows(2 * p, Tsize - 1);
 
   arma::vec g(n_mom);
   g(0) = m1;
@@ -670,7 +670,7 @@ double LRT_moment_lev_t_Amat_cpp(arma::vec y, Rcpp::List mdl_out,
     g_t(t, n_mom - 1) = rho - yabs(t) * y(t - 1) * lev_scale;
   }
 
-  g_t = g_t.rows(p, Tsize - 1);
+  g_t = g_t.rows(2 * p, Tsize - 1);
 
   Rcpp::Function pinv_f(pinv_fn.get());
   arma::mat Amat = hac_estimate(g_t, Tsize, Bartlett, pinv_f);
@@ -774,7 +774,7 @@ double LRT_moment_lev_ged_Amat_cpp(arma::vec y, Rcpp::List mdl_out,
     g_t(t, n_mom - 1) = lev_const - yabs(t) * y(t - 1);
   }
 
-  g_t = g_t.rows(p, Tsize - 1);
+  g_t = g_t.rows(2 * p, Tsize - 1);
 
   Rcpp::Function pinv_f(pinv_fn.get());
   arma::mat Amat = hac_estimate(g_t, Tsize, Bartlett, pinv_f);

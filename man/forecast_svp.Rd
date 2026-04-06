@@ -9,6 +9,9 @@ forecast_svp(
   H = 1,
   output = c("log-variance", "variance", "volatility"),
   filter_method = "corrected",
+  K = 7,
+  M = 1000,
+  seed = 42,
   del = 1e-10
 )
 }
@@ -24,8 +27,14 @@ native log-volatility w_h), \code{"variance"} (conditional variance
 \eqn{\sigma_{T+h|T}}). All three are always computed and stored; this
 controls which is used by \code{print} and \code{plot} methods.}
 
-\item{filter_method}{Character. Filter method: \code{"corrected"} (default)
-or \code{"mixture"} (GMKF).}
+\item{filter_method}{Character. Filter method: \code{"corrected"} (default),
+\code{"mixture"} (GMKF), or \code{"particle"} (BPF).}
+
+\item{K}{Integer. Number of mixture components for GMKF. Default 7.}
+
+\item{M}{Integer. Number of particles for BPF. Default 1000.}
+
+\item{seed}{Integer. Random seed for BPF. Default 42.}
 
 \item{del}{Numeric. Small constant for log transformation. Default \code{1e-10}.}
 }

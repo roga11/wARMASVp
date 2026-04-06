@@ -11,23 +11,6 @@ Rcpp::Rostream<true>&  Rcpp::Rcout = Rcpp::Rcpp_cout_get();
 Rcpp::Rostream<false>& Rcpp::Rcerr = Rcpp::Rcpp_cerr_get();
 #endif
 
-// svpCpp
-List svpCpp(arma::vec u, int p, int J, bool trunc_lev, double del, int rho_type, bool wDecay);
-RcppExport SEXP _wARMASVp_svpCpp(SEXP uSEXP, SEXP pSEXP, SEXP JSEXP, SEXP trunc_levSEXP, SEXP delSEXP, SEXP rho_typeSEXP, SEXP wDecaySEXP) {
-BEGIN_RCPP
-    Rcpp::RObject rcpp_result_gen;
-    Rcpp::RNGScope rcpp_rngScope_gen;
-    Rcpp::traits::input_parameter< arma::vec >::type u(uSEXP);
-    Rcpp::traits::input_parameter< int >::type p(pSEXP);
-    Rcpp::traits::input_parameter< int >::type J(JSEXP);
-    Rcpp::traits::input_parameter< bool >::type trunc_lev(trunc_levSEXP);
-    Rcpp::traits::input_parameter< double >::type del(delSEXP);
-    Rcpp::traits::input_parameter< int >::type rho_type(rho_typeSEXP);
-    Rcpp::traits::input_parameter< bool >::type wDecay(wDecaySEXP);
-    rcpp_result_gen = Rcpp::wrap(svpCpp(u, p, J, trunc_lev, del, rho_type, wDecay));
-    return rcpp_result_gen;
-END_RCPP
-}
 // svpCpp_nolev
 List svpCpp_nolev(arma::vec u, int p, int J, double del, bool wDecay);
 RcppExport SEXP _wARMASVp_svpCpp_nolev(SEXP uSEXP, SEXP pSEXP, SEXP JSEXP, SEXP delSEXP, SEXP wDecaySEXP) {
@@ -243,8 +226,8 @@ BEGIN_RCPP
 END_RCPP
 }
 // particle_filter_svp_cpp
-List particle_filter_svp_cpp(const arma::vec& y_raw, const arma::vec& phi, double sigma_y, double sigma_v, double nu, int dist_code, double delta, int M, int seed);
-RcppExport SEXP _wARMASVp_particle_filter_svp_cpp(SEXP y_rawSEXP, SEXP phiSEXP, SEXP sigma_ySEXP, SEXP sigma_vSEXP, SEXP nuSEXP, SEXP dist_codeSEXP, SEXP deltaSEXP, SEXP MSEXP, SEXP seedSEXP) {
+List particle_filter_svp_cpp(const arma::vec& y_raw, const arma::vec& phi, double sigma_y, double sigma_v, double nu, int dist_code, double delta, int M, int seed, double del);
+RcppExport SEXP _wARMASVp_particle_filter_svp_cpp(SEXP y_rawSEXP, SEXP phiSEXP, SEXP sigma_ySEXP, SEXP sigma_vSEXP, SEXP nuSEXP, SEXP dist_codeSEXP, SEXP deltaSEXP, SEXP MSEXP, SEXP seedSEXP, SEXP delSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
@@ -257,7 +240,8 @@ BEGIN_RCPP
     Rcpp::traits::input_parameter< double >::type delta(deltaSEXP);
     Rcpp::traits::input_parameter< int >::type M(MSEXP);
     Rcpp::traits::input_parameter< int >::type seed(seedSEXP);
-    rcpp_result_gen = Rcpp::wrap(particle_filter_svp_cpp(y_raw, phi, sigma_y, sigma_v, nu, dist_code, delta, M, seed));
+    Rcpp::traits::input_parameter< double >::type del(delSEXP);
+    rcpp_result_gen = Rcpp::wrap(particle_filter_svp_cpp(y_raw, phi, sigma_y, sigma_v, nu, dist_code, delta, M, seed, del));
     return rcpp_result_gen;
 END_RCPP
 }
@@ -536,7 +520,6 @@ END_RCPP
 }
 
 static const R_CallMethodDef CallEntries[] = {
-    {"_wARMASVp_svpCpp", (DL_FUNC) &_wARMASVp_svpCpp, 7},
     {"_wARMASVp_svpCpp_nolev", (DL_FUNC) &_wARMASVp_svpCpp_nolev, 5},
     {"_wARMASVp_solve_lyapunov_discrete_cpp", (DL_FUNC) &_wARMASVp_solve_lyapunov_discrete_cpp, 2},
     {"_wARMASVp_kalman_filter_cpp", (DL_FUNC) &_wARMASVp_kalman_filter_cpp, 9},
@@ -550,7 +533,7 @@ static const R_CallMethodDef CallEntries[] = {
     {"_wARMASVp_LRT_moment_ar_Amat_cpp", (DL_FUNC) &_wARMASVp_LRT_moment_ar_Amat_cpp, 5},
     {"_wARMASVp_LRT_moment_lev_t_Amat_cpp", (DL_FUNC) &_wARMASVp_LRT_moment_lev_t_Amat_cpp, 6},
     {"_wARMASVp_LRT_moment_lev_ged_Amat_cpp", (DL_FUNC) &_wARMASVp_LRT_moment_lev_ged_Amat_cpp, 8},
-    {"_wARMASVp_particle_filter_svp_cpp", (DL_FUNC) &_wARMASVp_particle_filter_svp_cpp, 9},
+    {"_wARMASVp_particle_filter_svp_cpp", (DL_FUNC) &_wARMASVp_particle_filter_svp_cpp, 10},
     {"_wARMASVp_find_nu_t_cpp", (DL_FUNC) &_wARMASVp_find_nu_t_cpp, 6},
     {"_wARMASVp_find_nu_ged_cpp", (DL_FUNC) &_wARMASVp_find_nu_ged_cpp, 5},
     {"_wARMASVp_find_delta_ged_cpp", (DL_FUNC) &_wARMASVp_find_delta_ged_cpp, 6},

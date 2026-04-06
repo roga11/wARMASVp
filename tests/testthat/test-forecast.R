@@ -2,17 +2,17 @@
 # Tests for forecasting
 # =========================================================================== #
 
-test_that("kalman_filter runs and returns expected components", {
+test_that("filter_svp CKF runs and returns expected components", {
   set.seed(42)
   y <- as.numeric(sim_svp(500, phi = 0.95, sigy = 1, sigv = 0.3))
   mdl <- svp(y, p = 1)
-  kf <- kalman_filter(y, mdl)
-  expect_type(kf, "list")
-  expect_true("w_estimated" %in% names(kf))
-  expect_true("w_smoothed" %in% names(kf))
-  # New enriched outputs
-  expect_true("P_filtered" %in% names(kf))
-  expect_true("loglik" %in% names(kf))
+  filt <- filter_svp(mdl)
+  expect_s3_class(filt, "svp_filter")
+  expect_true("w_filtered" %in% names(filt))
+  expect_true("w_smoothed" %in% names(filt))
+  expect_true("P_filtered" %in% names(filt))
+  expect_true("loglik" %in% names(filt))
+  expect_true("P_filt_T" %in% names(filt))
 })
 
 test_that("forecast_svp accepts model object and produces h-step forecasts", {
@@ -137,12 +137,17 @@ test_that("forecast_svp p=2: P_forecast increases with horizon (full P_T)", {
 })
 
 # =========================================================================== #
-# Regression: forecast_svp blocks particle filter method (Bug F fix, 2026-04-03)
+# BPF forecasting now supported (Fix 4, 2026-04-03)
 # =========================================================================== #
 
-test_that("forecast_svp rejects filter_method='particle'", {
+test_that("forecast_svp works with filter_method='particle'", {
   set.seed(42)
   y <- sim_svp(300, phi = 0.95, sigy = 1, sigv = 0.3)
   fit <- svp(y, p = 1)
-  expect_error(forecast_svp(fit, H = 3, filter_method = "particle"))
+  fc <- forecast_svp(fit, H = 3, filter_method = "particle")
+  expect_s3_class(fc, "svp_forecast")
+  expect_equal(length(fc$log_var_forecast), 3)
+  expect_true(all(is.finite(fc$log_var_forecast)))
+  # P_filt_T should be a 1x1 matrix from BPF
+  expect_equal(dim(fc$filter_output$P_filt_T), c(1L, 1L))
 })

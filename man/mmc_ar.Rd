@@ -17,7 +17,8 @@ mmc_ar(
   maxit = NULL,
   del = 1e-10,
   wDecay = FALSE,
-  Bartlett = FALSE
+  Bartlett = FALSE,
+  sigvMethod = "factored"
 )
 }
 \arguments{
@@ -50,6 +51,9 @@ Default \code{"pso"}.}
 \item{Bartlett}{Logical. If \code{TRUE}, use Bartlett kernel HAC weighting
 matrix for a GMM-LRT-type test statistic. If \code{FALSE} (default), use
 the sum of squared extra AR coefficients.}
+
+\item{sigvMethod}{Character. Method for \eqn{\sigma_v} estimation:
+\code{"factored"} (default), \code{"hybrid"}, or \code{"direct"}.}
 }
 \value{
 A list with optimization output including \code{value} (maximized p-value)

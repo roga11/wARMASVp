@@ -28,7 +28,6 @@ LazyData: false
 Imports:
     Rcpp (>= 1.0.0),
     gsignal,
-    expm,
     stats
 Suggests:
     pso,
