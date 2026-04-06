@@ -219,7 +219,7 @@ double LRT_moment_lev_t_cpp(arma::vec y, Rcpp::List mdl_out,
     2.0 * (R::lgammafn((nu - 1.0) / 2.0) - R::lgammafn(nu / 2.0)));
 
   double m1 = mu - mu_log_sq_t - std::log(sigy * sigy);
-  double m2 = gamk_all(1) / rho_w1 - arma::dot(phi, gamk_all.subvec(1, p)) - sigv * sigv;
+  double m2 = gam0 - arma::dot(phi, gamk_all.subvec(1, p)) - var_log_sq_t - sigv * sigv;
   arma::vec mk = build_mk(phi, gamk_all, p);
   double m_prof = var_log_sq_t - gam0 + gamk_all(1) / rho_w1;
   double m_lev = rho - (std::sqrt(2.0 * M_PI) * EH) /
@@ -280,7 +280,7 @@ double LRT_moment_lev_ged_cpp(arma::vec y, Rcpp::List mdl_out,
   }
 
   double m1 = mu - mu_log_sq_ged - std::log(sigy * sigy);
-  double m2 = gamk_all(1) / rho_w1 - arma::dot(phi, gamk_all.subvec(1, p)) - sigv * sigv;
+  double m2 = gam0 - arma::dot(phi, gamk_all.subvec(1, p)) - var_log_sq_ged - sigv * sigv;
   arma::vec mk = build_mk(phi, gamk_all, p);
   double m_prof = var_log_sq_ged - gam0 + gamk_all(1) / rho_w1;
   double m_lev = sigy * sigy * E_abs_u * E_g_shifted *
@@ -325,7 +325,7 @@ double LRT_moment_t_cpp(arma::vec y, Rcpp::List mdl_out,
   double var_log_sq_t = R::psigamma(0.5, 1) + R::psigamma(nu / 2.0, 1);
 
   double m1 = mu - mu_log_sq_t - std::log(sigy * sigy);
-  double m2 = gamk_all(1) / rho_w1 - arma::dot(phi, gamk_all.subvec(1, p)) - sigv * sigv;
+  double m2 = gam0 - arma::dot(phi, gamk_all.subvec(1, p)) - var_log_sq_t - sigv * sigv;
   arma::vec mk = build_mk(phi, gamk_all, p);
   double m_prof = var_log_sq_t - gam0 + gamk_all(1) / rho_w1;
 
@@ -344,12 +344,12 @@ double LRT_moment_t_cpp(arma::vec y, Rcpp::List mdl_out,
 
     arma::mat g_t(Tsize, n_mom, arma::fill::zeros);
     g_t.col(0) = ly2 - mu_log_sq_t - std::log(sigy * sigy);
-    // g2: gamk_t[,0]/rho_w1 - sum(phi_j * gamk_t[,j]) - sigv^2
-    arma::vec g2 = gamk_t.col(0) / rho_w1;
+    // g2: gam0_t - sum(phi_j * gamk_t[,j]) - var_log_sq_t - sigv^2
+    arma::vec g2 = gam0_t;
     for (int j = 0; j < p; j++) {
       g2 -= phi(j) * gamk_t.col(j);
     }
-    g_t.col(1) = g2 - sigv * sigv;
+    g_t.col(1) = g2 - var_log_sq_t - sigv * sigv;
 
     // YW per-obs
     arma::mat mk_t_mat = build_mk_t(phi, gamk_t, p);
@@ -399,7 +399,7 @@ double LRT_moment_ged_cpp(arma::vec y, Rcpp::List mdl_out,
   double var_log_sq_ged = std::pow(2.0 / nu, 2) * R::psigamma(1.0 / nu, 1);
 
   double m1 = mu - mu_log_sq_ged - std::log(sigy * sigy);
-  double m2 = gamk_all(1) / rho_w1 - arma::dot(phi, gamk_all.subvec(1, p)) - sigv * sigv;
+  double m2 = gam0 - arma::dot(phi, gamk_all.subvec(1, p)) - var_log_sq_ged - sigv * sigv;
   arma::vec mk = build_mk(phi, gamk_all, p);
   double m_prof = var_log_sq_ged - gam0 + gamk_all(1) / rho_w1;
 
@@ -417,11 +417,11 @@ double LRT_moment_ged_cpp(arma::vec y, Rcpp::List mdl_out,
 
     arma::mat g_t(Tsize, n_mom, arma::fill::zeros);
     g_t.col(0) = ly2 - mu_log_sq_ged - std::log(sigy * sigy);
-    arma::vec g2 = gamk_t.col(0) / rho_w1;
+    arma::vec g2 = gam0_t;
     for (int j = 0; j < p; j++) {
       g2 -= phi(j) * gamk_t.col(j);
     }
-    g_t.col(1) = g2 - sigv * sigv;
+    g_t.col(1) = g2 - var_log_sq_ged - sigv * sigv;
 
     arma::mat mk_t_mat = build_mk_t(phi, gamk_t, p);
     g_t.cols(2, p + 1) = mk_t_mat;
@@ -638,7 +638,7 @@ double LRT_moment_lev_t_Amat_cpp(arma::vec y, Rcpp::List mdl_out,
 
   // Aggregated moments
   double m1 = mu - mu_log_sq_t - std::log(sigy * sigy);
-  double m2 = gamk_all(1) / rho_w1 - arma::dot(phi, gamk_all.subvec(1, p)) - sigv * sigv;
+  double m2 = gam0 - arma::dot(phi, gamk_all.subvec(1, p)) - var_log_sq_t - sigv * sigv;
   arma::vec mk = build_mk(phi, gamk_all, p);
   double m_prof = var_log_sq_t - gam0 + gamk_all(1) / rho_w1;
   double m_lev = rho - (std::sqrt(2.0 * M_PI) * EH) /
@@ -654,11 +654,11 @@ double LRT_moment_lev_t_Amat_cpp(arma::vec y, Rcpp::List mdl_out,
   // Per-obs scores
   arma::mat g_t(Tsize, n_mom, arma::fill::zeros);
   g_t.col(0) = ly2 - mu_log_sq_t - std::log(sigy * sigy);
-  arma::vec g2 = gamk_t.col(0) / rho_w1;
+  arma::vec g2 = gam0_t;
   for (int j = 0; j < p; j++) {
     g2 -= phi(j) * gamk_t.col(j);
   }
-  g_t.col(1) = g2 - sigv * sigv;
+  g_t.col(1) = g2 - var_log_sq_t - sigv * sigv;
   arma::mat mk_t_mat = build_mk_t(phi, gamk_t, p);
   g_t.cols(2, p + 1) = mk_t_mat;
   g_t.col(p + 2) = var_log_sq_t - gam0_t + gamk_t.col(0) / rho_w1;
@@ -743,7 +743,7 @@ double LRT_moment_lev_ged_Amat_cpp(arma::vec y, Rcpp::List mdl_out,
 
   // Aggregated
   double m1 = mu - mu_log_sq_ged - std::log(sigy * sigy);
-  double m2 = gamk_all(1) / rho_w1 - arma::dot(phi, gamk_all.subvec(1, p)) - sigv * sigv;
+  double m2 = gam0 - arma::dot(phi, gamk_all.subvec(1, p)) - var_log_sq_ged - sigv * sigv;
   arma::vec mk = build_mk(phi, gamk_all, p);
   double m_prof = var_log_sq_ged - gam0 + gamk_all(1) / rho_w1;
   double m_lev = sigy * sigy * E_abs_u * E_g_shifted *
@@ -759,11 +759,11 @@ double LRT_moment_lev_ged_Amat_cpp(arma::vec y, Rcpp::List mdl_out,
   // Per-obs scores
   arma::mat g_t(Tsize, n_mom, arma::fill::zeros);
   g_t.col(0) = ly2 - mu_log_sq_ged - std::log(sigy * sigy);
-  arma::vec g2 = gamk_t.col(0) / rho_w1;
+  arma::vec g2 = gam0_t;
   for (int j = 0; j < p; j++) {
     g2 -= phi(j) * gamk_t.col(j);
   }
-  g_t.col(1) = g2 - sigv * sigv;
+  g_t.col(1) = g2 - var_log_sq_ged - sigv * sigv;
   arma::mat mk_t_mat = build_mk_t(phi, gamk_t, p);
   g_t.cols(2, p + 1) = mk_t_mat;
   g_t.col(p + 2) = var_log_sq_ged - gam0_t + gamk_t.col(0) / rho_w1;
