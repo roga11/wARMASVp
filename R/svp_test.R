@@ -355,7 +355,11 @@ lmc_lev <- function(y, p = 1, J = 10, N = 99, rho_null = 0,
 #'
 #' @inheritParams lmc_lev
 #' @param eps Numeric vector. Half-width of the search region around the
-#'   estimated nuisance parameters. Default \code{rep(0.3, p+2)}.
+#'   estimated nuisance parameters. For Gaussian: length \code{p+2}
+#'   (phi, sigma_y, sigma_v). For Student-t/GED: length \code{p+2}
+#'   (phi, sigma_y, sigma_v; nu bounds set proportionally at +/-30%) or
+#'   length \code{p+3} (phi, sigma_y, sigma_v, nu). Default \code{NULL}
+#'   which uses \code{rep(0.3, p+2)} with proportional nu bounds.
 #' @param threshold Numeric. Target p-value (optimization stops if reached).
 #'   Default 1.
 #' @param method Character. Optimization method: \code{"pso"} (particle swarm),
@@ -417,18 +421,33 @@ mmc_lev <- function(y, p = 1, J = 10, N = 99, rho_null = 0,
     theta_0 <- c(mdl_alt$phi, mdl_alt$sigy, mdl_alt$sigv, mdl_alt$v)
     n_nuisance <- p + 3
     n_mom <- p + 4
-    if (is.null(eps)) eps <- rep(0.3, p + 2)  # eps for phi, sigy, sigv only
-    if (length(eps) != p + 2)
-      stop("eps must have length ", p + 2,
-           " (p+2: one entry per nuisance parameter phi_1,...,phi_p, sigma_y, sigma_v; nu bounds are set proportionally).")
-    # Proportional bounds for nu
     nu_hat <- mdl_alt$v
-    if (errorType == "Student-t") {
-      nu_lo <- max(2.01, nu_hat * 0.7)
-      nu_hi <- min(500, nu_hat * 1.3)
+    if (is.null(eps)) {
+      eps <- rep(0.3, p + 2)  # default eps for phi, sigy, sigv only; nu gets proportional bounds
+    }
+    if (length(eps) == n_nuisance) {
+      # User provided eps for all nuisance params including nu
+      eps_nu <- eps[n_nuisance]
+      eps <- eps[1:(p + 2)]
+      if (errorType == "Student-t") {
+        nu_lo <- max(2.01, nu_hat - eps_nu)
+        nu_hi <- min(500, nu_hat + eps_nu)
+      } else {
+        nu_lo <- max(0.1, nu_hat - eps_nu)
+        nu_hi <- min(20, nu_hat + eps_nu)
+      }
+    } else if (length(eps) == p + 2) {
+      # eps for phi, sigy, sigv only; nu bounds set proportionally
+      if (errorType == "Student-t") {
+        nu_lo <- max(2.01, nu_hat * 0.7)
+        nu_hi <- min(500, nu_hat * 1.3)
+      } else {
+        nu_lo <- max(0.1, nu_hat * 0.7)
+        nu_hi <- min(20, nu_hat * 1.3)
+      }
     } else {
-      nu_lo <- max(0.1, nu_hat * 0.7)
-      nu_hi <- min(20, nu_hat * 1.3)
+      stop("eps must have length ", p + 2, " (phi, sigy, sigv) or ", n_nuisance,
+           " (phi, sigy, sigv, nu) for heavy-tail leverage tests.")
     }
     lower <- c(pmax(theta_0[1:p] - eps[1:p], rep(-0.999, p)),
                max(theta_0[p + 1] - eps[p + 1], 0.01),

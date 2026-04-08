@@ -40,7 +40,11 @@ mmc_lev(
 \item{burnin}{Integer. Burn-in for simulation. Default 500.}
 
 \item{eps}{Numeric vector. Half-width of the search region around the
-estimated nuisance parameters. Default \code{rep(0.3, p+2)}.}
+estimated nuisance parameters. For Gaussian: length \code{p+2}
+(phi, sigma_y, sigma_v). For Student-t/GED: length \code{p+2}
+(phi, sigma_y, sigma_v; nu bounds set proportionally at +/-30%) or
+length \code{p+3} (phi, sigma_y, sigma_v, nu). Default \code{NULL}
+which uses \code{rep(0.3, p+2)} with proportional nu bounds.}
 
 \item{threshold}{Numeric. Target p-value (optimization stops if reached).
 Default 1.}

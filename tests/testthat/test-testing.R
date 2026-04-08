@@ -250,3 +250,71 @@ test_that("mmc_ged eps length validation works", {
     "eps must have length 4"
   )
 })
+
+# ---- mmc_lev heavy-tail eps tests ----
+
+test_that("mmc_lev Student-t accepts eps of length p+3 (includes nu)", {
+  skip_on_cran()
+  set.seed(42)
+  y <- sim_svp(500, phi = 0.90, sigy = 1, sigv = 0.3,
+               errorType = "Student-t", nu = 5, leverage = TRUE, rho = -0.3)$y
+  test <- suppressWarnings(mmc_lev(y, N = 9, errorType = "Student-t",
+                                    eps = c(0.3, 0.3, 0.3, 2.0),
+                                    method = "pso", maxit = 5))
+  expect_true(test$value >= 0 && test$value <= 1)
+  expect_length(test$par, 4)  # phi, sigy, sigv, nu
+})
+
+test_that("mmc_lev GED accepts eps of length p+3 (includes nu)", {
+  skip_on_cran()
+  set.seed(42)
+  y <- sim_svp(500, phi = 0.90, sigy = 1, sigv = 0.3,
+               errorType = "GED", nu = 1.5, leverage = TRUE, rho = -0.3)$y
+  test <- suppressWarnings(mmc_lev(y, N = 9, errorType = "GED",
+                                    eps = c(0.3, 0.3, 0.3, 0.5),
+                                    method = "pso", maxit = 5))
+  expect_true(test$value >= 0 && test$value <= 1)
+  expect_length(test$par, 4)  # phi, sigy, sigv, nu
+})
+
+test_that("mmc_lev Student-t eps length p+2 still works (backward compat)", {
+  skip_on_cran()
+  set.seed(42)
+  y <- sim_svp(500, phi = 0.90, sigy = 1, sigv = 0.3,
+               errorType = "Student-t", nu = 5, leverage = TRUE, rho = -0.3)$y
+  test <- suppressWarnings(mmc_lev(y, N = 9, errorType = "Student-t",
+                                    eps = c(0.3, 0.3, 0.3),
+                                    method = "pso", maxit = 5))
+  expect_true(test$value >= 0 && test$value <= 1)
+})
+
+test_that("mmc_lev heavy-tail eps length validation rejects wrong lengths", {
+  skip_on_cran()
+  set.seed(42)
+  y <- sim_svp(500, phi = 0.90, sigy = 1, sigv = 0.3,
+               errorType = "Student-t", nu = 5, leverage = TRUE, rho = -0.3)$y
+  # length 1 — wrong
+  expect_error(
+    mmc_lev(y, N = 9, errorType = "Student-t", eps = 0.3,
+            method = "pso", maxit = 5),
+    "eps must have length"
+  )
+  # length p+4 = 5 — wrong
+  expect_error(
+    mmc_lev(y, N = 9, errorType = "Student-t", eps = rep(0.3, 5),
+            method = "pso", maxit = 5),
+    "eps must have length"
+  )
+})
+
+test_that("mmc_lev Student-t p=2 eps of length p+3=5 works", {
+  skip_on_cran()
+  set.seed(42)
+  y <- sim_svp(500, phi = c(0.20, 0.63), sigy = 1, sigv = 1.0,
+               errorType = "Student-t", nu = 5, leverage = TRUE, rho = -0.3)$y
+  test <- suppressWarnings(mmc_lev(y, p = 2, N = 9, errorType = "Student-t",
+                                    eps = c(0.3, 0.3, 0.3, 0.3, 2.0),
+                                    method = "pso", maxit = 5))
+  expect_true(test$value >= 0 && test$value <= 1)
+  expect_length(test$par, 5)  # phi1, phi2, sigy, sigv, nu
+})
