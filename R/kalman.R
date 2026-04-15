@@ -298,6 +298,12 @@ filter_svp <- function(object, method = c("corrected", "mixture", "particle"),
     stop("object must be of class 'svp', 'svp_t', or 'svp_ged'.")
   }
   method <- match.arg(method)
+  if (!is.numeric(K) || length(K) != 1L || K < 1L)
+    stop("'K' must be a positive integer (>= 1).")
+  if (!is.numeric(M) || length(M) != 1L || M < 1L)
+    stop("'M' must be a positive integer (>= 1).")
+  if (!is.numeric(del) || length(del) != 1L || del <= 0)
+    stop("'del' must be a positive number.")
   y_vec <- as.numeric(object$y)
   params <- .get_filter_params(object)
 

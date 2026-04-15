@@ -100,6 +100,17 @@ svp <- function(y, p = 1, J = 10, leverage = FALSE, errorType = "Gaussian",
                 sigvMethod = "factored", winsorize_eps = 0) {
   cl <- match.call()
   y <- as.numeric(y)
+  if (length(y) < 1L) stop("'y' must be a non-empty numeric vector.")
+  if (any(!is.finite(y))) stop("'y' must not contain NA, NaN, or Inf values.")
+  p <- as.integer(p)
+  if (p < 1L) stop("'p' must be a positive integer (>= 1).")
+  J <- as.integer(J)
+  if (J < 1L) stop("'J' must be a positive integer (>= 1).")
+  min_length <- 2L * p + J
+  if (length(y) < min_length)
+    stop("'y' must have length >= 2*p + J = ", min_length,
+         " (got ", length(y), ").")
+  if (!is.numeric(del) || del <= 0) stop("'del' must be a positive number.")
   errorType <- match.arg(errorType, c("Gaussian", "Student-t", "GED"))
   sigvMethod <- match.arg(sigvMethod, c("hybrid", "direct", "factored"))
   # Dispatch: estimate base model (without leverage)
@@ -166,6 +177,10 @@ svpSE <- function(object, n_sim = 199, alpha = 0.05, burnin = 500,
     stop("object must be of class 'svp', 'svp_t', or 'svp_ged'.")
   }
   if (n_sim < 1) stop("n_sim must be >= 1.")
+  if (!is.numeric(alpha) || alpha <= 0 || alpha >= 1)
+    stop("'alpha' must be a number in (0, 1).")
+  if (!is.numeric(burnin) || burnin < 0)
+    stop("'burnin' must be a non-negative integer.")
 
   if (inherits(object, "svp_t")) {
     .svpSE_t(object, n_sim, alpha, burnin, logNu)

@@ -2,3 +2,5 @@
 ^\.Rproj\.user$
 ^\.DS_Store$
 ^cran-comments\.md$
+^\.Rhistory$
+^\.RData$

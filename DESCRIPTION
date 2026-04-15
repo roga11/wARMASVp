@@ -24,7 +24,6 @@ License: GPL (>= 3)
 URL: https://github.com/roga11/wARMASVp
 BugReports: https://github.com/roga11/wARMASVp/issues
 Encoding: UTF-8
-LazyData: false
 Imports:
     Rcpp (>= 1.0.0),
     gsignal,
@@ -32,11 +31,6 @@ Imports:
 Suggests:
     pso,
     GenSA,
-    NMOF,
-    parallel,
-    doParallel,
-    foreach,
-    doRNG,
     testthat (>= 3.0.0),
     knitr,
     rmarkdown

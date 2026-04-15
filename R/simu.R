@@ -75,8 +75,21 @@
 sim_svp <- function(n, phi, sigy, sigv, errorType = "Gaussian",
                     leverage = FALSE, rho = 0, nu = NULL, K = 1,
                     burnin = 500) {
+  if (!is.numeric(n) || length(n) != 1L || n < 1L || n != as.integer(n))
+    stop("'n' must be a positive integer.")
+  n <- as.integer(n)
   phi <- as.numeric(phi)
+  if (length(phi) < 1L || any(!is.finite(phi)))
+    stop("'phi' must be a non-empty numeric vector with finite values.")
   p <- length(phi)
+  if (!is.numeric(sigy) || length(sigy) != 1L || sigy <= 0)
+    stop("'sigy' must be a positive number.")
+  if (!is.numeric(sigv) || length(sigv) != 1L || sigv <= 0)
+    stop("'sigv' must be a positive number.")
+  if (!is.numeric(K) || length(K) != 1L || K < 1L)
+    stop("'K' must be a positive integer (>= 1).")
+  if (!is.numeric(burnin) || length(burnin) != 1L || burnin < 0)
+    stop("'burnin' must be a non-negative integer.")
   errorType <- match.arg(errorType, c("Gaussian", "Student-t", "GED"))
 
   if (errorType == "Gaussian") {

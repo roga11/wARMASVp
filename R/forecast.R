@@ -54,6 +54,15 @@ forecast_svp <- function(object, H = 1,
     stop("object must be an svp/svp_t/svp_ged model from svp(). ",
          "Usage: fit <- svp(y, ...); fc <- forecast_svp(fit, H = 10)")
   }
+  if (!is.numeric(H) || length(H) != 1L || H < 1L)
+    stop("'H' must be a positive integer (>= 1).")
+  H <- as.integer(H)
+  if (!is.numeric(K) || length(K) != 1L || K < 1L)
+    stop("'K' must be a positive integer (>= 1).")
+  if (!is.numeric(M) || length(M) != 1L || M < 1L)
+    stop("'M' must be a positive integer (>= 1).")
+  if (!is.numeric(del) || length(del) != 1L || del <= 0)
+    stop("'del' must be a positive number.")
   output <- match.arg(output)
   filter_method <- match.arg(filter_method, c("corrected", "mixture", "particle"))
 

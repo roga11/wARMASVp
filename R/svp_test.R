@@ -2,6 +2,20 @@
 # Hypothesis testing functions for SV(p) models
 # =========================================================================== #
 
+# Internal validation for common test arguments
+.validate_test_common <- function(y, J, N, burnin, del) {
+  if (length(y) < 1L) stop("'y' must be a non-empty numeric vector.")
+  if (any(!is.finite(y))) stop("'y' must not contain NA, NaN, or Inf values.")
+  if (!is.numeric(J) || length(J) != 1L || J < 1L)
+    stop("'J' must be a positive integer (>= 1).")
+  if (!is.numeric(N) || length(N) != 1L || N < 1L)
+    stop("'N' must be a positive integer (>= 1).")
+  if (!is.numeric(burnin) || length(burnin) != 1L || burnin < 0)
+    stop("'burnin' must be a non-negative integer.")
+  if (!is.numeric(del) || length(del) != 1L || del <= 0)
+    stop("'del' must be a positive number.")
+}
+
 
 # =========================================================================== #
 # AR Order Tests
@@ -62,9 +76,11 @@ lmc_ar <- function(y, p_null, p_alt, J = 10, N = 99, burnin = 500,
                    sigvMethod = "factored") {
   cl <- match.call()
   y_vec <- as.numeric(y)
+  .validate_test_common(y_vec, J, N, burnin, del)
   Tsize <- length(y_vec)
   if (p_null >= p_alt) stop("p_alt must be greater than p_null.")
   if (p_null < 1) stop("p_null must be >= 1.")
+  sigvMethod <- match.arg(sigvMethod, c("hybrid", "direct", "factored"))
   # Estimate models
   mdl_alt <- svp(y_vec, p = p_alt, J = J, leverage = FALSE, del = del, wDecay = wDecay, sigvMethod = sigvMethod)
   mdl_null_est <- svp(y_vec, p = p_null, J = J, leverage = FALSE, del = del, wDecay = wDecay, sigvMethod = sigvMethod)
@@ -130,9 +146,11 @@ mmc_ar <- function(y, p_null, p_alt, J = 10, N = 99, burnin = 500,
                    sigvMethod = "factored") {
   cl <- match.call()
   y_vec <- as.numeric(y)
+  .validate_test_common(y_vec, J, N, burnin, del)
   Tsize <- length(y_vec)
   if (p_null >= p_alt) stop("p_alt must be greater than p_null.")
   if (p_null < 1) stop("p_null must be >= 1.")
+  sigvMethod <- match.arg(sigvMethod, c("hybrid", "direct", "factored"))
   # Estimate under alternative for test statistic
   mdl_alt <- svp(y_vec, p = p_alt, J = J, leverage = FALSE, del = del, wDecay = wDecay, sigvMethod = sigvMethod)
   mdl_null_est <- svp(y_vec, p = p_null, J = J, leverage = FALSE, del = del, wDecay = wDecay, sigvMethod = sigvMethod)
@@ -238,10 +256,13 @@ lmc_lev <- function(y, p = 1, J = 10, N = 99, rho_null = 0,
                     winsorize_eps = 0) {
   cl <- match.call()
   y_vec <- as.numeric(y)
+  .validate_test_common(y_vec, J, N, burnin, del)
+  if (!is.numeric(p) || length(p) != 1L || p < 1L)
+    stop("'p' must be a positive integer (>= 1).")
   y_mat <- as.matrix(y_vec)
   Tsize <- length(y_vec)
   errorType <- match.arg(errorType, c("Gaussian", "Student-t", "GED"))
-  # Warn about HAC reliability for Student-t nu <= 4
+  sigvMethod <- match.arg(sigvMethod, c("hybrid", "direct", "factored"))
   # Estimate model under alternative
   mdl_alt <- svp(y_vec, p, J, leverage = TRUE, errorType = errorType,
                  rho_type = rho_type, del = del, trunc_lev = trunc_lev,
@@ -393,9 +414,13 @@ mmc_lev <- function(y, p = 1, J = 10, N = 99, rho_null = 0,
                     winsorize_eps = 0) {
   cl <- match.call()
   y_vec <- as.numeric(y)
+  .validate_test_common(y_vec, J, N, burnin, del)
+  if (!is.numeric(p) || length(p) != 1L || p < 1L)
+    stop("'p' must be a positive integer (>= 1).")
   y_mat <- as.matrix(y_vec)
   Tsize <- length(y_vec)
   errorType <- match.arg(errorType, c("Gaussian", "Student-t", "GED"))
+  sigvMethod <- match.arg(sigvMethod, c("hybrid", "direct", "factored"))
   # Estimate model under alternative
   mdl_alt <- svp(y_vec, p, J, leverage = TRUE, errorType = errorType,
                  rho_type = rho_type, del = del, trunc_lev = trunc_lev,
@@ -592,6 +617,12 @@ lmc_t <- function(y, p = 1, J = 10, N = 99, nu_null, burnin = 500,
   cl <- match.call()
   direction <- match.arg(direction)
   y_vec <- as.numeric(y)
+  .validate_test_common(y_vec, J, N, burnin, del)
+  if (!is.numeric(p) || length(p) != 1L || p < 1L)
+    stop("'p' must be a positive integer (>= 1).")
+  if (!is.numeric(nu_null) || length(nu_null) != 1L || nu_null <= 2)
+    stop("'nu_null' must be > 2 for Student-t distribution.")
+  sigvMethod <- match.arg(sigvMethod, c("hybrid", "direct", "factored"))
   y_mat <- as.matrix(y_vec)
   Tsize <- length(y_vec)
   # Estimate model under alternative
@@ -665,6 +696,12 @@ lmc_ged <- function(y, p = 1, J = 10, N = 99, nu_null, burnin = 500,
   cl <- match.call()
   direction <- match.arg(direction)
   y_vec <- as.numeric(y)
+  .validate_test_common(y_vec, J, N, burnin, del)
+  if (!is.numeric(p) || length(p) != 1L || p < 1L)
+    stop("'p' must be a positive integer (>= 1).")
+  if (!is.numeric(nu_null) || length(nu_null) != 1L || nu_null <= 0)
+    stop("'nu_null' must be > 0 for GED distribution.")
+  sigvMethod <- match.arg(sigvMethod, c("hybrid", "direct", "factored"))
   y_mat <- as.matrix(y_vec)
   Tsize <- length(y_vec)
   mdl_alt <- svp(y_vec, p = p, J = J, errorType = "GED", del = del,
@@ -742,6 +779,12 @@ mmc_t <- function(y, p = 1, J = 10, N = 99, nu_null, burnin = 500,
   direction <- match.arg(direction)
   cl <- match.call()
   y_vec <- as.numeric(y)
+  .validate_test_common(y_vec, J, N, burnin, del)
+  if (!is.numeric(p) || length(p) != 1L || p < 1L)
+    stop("'p' must be a positive integer (>= 1).")
+  if (!is.numeric(nu_null) || length(nu_null) != 1L || nu_null <= 2)
+    stop("'nu_null' must be > 2 for Student-t distribution.")
+  sigvMethod <- match.arg(sigvMethod, c("hybrid", "direct", "factored"))
   y_mat <- as.matrix(y_vec)
   Tsize <- length(y_vec)
   mdl_alt <- svp(y_vec, p = p, J = J, errorType = "Student-t", del = del,
@@ -831,6 +874,12 @@ mmc_ged <- function(y, p = 1, J = 10, N = 99, nu_null, burnin = 500,
   direction <- match.arg(direction)
   cl <- match.call()
   y_vec <- as.numeric(y)
+  .validate_test_common(y_vec, J, N, burnin, del)
+  if (!is.numeric(p) || length(p) != 1L || p < 1L)
+    stop("'p' must be a positive integer (>= 1).")
+  if (!is.numeric(nu_null) || length(nu_null) != 1L || nu_null <= 0)
+    stop("'nu_null' must be > 0 for GED distribution.")
+  sigvMethod <- match.arg(sigvMethod, c("hybrid", "direct", "factored"))
   y_mat <- as.matrix(y_vec)
   Tsize <- length(y_vec)
   mdl_alt <- svp(y_vec, p = p, J = J, errorType = "GED", del = del,
