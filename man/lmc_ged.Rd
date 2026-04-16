@@ -13,7 +13,7 @@ lmc_ged(
   burnin = 500,
   del = 1e-10,
   wDecay = FALSE,
-  Bartlett = TRUE,
+  Bartlett = FALSE,
   Amat = NULL,
   direction = c("two-sided", "less", "greater"),
   sigvMethod = "factored",
@@ -38,11 +38,11 @@ lmc_ged(
 \item{wDecay}{Logical. Use decaying weights. Default \code{FALSE}.}
 
 \item{Bartlett}{Logical. Use Bartlett kernel HAC for weighting matrix.
-Default \code{TRUE}.}
+Default \code{FALSE}.}
 
-\item{Amat}{Weighting matrix specification. \code{NULL} for identity,
-\code{"Weighted"} for data-driven HAC, or a \code{(p+3)x(p+3)} matrix.
-Default \code{NULL}.}
+\item{Amat}{Weighting matrix specification. \code{NULL} (default) for identity
+weighting, \code{"Weighted"} for data-driven HAC, or a \code{(p+3)x(p+3)}
+matrix. Takes precedence over \code{Bartlett}.}
 
 \item{direction}{Character. Test direction: \code{"two-sided"} (default),
 \code{"less"} (H1: nu < nu_null), or \code{"greater"} (H1: nu > nu_null).
@@ -64,7 +64,7 @@ with GED errors. Testing \eqn{\nu_0 = 2} corresponds to testing normality.
 }
 \examples{
 \donttest{
-y <- sim_svp(1000, phi = 0.95, sigy = 1, sigv = 0.2, errorType = "GED", nu = 1.5)
+y <- sim_svp(1000, phi = 0.95, sigy = 1, sigv = 0.2, errorType = "GED", nu = 1.5)$y
 test <- lmc_ged(y, p = 1, J = 10, N = 49, nu_null = 2)
 print(test)
 }

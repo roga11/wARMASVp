@@ -1,6 +1,6 @@
 test_that("lmc_ar runs and returns svp_test object", {
   set.seed(42)
-  y <- sim_svp(1000, phi = 0.95, sigy = 1, sigv = 0.3)
+  y <- sim_svp(1000, phi = 0.95, sigy = 1, sigv = 0.3)$y
   test <- lmc_ar(y, p_null = 1, p_alt = 2, N = 19)
   expect_s3_class(test, "svp_test")
   expect_true("pval" %in% names(test))
@@ -10,7 +10,7 @@ test_that("lmc_ar runs and returns svp_test object", {
 test_that("mmc_ar runs and returns valid p-value", {
   skip_on_cran()
   set.seed(42)
-  y <- sim_svp(500, phi = 0.95, sigy = 1, sigv = 0.3)
+  y <- sim_svp(500, phi = 0.95, sigy = 1, sigv = 0.3)$y
   test <- mmc_ar(y, p_null = 1, p_alt = 2, N = 9,
                  method = "pso", maxit = 5)
   expect_true(test$value >= 0 && test$value <= 1)
@@ -18,7 +18,7 @@ test_that("mmc_ar runs and returns valid p-value", {
 
 test_that("lmc_lev runs and returns svp_test object", {
   set.seed(42)
-  y <- sim_svp(1000, phi = 0.95, sigy = 1, sigv = 0.3)
+  y <- sim_svp(1000, phi = 0.95, sigy = 1, sigv = 0.3)$y
   test <- lmc_lev(y, p = 1, N = 19)
   expect_s3_class(test, "svp_test")
   expect_true(test$pval >= 0 && test$pval <= 1)
@@ -27,7 +27,7 @@ test_that("lmc_lev runs and returns svp_test object", {
 test_that("lmc_t runs and returns svp_test object", {
   set.seed(42)
   y <- sim_svp(1000, phi = 0.90, sigy = 1, sigv = 0.3,
-               errorType = "Student-t", nu = 5)
+               errorType = "Student-t", nu = 5)$y
   test <- suppressWarnings(lmc_t(y, nu_null = 5, N = 19))
   expect_s3_class(test, "svp_test")
   expect_true(test$pval >= 0 && test$pval <= 1)
@@ -36,7 +36,7 @@ test_that("lmc_t runs and returns svp_test object", {
 test_that("lmc_ged runs and returns svp_test object", {
   set.seed(42)
   y <- sim_svp(1000, phi = 0.90, sigy = 1, sigv = 0.3,
-               errorType = "GED", nu = 1.5)
+               errorType = "GED", nu = 1.5)$y
   test <- suppressWarnings(lmc_ged(y, nu_null = 1.5, N = 19))
   expect_s3_class(test, "svp_test")
   expect_true(test$pval >= 0 && test$pval <= 1)
@@ -44,7 +44,7 @@ test_that("lmc_ged runs and returns svp_test object", {
 
 test_that("print.svp_test works", {
   set.seed(42)
-  y <- as.numeric(sim_svp(1000, phi = 0.95, sigy = 1, sigv = 0.3))
+  y <- sim_svp(1000, phi = 0.95, sigy = 1, sigv = 0.3)$y
   test <- lmc_ar(y, p_null = 1, p_alt = 2, N = 19)
   expect_output(print(test))
 })
@@ -73,8 +73,8 @@ test_that(".pvalue_directional computes correctly", {
 
 test_that("lmc_t with direction='two-sided' gives same structure as before", {
   set.seed(42)
-  y <- as.numeric(sim_svp(1000, phi = 0.90, sigy = 1, sigv = 0.3,
-                           errorType = "Student-t", nu = 5))
+  y <- sim_svp(1000, phi = 0.90, sigy = 1, sigv = 0.3,
+               errorType = "Student-t", nu = 5)$y
   test <- suppressWarnings(lmc_t(y, nu_null = 5, N = 19, direction = "two-sided"))
   expect_s3_class(test, "svp_test")
   expect_equal(test$direction, "two-sided")
@@ -84,8 +84,8 @@ test_that("lmc_t with direction='two-sided' gives same structure as before", {
 
 test_that("lmc_t with direction='less': p-value in [0,1] and S_T present", {
   set.seed(42)
-  y <- as.numeric(sim_svp(1000, phi = 0.90, sigy = 1, sigv = 0.3,
-                           errorType = "Student-t", nu = 5))
+  y <- sim_svp(1000, phi = 0.90, sigy = 1, sigv = 0.3,
+               errorType = "Student-t", nu = 5)$y
   test <- suppressWarnings(lmc_t(y, nu_null = 5, N = 19, direction = "less"))
   expect_s3_class(test, "svp_test")
   expect_equal(test$direction, "less")
@@ -95,8 +95,8 @@ test_that("lmc_t with direction='less': p-value in [0,1] and S_T present", {
 
 test_that("lmc_ged with direction='less': p-value in [0,1]", {
   set.seed(42)
-  y <- as.numeric(sim_svp(1000, phi = 0.90, sigy = 1, sigv = 0.3,
-                           errorType = "GED", nu = 1.5))
+  y <- sim_svp(1000, phi = 0.90, sigy = 1, sigv = 0.3,
+               errorType = "GED", nu = 1.5)$y
   test <- suppressWarnings(lmc_ged(y, nu_null = 1.5, N = 19, direction = "less"))
   expect_s3_class(test, "svp_test")
   expect_equal(test$direction, "less")
@@ -105,8 +105,8 @@ test_that("lmc_ged with direction='less': p-value in [0,1]", {
 
 test_that("print.svp_test shows direction for directional tests", {
   set.seed(42)
-  y <- as.numeric(sim_svp(1000, phi = 0.90, sigy = 1, sigv = 0.3,
-                           errorType = "Student-t", nu = 5))
+  y <- sim_svp(1000, phi = 0.90, sigy = 1, sigv = 0.3,
+               errorType = "Student-t", nu = 5)$y
   test <- suppressWarnings(lmc_t(y, nu_null = 5, N = 19, direction = "less"))
   expect_output(print(test), "less")
   expect_output(print(test), "Signed root")
@@ -120,7 +120,7 @@ test_that("print.svp_test shows direction for directional tests", {
 test_that("lmc_t with p=2 runs and returns svp_test object", {
   set.seed(42)
   y <- sim_svp(1000, phi = c(0.20, 0.63), sigy = 1, sigv = 1,
-               errorType = "Student-t", nu = 3)
+               errorType = "Student-t", nu = 3)$y
   test <- suppressWarnings(lmc_t(y, p = 2, nu_null = 3, N = 19))
   expect_s3_class(test, "svp_test")
   expect_true(test$pval >= 0 && test$pval <= 1)
@@ -130,7 +130,7 @@ test_that("mmc_t with p=2 runs and returns valid p-value", {
   skip_on_cran()
   set.seed(42)
   y <- sim_svp(500, phi = c(0.20, 0.63), sigy = 1, sigv = 1,
-               errorType = "Student-t", nu = 3)
+               errorType = "Student-t", nu = 3)$y
   test <- suppressWarnings(mmc_t(y, p = 2, nu_null = 3, N = 9,
                                   method = "pso", maxit = 5))
   expect_true(test$value >= 0 && test$value <= 1)
@@ -139,7 +139,7 @@ test_that("mmc_t with p=2 runs and returns valid p-value", {
 test_that("lmc_ged with p=2 runs and returns svp_test object", {
   set.seed(42)
   y <- sim_svp(1000, phi = c(0.20, 0.63), sigy = 1, sigv = 1,
-               errorType = "GED", nu = 1.5)
+               errorType = "GED", nu = 1.5)$y
   test <- suppressWarnings(lmc_ged(y, p = 2, nu_null = 1.5, N = 19))
   expect_s3_class(test, "svp_test")
   expect_true(test$pval >= 0 && test$pval <= 1)
@@ -149,7 +149,7 @@ test_that("mmc_ged with p=2 runs and returns valid p-value", {
   skip_on_cran()
   set.seed(42)
   y <- sim_svp(500, phi = c(0.20, 0.63), sigy = 1, sigv = 1,
-               errorType = "GED", nu = 1.5)
+               errorType = "GED", nu = 1.5)$y
   test <- suppressWarnings(mmc_ged(y, p = 2, nu_null = 1.5, N = 9,
                                     method = "pso", maxit = 5))
   expect_true(test$value >= 0 && test$value <= 1)
@@ -157,7 +157,7 @@ test_that("mmc_ged with p=2 runs and returns valid p-value", {
 
 test_that("lmc_lev with p=2 runs and returns svp_test object", {
   set.seed(42)
-  y <- sim_svp(1000, phi = c(0.20, 0.63), sigy = 1, sigv = 1)
+  y <- sim_svp(1000, phi = c(0.20, 0.63), sigy = 1, sigv = 1)$y
   test <- suppressWarnings(lmc_lev(y, p = 2, N = 19))
   expect_s3_class(test, "svp_test")
   expect_true(test$pval >= 0 && test$pval <= 1)
@@ -166,7 +166,7 @@ test_that("lmc_lev with p=2 runs and returns svp_test object", {
 test_that("mmc_lev with p=2 runs and returns svp_test object", {
   skip_on_cran()
   set.seed(42)
-  y <- sim_svp(500, phi = c(0.20, 0.63), sigy = 1, sigv = 1)
+  y <- sim_svp(500, phi = c(0.20, 0.63), sigy = 1, sigv = 1)$y
   test <- suppressWarnings(mmc_lev(y, p = 2, N = 9,
                                     method = "pso", maxit = 5))
   expect_true(test$value >= 0 && test$value <= 1)
@@ -180,7 +180,7 @@ test_that("mmc_t with Amat='Weighted' (WAmat) runs without error", {
   skip_on_cran()
   set.seed(42)
   y <- sim_svp(500, phi = 0.90, sigy = 1, sigv = 0.3,
-               errorType = "Student-t", nu = 5)
+               errorType = "Student-t", nu = 5)$y
   test <- suppressWarnings(mmc_t(y, nu_null = 5, N = 9,
                                   Amat = "Weighted",
                                   method = "pso", maxit = 5))
@@ -191,39 +191,39 @@ test_that("mmc_ged with Amat='Weighted' (WAmat) runs without error", {
   skip_on_cran()
   set.seed(42)
   y <- sim_svp(500, phi = 0.90, sigy = 1, sigv = 0.3,
-               errorType = "GED", nu = 1.5)
+               errorType = "GED", nu = 1.5)$y
   test <- suppressWarnings(mmc_ged(y, nu_null = 1.5, N = 9,
                                     Amat = "Weighted",
                                     method = "pso", maxit = 5))
   expect_true(test$value >= 0 && test$value <= 1)
 })
 
-test_that("mmc_lev Gaussian Bartlett=TRUE runs without error", {
+test_that("mmc_lev Gaussian Amat='Weighted' runs without error", {
   skip_on_cran()
   set.seed(42)
-  y <- sim_svp(500, phi = 0.95, sigy = 1, sigv = 0.3)
-  test <- suppressWarnings(mmc_lev(y, N = 9, Bartlett = TRUE,
+  y <- sim_svp(500, phi = 0.95, sigy = 1, sigv = 0.3)$y
+  test <- suppressWarnings(mmc_lev(y, N = 9, Amat = "Weighted",
                                     method = "pso", maxit = 5))
   expect_true(test$value >= 0 && test$value <= 1)
 })
 
-test_that("mmc_lev Student-t Bartlett=TRUE runs without error", {
+test_that("mmc_lev Student-t Amat='Weighted' runs without error", {
   skip_on_cran()
   set.seed(42)
   y <- sim_svp(500, phi = 0.90, sigy = 1, sigv = 0.3,
-               errorType = "Student-t", nu = 5)
-  test <- suppressWarnings(mmc_lev(y, N = 9, Bartlett = TRUE,
+               errorType = "Student-t", nu = 5)$y
+  test <- suppressWarnings(mmc_lev(y, N = 9, Amat = "Weighted",
                                     errorType = "Student-t",
                                     method = "pso", maxit = 5))
   expect_true(test$value >= 0 && test$value <= 1)
 })
 
-test_that("mmc_lev GED Bartlett=TRUE runs without error", {
+test_that("mmc_lev GED Amat='Weighted' runs without error", {
   skip_on_cran()
   set.seed(42)
   y <- sim_svp(500, phi = 0.90, sigy = 1, sigv = 0.3,
-               errorType = "GED", nu = 1.5)
-  test <- suppressWarnings(mmc_lev(y, N = 9, Bartlett = TRUE,
+               errorType = "GED", nu = 1.5)$y
+  test <- suppressWarnings(mmc_lev(y, N = 9, Amat = "Weighted",
                                     errorType = "GED",
                                     method = "pso", maxit = 5))
   expect_true(test$value >= 0 && test$value <= 1)
@@ -233,7 +233,7 @@ test_that("mmc_t eps length validation works", {
   skip_on_cran()
   set.seed(42)
   y <- sim_svp(500, phi = c(0.20, 0.63), sigy = 1, sigv = 1,
-               errorType = "Student-t", nu = 3)
+               errorType = "Student-t", nu = 3)$y
   expect_error(
     mmc_t(y, p = 2, nu_null = 3, N = 9, eps = c(0.3, 0.3, 0.3)),
     "eps must have length 4"
@@ -244,7 +244,7 @@ test_that("mmc_ged eps length validation works", {
   skip_on_cran()
   set.seed(42)
   y <- sim_svp(500, phi = c(0.20, 0.63), sigy = 1, sigv = 1,
-               errorType = "GED", nu = 1.5)
+               errorType = "GED", nu = 1.5)$y
   expect_error(
     mmc_ged(y, p = 2, nu_null = 1.5, N = 9, eps = c(0.3, 0.3, 0.3)),
     "eps must have length 4"
@@ -317,4 +317,87 @@ test_that("mmc_lev Student-t p=2 eps of length p+3=5 works", {
                                     method = "pso", maxit = 5))
   expect_true(test$value >= 0 && test$value <= 1)
   expect_length(test$par, 5)  # phi1, phi2, sigy, sigv, nu
+})
+
+
+# =========================================================================== #
+# Unified Amat interface tests (2026-04-15)
+# =========================================================================== #
+
+test_that("lmc_ar with Amat='Weighted' runs (HAC via Amat)", {
+  set.seed(42)
+  y <- sim_svp(500, phi = 0.95, sigy = 1, sigv = 0.2)$y
+  test <- lmc_ar(y, p_null = 1, p_alt = 2, N = 19, Amat = "Weighted")
+  expect_s3_class(test, "svp_test")
+  expect_true(test$pval >= 0 && test$pval <= 1)
+  expect_true(grepl("Bartlett", test$test_type))
+})
+
+test_that("mmc_ar with Amat='Weighted' runs (HAC via Amat)", {
+  skip_on_cran()
+  set.seed(42)
+  y <- sim_svp(500, phi = 0.95, sigy = 1, sigv = 0.2)$y
+  test <- mmc_ar(y, p_null = 1, p_alt = 2, N = 9, Amat = "Weighted",
+                 method = "pso", maxit = 5)
+  expect_true(test$value >= 0 && test$value <= 1)
+})
+
+test_that("lmc_ar rejects user-supplied weighting matrix", {
+  set.seed(42)
+  y <- sim_svp(500, phi = 0.95, sigy = 1, sigv = 0.2)$y
+  expect_error(
+    lmc_ar(y, p_null = 1, p_alt = 2, N = 19, Amat = diag(4)),
+    "not supported"
+  )
+})
+
+test_that("lmc_lev with Amat='Weighted' runs (HAC via Amat)", {
+  set.seed(42)
+  y <- sim_svp(500, phi = 0.95, sigy = 1, sigv = 0.2,
+               leverage = TRUE, rho = -0.3)$y
+  test <- suppressWarnings(lmc_lev(y, p = 1, N = 19, Amat = "Weighted"))
+  expect_s3_class(test, "svp_test")
+  expect_true(test$pval >= 0 && test$pval <= 1)
+})
+
+test_that("mmc_lev with Amat='Weighted' runs (HAC via Amat)", {
+  skip_on_cran()
+  set.seed(42)
+  y <- sim_svp(500, phi = 0.95, sigy = 1, sigv = 0.2,
+               leverage = TRUE, rho = -0.3)$y
+  test <- suppressWarnings(mmc_lev(y, p = 1, N = 9, Amat = "Weighted",
+                                    method = "pso", maxit = 5))
+  expect_true(test$value >= 0 && test$value <= 1)
+})
+
+test_that("Amat takes precedence over Bartlett", {
+  set.seed(42)
+  y <- sim_svp(500, phi = 0.95, sigy = 1, sigv = 0.2)$y
+  # Amat = "Weighted" should override Bartlett = FALSE
+  test <- lmc_ar(y, p_null = 1, p_alt = 2, N = 19,
+                 Bartlett = FALSE, Amat = "Weighted")
+  expect_true(grepl("Bartlett", test$test_type))
+})
+
+test_that("lmc_t default is now identity weighting (Bartlett=FALSE)", {
+  set.seed(42)
+  y <- sim_svp(500, phi = 0.95, sigy = 1, sigv = 0.2,
+               errorType = "Student-t", nu = 5)$y
+  # Default call — should use identity (no HAC), same as Bartlett=FALSE
+  test_default <- suppressWarnings(lmc_t(y, nu_null = 5, N = 19))
+  test_explicit <- suppressWarnings(lmc_t(y, nu_null = 5, N = 19,
+                                           Bartlett = FALSE, Amat = NULL))
+  expect_equal(test_default$s0, test_explicit$s0)
+})
+
+test_that("lmc_t Amat='Weighted' gives HAC weighting", {
+  set.seed(42)
+  y <- sim_svp(500, phi = 0.95, sigy = 1, sigv = 0.2,
+               errorType = "Student-t", nu = 5)$y
+  # Amat="Weighted" should produce same result as Bartlett=TRUE
+  test_amat <- suppressWarnings(lmc_t(y, nu_null = 5, N = 19,
+                                       Amat = "Weighted"))
+  test_bart <- suppressWarnings(lmc_t(y, nu_null = 5, N = 19,
+                                       Bartlett = TRUE))
+  expect_equal(test_amat$s0, test_bart$s0)
 })

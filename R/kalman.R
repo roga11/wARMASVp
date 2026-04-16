@@ -85,14 +85,14 @@ density_eps_ged <- function(y, nu) {
 #'   \code{"ged"}.
 #' @param nu Numeric. Shape parameter (ignored for Gaussian).
 #' @param K Integer. Number of mixture components. Default 7.
-#' @param n_sample Integer. Sample size for EM fitting. Default 500000.
+#' @param n_sample Integer. Sample size for EM fitting. Default 10000.
 #' @param max_iter Integer. Maximum EM iterations. Default 500.
 #' @param tol Numeric. Convergence tolerance. Default 1e-8.
 #' @param seed Integer. Random seed. Default 42.
 #' @return List with \code{weights}, \code{means}, \code{vars}, \code{KL_div}.
 #' @keywords internal
 fit_ksc_mixture <- function(distribution = c("gaussian", "student_t", "ged"),
-                            nu = NULL, K = 7, n_sample = 100000,
+                            nu = NULL, K = 7, n_sample = 10000,
                             max_iter = 500, tol = 1e-8, seed = 42) {
   distribution <- match.arg(distribution)
 
@@ -147,49 +147,14 @@ fit_ksc_mixture <- function(distribution = c("gaussian", "student_t", "ged"),
     q[k] <- length(idx) / n_sample
   }
 
-  n <- length(eps)
-  for (iter in 1:max_iter) {
-    # E-step: compute log responsibilities
-    log_tau <- matrix(0, n, K)
-    for (k in 1:K) {
-      log_tau[, k] <- log(q[k]) + dnorm(eps, mean = m[k], sd = sqrt(s2[k]), log = TRUE)
-    }
-    # Normalize (log-sum-exp per row)
-    max_log <- apply(log_tau, 1, max)
-    log_tau_shifted <- log_tau - max_log
-    tau <- exp(log_tau_shifted)
-    row_sums <- rowSums(tau)
-    tau <- tau / row_sums
-
-    # M-step
-    q_new <- colMeans(tau)
-    m_new <- numeric(K)
-    s2_new <- numeric(K)
-    for (k in 1:K) {
-      Nk <- sum(tau[, k])
-      if (Nk < 1e-10) { Nk <- 1e-10 }
-      m_new[k] <- sum(tau[, k] * eps) / Nk
-      s2_new[k] <- sum(tau[, k] * (eps - m_new[k])^2) / Nk
-      if (s2_new[k] < 1e-10) s2_new[k] <- 1e-10
-    }
-
-    # Check convergence
-    if (max(abs(m_new - m)) < tol && max(abs(q_new - q)) < tol) break
-    q <- q_new
-    m <- m_new
-    s2 <- s2_new
-  }
-
-  # Sort by mean
-  ord <- order(m)
-  q <- q[ord]
-  m <- m[ord]
-  s2 <- s2[ord]
+  # EM loop in C++ (returns sorted weights/means/vars)
+  fit <- fit_ksc_em_cpp(eps = eps, init_m = m, init_s2 = s2, init_q = q,
+                        max_iter = max_iter, tol = tol)
 
   list(
-    weights = q,
-    means   = m,
-    vars    = s2,
+    weights = fit$weights,
+    means   = fit$means,
+    vars    = fit$vars,
     KL_div  = NA_real_,
     nu      = nu,
     distribution = distribution
@@ -285,7 +250,7 @@ fit_ksc_mixture <- function(distribution = c("gaussian", "student_t", "ged"),
 #'
 #' @examples
 #' \donttest{
-#' y <- sim_svp(1000, phi = 0.95, sigy = 1, sigv = 0.2)
+#' y <- sim_svp(1000, phi = 0.95, sigy = 1, sigv = 0.2)$y
 #' fit <- svp(y, p = 1)
 #' filt <- filter_svp(fit)
 #' plot(filt$w_smoothed, type = "l")

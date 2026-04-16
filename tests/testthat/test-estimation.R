@@ -1,6 +1,6 @@
 test_that("svp Gaussian SV(1) returns correct class and reasonable estimates", {
   set.seed(42)
-  y <- sim_svp(5000, phi = 0.95, sigy = 1, sigv = 0.3)
+  y <- sim_svp(5000, phi = 0.95, sigy = 1, sigv = 0.3)$y
   fit <- svp(y, p = 1, J = 10)
   expect_s3_class(fit, "svp")
   expect_length(fit$phi, 1)
@@ -13,7 +13,7 @@ test_that("svp Gaussian SV(1) returns correct class and reasonable estimates", {
 
 test_that("svp Gaussian SV(2) returns 2 phi values", {
   set.seed(42)
-  y <- sim_svp(3000, phi = c(0.20, 0.63), sigy = 1, sigv = 0.5)
+  y <- sim_svp(3000, phi = c(0.20, 0.63), sigy = 1, sigv = 0.5)$y
   fit <- svp(y, p = 2, J = 10)
   expect_s3_class(fit, "svp")
   expect_length(fit$phi, 2)
@@ -33,7 +33,7 @@ test_that("svp leverage returns rho estimate", {
 test_that("svp Student-t returns correct class and reasonable nu", {
   set.seed(42)
   y <- sim_svp(5000, phi = 0.90, sigy = 1, sigv = 0.3,
-               errorType = "Student-t", nu = 5)
+               errorType = "Student-t", nu = 5)$y
   fit <- suppressWarnings(svp(y, p = 1, errorType = "Student-t"))
   expect_s3_class(fit, "svp_t")
   expect_true(!is.na(fit$v))
@@ -47,7 +47,7 @@ test_that("svp Student-t returns correct class and reasonable nu", {
 test_that("svp GED returns correct class and reasonable nu", {
   set.seed(42)
   y <- sim_svp(5000, phi = 0.90, sigy = 1, sigv = 0.3,
-               errorType = "GED", nu = 1.5)
+               errorType = "GED", nu = 1.5)$y
   fit <- suppressWarnings(svp(y, p = 1, errorType = "GED"))
   expect_s3_class(fit, "svp_ged")
   expect_true(!is.na(fit$v))
@@ -58,7 +58,7 @@ test_that("svp GED returns correct class and reasonable nu", {
 test_that("svp Student-t SV(2) works", {
   set.seed(42)
   y <- sim_svp(3000, phi = c(0.20, 0.63), sigy = 1, sigv = 0.5,
-               errorType = "Student-t", nu = 10)
+               errorType = "Student-t", nu = 10)$y
   fit <- suppressWarnings(svp(y, p = 2, errorType = "Student-t"))
   expect_s3_class(fit, "svp_t")
   expect_length(fit$phi, 2)
@@ -66,7 +66,7 @@ test_that("svp Student-t SV(2) works", {
 
 test_that("svpSE returns CI and SE components", {
   set.seed(42)
-  y <- sim_svp(1000, phi = 0.95, sigy = 1, sigv = 0.3)
+  y <- sim_svp(1000, phi = 0.95, sigy = 1, sigv = 0.3)$y
   fit <- svp(y, p = 1)
   se <- svpSE(fit, n_sim = 19)
   expect_type(se, "list")
@@ -84,7 +84,7 @@ test_that("svpSE returns CI and SE components", {
 test_that("svp_t object contains nonstationary_ind field", {
   set.seed(42)
   y <- sim_svp(1000, phi = 0.90, sigy = 1, sigv = 0.3,
-               errorType = "Student-t", nu = 5)
+               errorType = "Student-t", nu = 5)$y
   fit <- suppressWarnings(svp(y, errorType = "Student-t"))
   expect_true("nonstationary_ind" %in% names(fit))
   expect_type(fit$nonstationary_ind, "logical")
@@ -93,7 +93,7 @@ test_that("svp_t object contains nonstationary_ind field", {
 test_that("svp_ged object contains nonstationary_ind field", {
   set.seed(42)
   y <- sim_svp(1000, phi = 0.90, sigy = 1, sigv = 0.3,
-               errorType = "GED", nu = 1.5)
+               errorType = "GED", nu = 1.5)$y
   fit <- suppressWarnings(svp(y, errorType = "GED"))
   expect_true("nonstationary_ind" %in% names(fit))
   expect_type(fit$nonstationary_ind, "logical")
@@ -101,12 +101,12 @@ test_that("svp_ged object contains nonstationary_ind field", {
 
 test_that("coef method works for all model types", {
   set.seed(42)
-  y <- sim_svp(1000, phi = 0.95, sigy = 1, sigv = 0.3)
+  y <- sim_svp(1000, phi = 0.95, sigy = 1, sigv = 0.3)$y
   fit <- svp(y)
   expect_true(is.numeric(coef(fit)))
 
   yt <- sim_svp(1000, phi = 0.90, sigy = 1, sigv = 0.3,
-                errorType = "Student-t", nu = 5)
+                errorType = "Student-t", nu = 5)$y
   fit_t <- suppressWarnings(svp(yt, errorType = "Student-t"))
   if (!is.na(fit_t$v)) {
     expect_true(is.numeric(coef(fit_t)))

@@ -6,7 +6,7 @@
 test_that("PF returns correct class and components (Gaussian)", {
   skip_on_cran()
   set.seed(42)
-  y <- as.numeric(sim_svp(300, phi = 0.95, sigy = 1, sigv = 0.3))
+  y <- sim_svp(300, phi = 0.95, sigy = 1, sigv = 0.3)$y
   fit <- svp(y, p = 1)
   pf <- filter_svp(fit, method = "particle", M = 200, seed = 42)
   expect_s3_class(pf, "svp_filter")
@@ -20,7 +20,7 @@ test_that("PF returns correct class and components (Gaussian)", {
 test_that("PF: ESS doesn't collapse (Gaussian)", {
   skip_on_cran()
   set.seed(42)
-  y <- as.numeric(sim_svp(300, phi = 0.95, sigy = 1, sigv = 0.3))
+  y <- sim_svp(300, phi = 0.95, sigy = 1, sigv = 0.3)$y
   fit <- svp(y, p = 1)
   pf <- filter_svp(fit, method = "particle", M = 500, seed = 42)
   # Mean ESS should be > M/10 = 50
@@ -30,7 +30,7 @@ test_that("PF: ESS doesn't collapse (Gaussian)", {
 test_that("PF: filtered states close to CKF (Gaussian)", {
   skip_on_cran()
   set.seed(42)
-  y <- as.numeric(sim_svp(500, phi = 0.95, sigy = 1, sigv = 0.3))
+  y <- sim_svp(500, phi = 0.95, sigy = 1, sigv = 0.3)$y
   fit <- svp(y, p = 1)
   ckf <- filter_svp(fit, method = "corrected")
   pf <- filter_svp(fit, method = "particle", M = 1000, seed = 42)
@@ -42,7 +42,7 @@ test_that("PF: no NaN/Inf in output (all distributions)", {
   skip_on_cran()
   # Gaussian
   set.seed(42)
-  y <- as.numeric(sim_svp(200, phi = 0.95, sigy = 1, sigv = 0.3))
+  y <- sim_svp(200, phi = 0.95, sigy = 1, sigv = 0.3)$y
   fit <- svp(y, p = 1)
   pf <- filter_svp(fit, method = "particle", M = 200, seed = 42)
   expect_true(all(is.finite(pf$w_filtered)))
@@ -50,16 +50,16 @@ test_that("PF: no NaN/Inf in output (all distributions)", {
 
   # Student-t
   set.seed(42)
-  y_t <- as.numeric(sim_svp(200, phi = 0.95, sigy = 1, sigv = 0.3,
-                             errorType = "Student-t", nu = 5))
+  y_t <- sim_svp(200, phi = 0.95, sigy = 1, sigv = 0.3,
+                 errorType = "Student-t", nu = 5)$y
   fit_t <- svp(y_t, p = 1, errorType = "Student-t")
   pf_t <- filter_svp(fit_t, method = "particle", M = 200, seed = 42)
   expect_true(all(is.finite(pf_t$w_filtered)))
 
   # GED
   set.seed(42)
-  y_g <- as.numeric(sim_svp(200, phi = 0.95, sigy = 1, sigv = 0.3,
-                             errorType = "GED", nu = 1.5))
+  y_g <- sim_svp(200, phi = 0.95, sigy = 1, sigv = 0.3,
+                 errorType = "GED", nu = 1.5)$y
   fit_g <- suppressWarnings(svp(y_g, p = 1, errorType = "GED"))
   pf_g <- filter_svp(fit_g, method = "particle", M = 200, seed = 42)
   expect_true(all(is.finite(pf_g$w_filtered)))
@@ -68,8 +68,8 @@ test_that("PF: no NaN/Inf in output (all distributions)", {
 test_that("PF: ESS doesn't collapse (Student-t)", {
   skip_on_cran()
   set.seed(42)
-  y <- as.numeric(sim_svp(300, phi = 0.95, sigy = 1, sigv = 0.3,
-                           errorType = "Student-t", nu = 5))
+  y <- sim_svp(300, phi = 0.95, sigy = 1, sigv = 0.3,
+               errorType = "Student-t", nu = 5)$y
   fit <- svp(y, p = 1, errorType = "Student-t")
   pf <- filter_svp(fit, method = "particle", M = 500, seed = 42)
   expect_true(mean(pf$ESS) > 500 / 10)
@@ -113,7 +113,7 @@ test_that("PF: leverage (GED, exact z via copula inversion)", {
 test_that("PF: SV(2) companion form works", {
   skip_on_cran()
   set.seed(77)
-  y <- as.numeric(sim_svp(300, phi = c(0.2, 0.63), sigy = 1, sigv = 0.5))
+  y <- sim_svp(300, phi = c(0.2, 0.63), sigy = 1, sigv = 0.5)$y
   fit <- svp(y, p = 2)
   pf <- filter_svp(fit, method = "particle", M = 300, seed = 42)
   expect_true(all(is.finite(pf$w_filtered)))
@@ -123,7 +123,7 @@ test_that("PF: SV(2) companion form works", {
 test_that("PF: reproducibility with same seed", {
   skip_on_cran()
   set.seed(42)
-  y <- as.numeric(sim_svp(200, phi = 0.95, sigy = 1, sigv = 0.3))
+  y <- sim_svp(200, phi = 0.95, sigy = 1, sigv = 0.3)$y
   fit <- svp(y, p = 1)
   pf1 <- filter_svp(fit, method = "particle", M = 200, seed = 123)
   pf2 <- filter_svp(fit, method = "particle", M = 200, seed = 123)
@@ -134,7 +134,7 @@ test_that("PF: reproducibility with same seed", {
 test_that("print.svp_filter works for particle filter", {
   skip_on_cran()
   set.seed(42)
-  y <- as.numeric(sim_svp(200, phi = 0.95, sigy = 1, sigv = 0.3))
+  y <- sim_svp(200, phi = 0.95, sigy = 1, sigv = 0.3)$y
   fit <- svp(y, p = 1)
   pf <- filter_svp(fit, method = "particle", M = 200, seed = 42)
   expect_output(print(pf), "particle")

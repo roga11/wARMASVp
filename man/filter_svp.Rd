@@ -52,7 +52,7 @@ to extract the latent log-volatility process from an estimated SV(p) model.
 }
 \examples{
 \donttest{
-y <- sim_svp(1000, phi = 0.95, sigy = 1, sigv = 0.2)
+y <- sim_svp(1000, phi = 0.95, sigy = 1, sigv = 0.2)$y
 fit <- svp(y, p = 1)
 filt <- filter_svp(fit)
 plot(filt$w_smoothed, type = "l")

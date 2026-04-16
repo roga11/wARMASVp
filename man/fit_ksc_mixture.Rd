@@ -8,7 +8,7 @@ fit_ksc_mixture(
   distribution = c("gaussian", "student_t", "ged"),
   nu = NULL,
   K = 7,
-  n_sample = 1e+05,
+  n_sample = 10000,
   max_iter = 500,
   tol = 1e-08,
   seed = 42
@@ -22,7 +22,7 @@ fit_ksc_mixture(
 
 \item{K}{Integer. Number of mixture components. Default 7.}
 
-\item{n_sample}{Integer. Sample size for EM fitting. Default 500000.}
+\item{n_sample}{Integer. Sample size for EM fitting. Default 10000.}
 
 \item{max_iter}{Integer. Maximum EM iterations. Default 500.}
 

@@ -17,6 +17,10 @@ gmkf_filter_cpp <- function(y_star, y_raw, phi, sigma_y, sigma_v, delta_p, var_z
     .Call(`_wARMASVp_gmkf_filter_cpp`, y_star, y_raw, phi, sigma_y, sigma_v, delta_p, var_zt, mix_weights, mix_means, mix_vars, mu_intercept, P0)
 }
 
+fit_ksc_em_cpp <- function(eps, init_m, init_s2, init_q, max_iter = 500L, tol = 1e-8) {
+    .Call(`_wARMASVp_fit_ksc_em_cpp`, eps, init_m, init_s2, init_q, max_iter, tol)
+}
+
 LRT_moment_lev_svp_cpp <- function(y, mdl_out, Amat, rho_type, del = 1e-10) {
     .Call(`_wARMASVp_LRT_moment_lev_svp_cpp`, y, mdl_out, Amat, rho_type, del)
 }
@@ -101,12 +105,12 @@ sim_svp_leverage_norm_cpp <- function(beta, p, N, burnin) {
     .Call(`_wARMASVp_sim_svp_leverage_norm_cpp`, beta, p, N, burnin)
 }
 
-sim_sv_t_cpp <- function(beta, p, N, K, burnin) {
-    .Call(`_wARMASVp_sim_sv_t_cpp`, beta, p, N, K, burnin)
+sim_sv_t_cpp <- function(beta, p, N, burnin) {
+    .Call(`_wARMASVp_sim_sv_t_cpp`, beta, p, N, burnin)
 }
 
-sim_sv_ged_cpp <- function(beta, p, N, K, burnin) {
-    .Call(`_wARMASVp_sim_sv_ged_cpp`, beta, p, N, K, burnin)
+sim_sv_ged_cpp <- function(beta, p, N, burnin) {
+    .Call(`_wARMASVp_sim_sv_ged_cpp`, beta, p, N, burnin)
 }
 
 sim_svp_leverage_t_cpp <- function(beta, p, N, burnin) {

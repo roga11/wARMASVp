@@ -13,7 +13,6 @@ sim_svp(
   leverage = FALSE,
   rho = 0,
   nu = NULL,
-  K = 1,
   burnin = 500
 )
 }
@@ -40,20 +39,21 @@ volatility shocks). Must be in \code{[-1, 1]}. Only used when
 Degrees of freedom for Student-t (must be > 2) or GED shape (must be > 0).
 Required when \code{errorType} is \code{"Student-t"} or \code{"GED"}.}
 
-\item{K}{Integer. Number of independent series to simulate. Default 1.
-Only used for Student-t and GED.}
-
 \item{burnin}{Integer. Number of initial observations to discard. Default 500.}
 }
 \value{
-Depending on the configuration:
-\itemize{
-  \item Gaussian without leverage: a numeric vector of length \code{n}.
-  \item Gaussian with leverage: a list with components \code{y} (returns),
-    \code{h} (log-volatility), \code{zeta} (return shocks), \code{veta}
-    (volatility shocks).
-  \item Student-t or GED: if \code{K = 1}, a numeric vector of length
-    \code{n}; otherwise an \code{n x K} matrix.
+A named list of four length-\code{n} numeric vectors:
+\describe{
+  \item{\code{y}}{Observed returns \eqn{y_t}.}
+  \item{\code{h}}{Log-volatility process \eqn{w_t} (equivalently \eqn{h_t}).}
+  \item{\code{z}}{Return innovation such that
+    \eqn{y_t = \sigma_y \exp(h_t/2)\, z_t}.
+    Marginal distribution matches \code{errorType}: N(0,1) for Gaussian,
+    t(\eqn{\nu}) for Student-t, unit-variance GED(\eqn{\nu}) for GED.}
+  \item{\code{v}}{Volatility innovation such that
+    \eqn{h_t - \sum_{j=1}^p \phi_j h_{t-j} = \sigma_v\, v_t}.
+    Always N(0,1); under leverage, \eqn{v_t = \rho\, \zeta_{t-1} +
+    \sqrt{1-\rho^2}\, \epsilon_t}.}
 }
 }
 \description{
@@ -69,33 +69,36 @@ The model is:
 where \eqn{z_t} follows a distribution specified by \code{errorType}
 (Gaussian, Student-t, or GED), and \eqn{v_t} is i.i.d. standard normal.
 When \code{leverage = TRUE}, the correlation between \eqn{z_t} and
-\eqn{v_t} is \eqn{\rho}.
+\eqn{v_{t+1}} is \eqn{\rho}.
 
 For Student-t errors with leverage, the scale-mixture representation
-\eqn{u_t = z_t \lambda_t^{-1/2}} is used, where leverage operates through
-the Gaussian component \eqn{z_t}. For GED errors with leverage, a Gaussian
-copula construction \eqn{u_t = F_{GED}^{-1}(\Phi(z_t))} is used.
+\eqn{z_t = \zeta_t \lambda_t^{-1/2}} is used, where leverage operates through
+the Gaussian component \eqn{\zeta_t}. For GED errors with leverage, a Gaussian
+copula construction \eqn{z_t = F_{\mathrm{GED}}^{-1}(\Phi(\zeta_t))} is used.
+In both cases the returned \code{z} is the \emph{effective} return innovation
+(not the latent \eqn{\zeta_t}), with marginal distribution matching the
+\code{errorType}.
 }
 \examples{
 \donttest{
 # Gaussian SV(1), no leverage
-y <- sim_svp(1000, phi = 0.95, sigy = 1, sigv = 0.2)
-plot(y, type = "l")
-
-# Gaussian SV(1) with leverage
-sim <- sim_svp(1000, phi = 0.95, sigy = 1, sigv = 0.2,
-               leverage = TRUE, rho = -0.5)
+sim <- sim_svp(1000, phi = 0.95, sigy = 1, sigv = 0.2)
 plot(sim$y, type = "l")
 
+# Gaussian SV(1) with leverage
+sim_lev <- sim_svp(1000, phi = 0.95, sigy = 1, sigv = 0.2,
+                   leverage = TRUE, rho = -0.5)
+plot(sim_lev$y, type = "l")
+
 # Student-t SV(1)
-y_t <- sim_svp(1000, phi = 0.95, sigy = 1, sigv = 0.2,
-               errorType = "Student-t", nu = 5)
-plot(y_t, type = "l")
+sim_t <- sim_svp(1000, phi = 0.95, sigy = 1, sigv = 0.2,
+                 errorType = "Student-t", nu = 5)
+plot(sim_t$y, type = "l")
 
 # GED SV(1)
-y_ged <- sim_svp(1000, phi = 0.95, sigy = 1, sigv = 0.2,
-                 errorType = "GED", nu = 1.5)
-plot(y_ged, type = "l")
+sim_ged <- sim_svp(1000, phi = 0.95, sigy = 1, sigv = 0.2,
+                   errorType = "GED", nu = 1.5)
+plot(sim_ged$y, type = "l")
 }
 
 }

@@ -14,6 +14,7 @@ lmc_ar(
   del = 1e-10,
   wDecay = FALSE,
   Bartlett = FALSE,
+  Amat = NULL,
   sigvMethod = "factored"
 )
 }
@@ -37,6 +38,10 @@ lmc_ar(
 \item{Bartlett}{Logical. If \code{TRUE}, use Bartlett kernel HAC weighting
 matrix for a GMM-LRT-type test statistic. If \code{FALSE} (default), use
 the sum of squared extra AR coefficients.}
+
+\item{Amat}{Weighting matrix specification. \code{NULL} (default) for identity
+weighting, or \code{"Weighted"} for data-driven HAC. Takes precedence over
+\code{Bartlett}. User-supplied matrices are not supported for AR order tests.}
 
 \item{sigvMethod}{Character. Method for \eqn{\sigma_v} estimation:
 \code{"factored"} (default), \code{"hybrid"}, or \code{"direct"}.}
@@ -71,7 +76,7 @@ yielding negative test statistics are discarded and re-drawn.
 }
 \examples{
 \donttest{
-y <- sim_svp(1000, phi = 0.95, sigy = 1, sigv = 0.2)
+y <- sim_svp(1000, phi = 0.95, sigy = 1, sigv = 0.2)$y
 test <- lmc_ar(y, p_null = 1, p_alt = 2, J = 10, N = 49)
 print(test)
 }

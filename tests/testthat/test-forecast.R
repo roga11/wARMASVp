@@ -4,7 +4,7 @@
 
 test_that("filter_svp CKF runs and returns expected components", {
   set.seed(42)
-  y <- as.numeric(sim_svp(500, phi = 0.95, sigy = 1, sigv = 0.3))
+  y <- sim_svp(500, phi = 0.95, sigy = 1, sigv = 0.3)$y
   mdl <- svp(y, p = 1)
   filt <- filter_svp(mdl)
   expect_s3_class(filt, "svp_filter")
@@ -28,13 +28,13 @@ test_that("forecast_svp accepts model object and produces h-step forecasts", {
 
 test_that("forecast_svp errors on raw numeric input", {
   set.seed(42)
-  y <- as.numeric(sim_svp(200, phi = 0.95, sigy = 1, sigv = 0.3))
+  y <- sim_svp(200, phi = 0.95, sigy = 1, sigv = 0.3)$y
   expect_error(forecast_svp(y, H = 5), "svp/svp_t/svp_ged")
 })
 
 test_that("forecast_svp: all three output representations are stored", {
   set.seed(42)
-  y <- as.numeric(sim_svp(300, phi = 0.95, sigy = 1, sigv = 0.3))
+  y <- sim_svp(300, phi = 0.95, sigy = 1, sigv = 0.3)$y
   fit <- svp(y, p = 1)
   fc <- forecast_svp(fit, H = 10)
   expect_length(fc$log_var_forecast, 10)
@@ -47,7 +47,7 @@ test_that("forecast_svp: all three output representations are stored", {
 
 test_that("forecast_svp: output parameter selects primary output", {
   set.seed(42)
-  y <- as.numeric(sim_svp(300, phi = 0.95, sigy = 1, sigv = 0.3))
+  y <- sim_svp(300, phi = 0.95, sigy = 1, sigv = 0.3)$y
   fit <- svp(y, p = 1)
   fc_var <- forecast_svp(fit, H = 5, output = "variance")
   expect_equal(fc_var$w_forecasted, fc_var$var_forecast)
@@ -57,7 +57,7 @@ test_that("forecast_svp: output parameter selects primary output", {
 
 test_that("forecast_svp: P_forecast is positive and increasing", {
   set.seed(42)
-  y <- as.numeric(sim_svp(500, phi = 0.95, sigy = 1, sigv = 0.3))
+  y <- sim_svp(500, phi = 0.95, sigy = 1, sigv = 0.3)$y
   fit <- svp(y, p = 1)
   fc <- forecast_svp(fit, H = 20)
   expect_true(all(fc$P_forecast > 0))
@@ -67,7 +67,7 @@ test_that("forecast_svp: P_forecast is positive and increasing", {
 
 test_that("forecast_svp: sigma2_forecast is positive", {
   set.seed(42)
-  y <- as.numeric(sim_svp(300, phi = 0.95, sigy = 1, sigv = 0.3))
+  y <- sim_svp(300, phi = 0.95, sigy = 1, sigv = 0.3)$y
   fit <- svp(y, p = 1)
   fc <- forecast_svp(fit, H = 10)
   expect_true(all(fc$var_forecast > 0))
@@ -76,7 +76,7 @@ test_that("forecast_svp: sigma2_forecast is positive", {
 
 test_that("forecast_svp: long horizon converges toward 0 (log-var)", {
   set.seed(42)
-  y <- as.numeric(sim_svp(500, phi = 0.90, sigy = 1, sigv = 0.3))
+  y <- sim_svp(500, phi = 0.90, sigy = 1, sigv = 0.3)$y
   fit <- svp(y, p = 1)
   fc <- forecast_svp(fit, H = 100)
   # Long-horizon log-variance forecast should converge toward 0
@@ -87,7 +87,7 @@ test_that("forecast_svp: Student-t uses E[u^2] = nu/(nu-2)", {
   set.seed(42)
   sim <- sim_svp(500, phi = 0.95, sigy = 1, sigv = 0.3,
                  errorType = "Student-t", nu = 5)
-  fit <- svp(as.numeric(sim), p = 1, errorType = "Student-t")
+  fit <- svp(sim$y, p = 1, errorType = "Student-t")
   fc <- forecast_svp(fit, H = 5)
   # var_forecast should incorporate nu/(nu-2) = 5/3 factor
   expect_true(all(fc$var_forecast > 0))
@@ -97,7 +97,7 @@ test_that("forecast_svp: GED uses E[u^2] = 1", {
   set.seed(42)
   sim <- sim_svp(500, phi = 0.95, sigy = 1, sigv = 0.3,
                  errorType = "GED", nu = 1.5)
-  fit <- svp(as.numeric(sim), p = 1, errorType = "GED")
+  fit <- svp(sim$y, p = 1, errorType = "GED")
   fc <- forecast_svp(fit, H = 5)
   expect_true(all(fc$var_forecast > 0))
 })
@@ -125,7 +125,7 @@ test_that("companionMat returns correct dimensions", {
 
 test_that("forecast_svp p=2: P_forecast increases with horizon (full P_T)", {
   set.seed(42)
-  y <- sim_svp(500, phi = c(0.20, 0.63), sigy = 1, sigv = 1)
+  y <- sim_svp(500, phi = c(0.20, 0.63), sigy = 1, sigv = 1)$y
   fit <- svp(y, p = 2)
   fc <- forecast_svp(fit, H = 5)
   # MSE should be non-decreasing with horizon for a stationary AR
@@ -142,7 +142,7 @@ test_that("forecast_svp p=2: P_forecast increases with horizon (full P_T)", {
 
 test_that("forecast_svp works with filter_method='particle'", {
   set.seed(42)
-  y <- sim_svp(300, phi = 0.95, sigy = 1, sigv = 0.3)
+  y <- sim_svp(300, phi = 0.95, sigy = 1, sigv = 0.3)$y
   fit <- svp(y, p = 1)
   fc <- forecast_svp(fit, H = 3, filter_method = "particle")
   expect_s3_class(fc, "svp_forecast")

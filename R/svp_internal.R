@@ -511,7 +511,7 @@ correction_factor_ged_approx <- function(nu, n_nodes = 200L) {
       u <- u_out$y
     } else {
       u <- sim_svp(Tsize, phi = object$phi, sigy = object$sigy,
-                   sigv = object$sigv, burnin = burnin)
+                   sigv = object$sigv, burnin = burnin)$y
     }
     sigvMethod_g <- if (is.null(object$sigvMethod)) "factored" else object$sigvMethod
     out_tmp <- tryCatch(
@@ -560,7 +560,7 @@ correction_factor_ged_approx <- function(nu, n_nodes = 200L) {
     } else {
       u <- sim_svp(Tsize, phi = object$phi, sigy = object$sigy,
                    sigv = object$sigv, errorType = "Student-t",
-                   nu = object$v, burnin = burnin)
+                   nu = object$v, burnin = burnin)$y
     }
     out_tmp <- tryCatch(
       svp(as.numeric(u), p = p, J = object$J,
@@ -612,7 +612,7 @@ correction_factor_ged_approx <- function(nu, n_nodes = 200L) {
     } else {
       u <- sim_svp(Tsize, phi = object$phi, sigy = object$sigy,
                    sigv = object$sigv, errorType = "GED",
-                   nu = object$v, burnin = burnin)
+                   nu = object$v, burnin = burnin)$y
     }
     out_tmp <- tryCatch(
       svp(as.numeric(u), p = p, J = object$J,
@@ -964,6 +964,25 @@ correction_factor_ged_approx <- function(nu, n_nodes = 200L) {
 }
 
 # --- Amat parsing and MMC optimizer dispatch ---
+
+# Resolve Amat + Bartlett into a unified weighting specification.
+# Amat takes precedence: "Weighted" -> HAC, <matrix> -> user-supplied, NULL -> check Bartlett.
+# Bartlett = TRUE without Amat is backward-compat shorthand for Amat = "Weighted".
+.resolve_weighting <- function(Amat, Bartlett) {
+  if (!is.null(Amat)) {
+    if (identical(Amat, "Weighted")) {
+      return(list(Amat = "Weighted", use_hac = TRUE))
+    } else if (is.matrix(Amat)) {
+      return(list(Amat = Amat, use_hac = FALSE))
+    } else {
+      stop("Amat must be NULL, 'Weighted', or a numeric matrix.")
+    }
+  }
+  if (isTRUE(Bartlett)) {
+    return(list(Amat = "Weighted", use_hac = TRUE))
+  }
+  list(Amat = NULL, use_hac = FALSE)
+}
 
 # Parse Amat argument (shared by t, GED, and leverage tests)
 # n_mom: number of moment conditions (p+3 for non-leverage heavy-tail, p+4 for leverage heavy-tail)

@@ -79,6 +79,22 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
+// fit_ksc_em_cpp
+List fit_ksc_em_cpp(const arma::vec& eps, const arma::vec& init_m, const arma::vec& init_s2, const arma::vec& init_q, int max_iter, double tol);
+RcppExport SEXP _wARMASVp_fit_ksc_em_cpp(SEXP epsSEXP, SEXP init_mSEXP, SEXP init_s2SEXP, SEXP init_qSEXP, SEXP max_iterSEXP, SEXP tolSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< const arma::vec& >::type eps(epsSEXP);
+    Rcpp::traits::input_parameter< const arma::vec& >::type init_m(init_mSEXP);
+    Rcpp::traits::input_parameter< const arma::vec& >::type init_s2(init_s2SEXP);
+    Rcpp::traits::input_parameter< const arma::vec& >::type init_q(init_qSEXP);
+    Rcpp::traits::input_parameter< int >::type max_iter(max_iterSEXP);
+    Rcpp::traits::input_parameter< double >::type tol(tolSEXP);
+    rcpp_result_gen = Rcpp::wrap(fit_ksc_em_cpp(eps, init_m, init_s2, init_q, max_iter, tol));
+    return rcpp_result_gen;
+END_RCPP
+}
 // LRT_moment_lev_svp_cpp
 double LRT_moment_lev_svp_cpp(arma::vec y, Rcpp::List mdl_out, arma::mat Amat, std::string rho_type, double del);
 RcppExport SEXP _wARMASVp_LRT_moment_lev_svp_cpp(SEXP ySEXP, SEXP mdl_outSEXP, SEXP AmatSEXP, SEXP rho_typeSEXP, SEXP delSEXP) {
@@ -407,7 +423,7 @@ BEGIN_RCPP
 END_RCPP
 }
 // sim_svp_norm_cpp
-arma::mat sim_svp_norm_cpp(arma::vec beta, int p, int N, int burnin);
+List sim_svp_norm_cpp(arma::vec beta, int p, int N, int burnin);
 RcppExport SEXP _wARMASVp_sim_svp_norm_cpp(SEXP betaSEXP, SEXP pSEXP, SEXP NSEXP, SEXP burninSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
@@ -435,32 +451,30 @@ BEGIN_RCPP
 END_RCPP
 }
 // sim_sv_t_cpp
-arma::mat sim_sv_t_cpp(arma::vec beta, int p, int N, int K, int burnin);
-RcppExport SEXP _wARMASVp_sim_sv_t_cpp(SEXP betaSEXP, SEXP pSEXP, SEXP NSEXP, SEXP KSEXP, SEXP burninSEXP) {
+List sim_sv_t_cpp(arma::vec beta, int p, int N, int burnin);
+RcppExport SEXP _wARMASVp_sim_sv_t_cpp(SEXP betaSEXP, SEXP pSEXP, SEXP NSEXP, SEXP burninSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
     Rcpp::traits::input_parameter< arma::vec >::type beta(betaSEXP);
     Rcpp::traits::input_parameter< int >::type p(pSEXP);
     Rcpp::traits::input_parameter< int >::type N(NSEXP);
-    Rcpp::traits::input_parameter< int >::type K(KSEXP);
     Rcpp::traits::input_parameter< int >::type burnin(burninSEXP);
-    rcpp_result_gen = Rcpp::wrap(sim_sv_t_cpp(beta, p, N, K, burnin));
+    rcpp_result_gen = Rcpp::wrap(sim_sv_t_cpp(beta, p, N, burnin));
     return rcpp_result_gen;
 END_RCPP
 }
 // sim_sv_ged_cpp
-arma::mat sim_sv_ged_cpp(arma::vec beta, int p, int N, int K, int burnin);
-RcppExport SEXP _wARMASVp_sim_sv_ged_cpp(SEXP betaSEXP, SEXP pSEXP, SEXP NSEXP, SEXP KSEXP, SEXP burninSEXP) {
+List sim_sv_ged_cpp(arma::vec beta, int p, int N, int burnin);
+RcppExport SEXP _wARMASVp_sim_sv_ged_cpp(SEXP betaSEXP, SEXP pSEXP, SEXP NSEXP, SEXP burninSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
     Rcpp::traits::input_parameter< arma::vec >::type beta(betaSEXP);
     Rcpp::traits::input_parameter< int >::type p(pSEXP);
     Rcpp::traits::input_parameter< int >::type N(NSEXP);
-    Rcpp::traits::input_parameter< int >::type K(KSEXP);
     Rcpp::traits::input_parameter< int >::type burnin(burninSEXP);
-    rcpp_result_gen = Rcpp::wrap(sim_sv_ged_cpp(beta, p, N, K, burnin));
+    rcpp_result_gen = Rcpp::wrap(sim_sv_ged_cpp(beta, p, N, burnin));
     return rcpp_result_gen;
 END_RCPP
 }
@@ -524,6 +538,7 @@ static const R_CallMethodDef CallEntries[] = {
     {"_wARMASVp_solve_lyapunov_discrete_cpp", (DL_FUNC) &_wARMASVp_solve_lyapunov_discrete_cpp, 2},
     {"_wARMASVp_kalman_filter_cpp", (DL_FUNC) &_wARMASVp_kalman_filter_cpp, 9},
     {"_wARMASVp_gmkf_filter_cpp", (DL_FUNC) &_wARMASVp_gmkf_filter_cpp, 12},
+    {"_wARMASVp_fit_ksc_em_cpp", (DL_FUNC) &_wARMASVp_fit_ksc_em_cpp, 6},
     {"_wARMASVp_LRT_moment_lev_svp_cpp", (DL_FUNC) &_wARMASVp_LRT_moment_lev_svp_cpp, 5},
     {"_wARMASVp_LRT_moment_lev_t_cpp", (DL_FUNC) &_wARMASVp_LRT_moment_lev_t_cpp, 5},
     {"_wARMASVp_LRT_moment_lev_ged_cpp", (DL_FUNC) &_wARMASVp_LRT_moment_lev_ged_cpp, 7},
@@ -545,8 +560,8 @@ static const R_CallMethodDef CallEntries[] = {
     {"_wARMASVp_sim_from_innov_ged_lev_cpp", (DL_FUNC) &_wARMASVp_sim_from_innov_ged_lev_cpp, 10},
     {"_wARMASVp_sim_svp_norm_cpp", (DL_FUNC) &_wARMASVp_sim_svp_norm_cpp, 4},
     {"_wARMASVp_sim_svp_leverage_norm_cpp", (DL_FUNC) &_wARMASVp_sim_svp_leverage_norm_cpp, 4},
-    {"_wARMASVp_sim_sv_t_cpp", (DL_FUNC) &_wARMASVp_sim_sv_t_cpp, 5},
-    {"_wARMASVp_sim_sv_ged_cpp", (DL_FUNC) &_wARMASVp_sim_sv_ged_cpp, 5},
+    {"_wARMASVp_sim_sv_t_cpp", (DL_FUNC) &_wARMASVp_sim_sv_t_cpp, 4},
+    {"_wARMASVp_sim_sv_ged_cpp", (DL_FUNC) &_wARMASVp_sim_sv_ged_cpp, 4},
     {"_wARMASVp_sim_svp_leverage_t_cpp", (DL_FUNC) &_wARMASVp_sim_svp_leverage_t_cpp, 4},
     {"_wARMASVp_sim_svp_leverage_ged_cpp", (DL_FUNC) &_wARMASVp_sim_svp_leverage_ged_cpp, 4},
     {"_wARMASVp_kendall_corr", (DL_FUNC) &_wARMASVp_kendall_corr, 2},

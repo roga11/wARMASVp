@@ -9,11 +9,11 @@ test_that("SVL(1) Student-t leverage simulation produces correct output", {
   out <- sim_svp(500, phi = 0.9, sigy = 1, sigv = 0.5,
                  errorType = "Student-t", leverage = TRUE, rho = -0.5, nu = 5)
   expect_type(out, "list")
-  expect_true(all(c("y", "h", "zeta", "veta") %in% names(out)))
+  expect_true(all(c("y", "h", "z", "v") %in% names(out)))
   expect_length(out$y, 500)
   expect_length(out$h, 500)
-  expect_length(out$zeta, 500)
-  expect_length(out$veta, 500)
+  expect_length(out$z, 500)
+  expect_length(out$v, 500)
 })
 
 test_that("SVL(1) GED leverage simulation produces correct output", {
@@ -21,7 +21,7 @@ test_that("SVL(1) GED leverage simulation produces correct output", {
   out <- sim_svp(500, phi = 0.9, sigy = 1, sigv = 0.5,
                  errorType = "GED", leverage = TRUE, rho = -0.5, nu = 1.5)
   expect_type(out, "list")
-  expect_true(all(c("y", "h", "zeta", "veta") %in% names(out)))
+  expect_true(all(c("y", "h", "z", "v") %in% names(out)))
   expect_length(out$y, 500)
 })
 
@@ -31,7 +31,7 @@ test_that("SVL(1) Student-t with rho=0 matches non-leverage marginal variance", 
                    errorType = "Student-t", leverage = TRUE, rho = 0, nu = 5)$y
   set.seed(456)
   y_nolev <- sim_svp(5000, phi = 0.9, sigy = 1, sigv = 0.5,
-                     errorType = "Student-t", leverage = FALSE, nu = 5)
+                     errorType = "Student-t", leverage = FALSE, nu = 5)$y
   expect_true(abs(var(y_lev) - var(y_nolev)) / var(y_nolev) < 0.15)
 })
 
@@ -217,7 +217,7 @@ test_that("coef.svp_t includes rho for leverage models", {
 test_that("coef.svp_t excludes rho for non-leverage models", {
   set.seed(42)
   y <- sim_svp(1000, phi = 0.9, sigy = 1, sigv = 0.5,
-               errorType = "Student-t", nu = 5)
+               errorType = "Student-t", nu = 5)$y
   fit <- svp(y, p = 1, J = 50, errorType = "Student-t")
   co <- coef(fit)
   expect_false("rho" %in% names(co))

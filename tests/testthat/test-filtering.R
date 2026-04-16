@@ -3,7 +3,6 @@
 # =========================================================================== #
 
 # --- Helper: simulate and estimate a model ---
-# sim_svp returns a vector when leverage=FALSE, a list when leverage=TRUE
 .fit_model <- function(n = 500, phi = 0.95, sigy = 1, sigv = 0.3,
                        errorType = "Gaussian", nu = NULL,
                        leverage = FALSE, rho = 0, seed = 123) {
@@ -11,7 +10,7 @@
   sim <- sim_svp(n, phi = phi, sigy = sigy, sigv = sigv,
                  errorType = errorType, nu = nu,
                  leverage = leverage, rho = rho)
-  y <- if (is.list(sim)) sim$y else as.numeric(sim)
+  y <- sim$y
   fit <- svp(y, p = 1, leverage = leverage, errorType = errorType)
   list(sim = sim, y = y, fit = fit)
 }
@@ -230,7 +229,7 @@ test_that("GMKF runs without error (GED)", {
 
 test_that("filter_svp: very persistent SV(1) doesn't diverge", {
   set.seed(99)
-  y <- as.numeric(sim_svp(500, phi = 0.99, sigy = 1, sigv = 0.1))
+  y <- sim_svp(500, phi = 0.99, sigy = 1, sigv = 0.1)$y
   fit <- svp(y, p = 1)
   filt <- filter_svp(fit)
   expect_true(all(is.finite(filt$w_filtered)))
@@ -245,7 +244,7 @@ test_that("filter_svp: heavy tails Student-t nu=3 doesn't collapse", {
 
 test_that("filter_svp: SV(2) companion form works", {
   set.seed(77)
-  y <- as.numeric(sim_svp(500, phi = c(0.2, 0.63), sigy = 1, sigv = 0.5))
+  y <- sim_svp(500, phi = c(0.2, 0.63), sigy = 1, sigv = 0.5)$y
   fit <- svp(y, p = 2)
   filt <- filter_svp(fit)
   expect_true(all(is.finite(filt$w_filtered)))
@@ -254,7 +253,7 @@ test_that("filter_svp: SV(2) companion form works", {
 
 test_that("filter_svp: short series T=50 doesn't crash", {
   set.seed(55)
-  y <- as.numeric(sim_svp(50, phi = 0.9, sigy = 1, sigv = 0.3))
+  y <- sim_svp(50, phi = 0.9, sigy = 1, sigv = 0.3)$y
   fit <- svp(y, p = 1)
   filt <- filter_svp(fit)
   expect_equal(length(filt$w_filtered), 50)
@@ -284,7 +283,7 @@ test_that("plot.svp_filter runs without error", {
 
 test_that("filter_svp returns P_filt_T as a p x p matrix (p=1)", {
   set.seed(42)
-  y <- as.numeric(sim_svp(300, phi = 0.95, sigy = 1, sigv = 0.3))
+  y <- sim_svp(300, phi = 0.95, sigy = 1, sigv = 0.3)$y
   fit <- svp(y, p = 1)
   filt <- filter_svp(fit, method = "corrected")
   expect_true("P_filt_T" %in% names(filt))
@@ -294,7 +293,7 @@ test_that("filter_svp returns P_filt_T as a p x p matrix (p=1)", {
 
 test_that("filter_svp returns full P_filt_T with non-zero off-diagonals (p=2)", {
   set.seed(42)
-  y <- sim_svp(500, phi = c(0.20, 0.63), sigy = 1, sigv = 1)
+  y <- sim_svp(500, phi = c(0.20, 0.63), sigy = 1, sigv = 1)$y
   fit <- svp(y, p = 2)
   filt_ckf  <- filter_svp(fit, method = "corrected")
   filt_gmkf <- filter_svp(fit, method = "mixture")
@@ -311,7 +310,7 @@ test_that("filter_svp returns full P_filt_T with non-zero off-diagonals (p=2)", 
 
 test_that("RTS smoother (pinv) produces no NaN/Inf on near-unit-root SV(2)", {
   set.seed(42)
-  y <- sim_svp(400, phi = c(0.50, 0.49), sigy = 1, sigv = 0.5)
+  y <- sim_svp(400, phi = c(0.50, 0.49), sigy = 1, sigv = 0.5)$y
   fit <- svp(y, p = 2)
   filt_ckf  <- filter_svp(fit, method = "corrected")
   filt_gmkf <- filter_svp(fit, method = "mixture")
@@ -326,7 +325,7 @@ test_that("RTS smoother (pinv) produces no NaN/Inf on near-unit-root SV(2)", {
 test_that("BPF xi_filtered has correct p x T dimensions for p=2", {
   skip_on_cran()
   set.seed(42)
-  y <- sim_svp(300, phi = c(0.20, 0.63), sigy = 1, sigv = 1)
+  y <- sim_svp(300, phi = c(0.20, 0.63), sigy = 1, sigv = 1)$y
   fit <- svp(y, p = 2)
   filt <- filter_svp(fit, method = "particle", M = 100)
   expect_equal(nrow(filt$xi_filtered), 2L)

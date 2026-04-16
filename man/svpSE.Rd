@@ -39,7 +39,7 @@ Student-t, and GED.
 \examples{
 \donttest{
 # Gaussian SV(1)
-y <- sim_svp(1000, phi = 0.95, sigy = 1, sigv = 0.2)
+y <- sim_svp(1000, phi = 0.95, sigy = 1, sigv = 0.2)$y
 fit <- svp(y)
 se <- svpSE(fit, n_sim = 49)
 se$CI

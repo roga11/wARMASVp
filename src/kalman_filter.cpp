@@ -302,3 +302,106 @@ List gmkf_filter_cpp(const arma::vec& y_star,
     Named("loglik") = loglik
   );
 }
+
+
+// --------------------------------------------------------------------------- //
+// EM loop for Gaussian-mixture fit to measurement-noise density (KSC 1998).
+// R-side supplies initial (m, s2, q) from quantile binning; this function
+// iterates E/M until convergence and returns sorted mixture parameters.
+// Pointer-arithmetic hot loops in E-step and M-step for ~15-20x over the R
+// implementation at n = 1e5 (dominated by row-max in log-sum-exp normalize).
+// --------------------------------------------------------------------------- //
+// [[Rcpp::export]]
+List fit_ksc_em_cpp(const arma::vec& eps,
+                    const arma::vec& init_m,
+                    const arma::vec& init_s2,
+                    const arma::vec& init_q,
+                    int max_iter = 500,
+                    double tol = 1e-8) {
+  const arma::uword n = eps.n_elem;
+  const arma::uword K = init_m.n_elem;
+  arma::vec m = init_m;
+  arma::vec s2 = init_s2;
+  arma::vec q = init_q;
+  arma::mat log_tau(n, K);
+  arma::vec max_log(n);
+  arma::mat tau(n, K);
+  arma::vec row_sums(n);
+  arma::vec q_new(K), m_new(K), s2_new(K);
+
+  const double LOG_2PI = std::log(2.0 * arma::datum::pi);
+  int n_iter_used = max_iter;
+
+  for (int iter = 1; iter <= max_iter; ++iter) {
+    // E-step: log_tau[i,k] = log q_k - 0.5 log(2 pi s2_k) - 0.5 (eps_i - m_k)^2 / s2_k
+    for (arma::uword k = 0; k < K; ++k) {
+      const double inv_s2 = 1.0 / s2(k);
+      const double c = std::log(q(k)) - 0.5 * (LOG_2PI + std::log(s2(k)));
+      const double mk = m(k);
+      double* p_out = log_tau.colptr(k);
+      const double* p_eps = eps.memptr();
+      for (arma::uword i = 0; i < n; ++i) {
+        const double d = p_eps[i] - mk;
+        p_out[i] = c - 0.5 * d * d * inv_s2;
+      }
+    }
+    // Normalise row-wise via log-sum-exp
+    for (arma::uword i = 0; i < n; ++i) {
+      double mx = log_tau(i, 0);
+      for (arma::uword k = 1; k < K; ++k)
+        if (log_tau(i, k) > mx) mx = log_tau(i, k);
+      max_log(i) = mx;
+    }
+    for (arma::uword k = 0; k < K; ++k) {
+      double* p_tau = tau.colptr(k);
+      const double* p_lt = log_tau.colptr(k);
+      for (arma::uword i = 0; i < n; ++i)
+        p_tau[i] = std::exp(p_lt[i] - max_log(i));
+    }
+    row_sums.zeros();
+    for (arma::uword k = 0; k < K; ++k) {
+      double* p_rs = row_sums.memptr();
+      const double* p_tau = tau.colptr(k);
+      for (arma::uword i = 0; i < n; ++i) p_rs[i] += p_tau[i];
+    }
+    for (arma::uword k = 0; k < K; ++k) {
+      double* p_tau = tau.colptr(k);
+      const double* p_rs = row_sums.memptr();
+      for (arma::uword i = 0; i < n; ++i) p_tau[i] /= p_rs[i];
+    }
+
+    // M-step
+    for (arma::uword k = 0; k < K; ++k) {
+      double Nk = 0.0, s_eps = 0.0;
+      const double* p_tau = tau.colptr(k);
+      const double* p_eps = eps.memptr();
+      for (arma::uword i = 0; i < n; ++i) {
+        Nk    += p_tau[i];
+        s_eps += p_tau[i] * p_eps[i];
+      }
+      if (Nk < 1e-10) Nk = 1e-10;
+      q_new(k) = Nk / (double)n;
+      m_new(k) = s_eps / Nk;
+      double s_var = 0.0;
+      for (arma::uword i = 0; i < n; ++i) {
+        const double d = p_eps[i] - m_new(k);
+        s_var += p_tau[i] * d * d;
+      }
+      s2_new(k) = s_var / Nk;
+      if (s2_new(k) < 1e-10) s2_new(k) = 1e-10;
+    }
+
+    const double dm = arma::abs(m_new - m).max();
+    const double dq = arma::abs(q_new - q).max();
+    q = q_new; m = m_new; s2 = s2_new;
+    if (dm < tol && dq < tol) { n_iter_used = iter; break; }
+  }
+  arma::uvec ord = arma::sort_index(m);
+  arma::vec q_out = q(ord);
+  arma::vec m_out = m(ord);
+  arma::vec s_out = s2(ord);
+  return List::create(Named("weights") = q_out,
+                      Named("means")   = m_out,
+                      Named("vars")    = s_out,
+                      Named("n_iter")  = n_iter_used);
+}

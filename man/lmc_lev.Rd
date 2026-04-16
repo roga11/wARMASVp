@@ -16,6 +16,7 @@ lmc_lev(
   trunc_lev = TRUE,
   wDecay = FALSE,
   Bartlett = FALSE,
+  Amat = NULL,
   errorType = "Gaussian",
   logNu = FALSE,
   sigvMethod = "factored",
@@ -46,6 +47,11 @@ lmc_lev(
 
 \item{Bartlett}{Logical. If \code{TRUE}, use Bartlett kernel HAC weighting
 matrix. If \code{FALSE}, use identity matrix. Default \code{FALSE}.}
+
+\item{Amat}{Weighting matrix specification. \code{NULL} (default) for identity
+weighting, \code{"Weighted"} for data-driven HAC, or a numeric matrix of
+dimension \code{(p+3)x(p+3)} (Gaussian) or \code{(p+4)x(p+4)} (heavy-tail).
+Takes precedence over \code{Bartlett}.}
 
 \item{errorType}{Character. Error distribution: \code{"Gaussian"} (default),
 \code{"Student-t"}, or \code{"GED"}.}

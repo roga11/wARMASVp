@@ -38,6 +38,9 @@
 #' @param Bartlett Logical. If \code{TRUE}, use Bartlett kernel HAC weighting
 #'   matrix for a GMM-LRT-type test statistic. If \code{FALSE} (default), use
 #'   the sum of squared extra AR coefficients.
+#' @param Amat Weighting matrix specification. \code{NULL} (default) for identity
+#'   weighting, or \code{"Weighted"} for data-driven HAC. Takes precedence over
+#'   \code{Bartlett}. User-supplied matrices are not supported for AR order tests.
 #' @param sigvMethod Character. Method for \eqn{\sigma_v} estimation:
 #'   \code{"factored"} (default), \code{"hybrid"}, or \code{"direct"}.
 #'
@@ -65,7 +68,7 @@
 #'
 #' @examples
 #' \donttest{
-#' y <- sim_svp(1000, phi = 0.95, sigy = 1, sigv = 0.2)
+#' y <- sim_svp(1000, phi = 0.95, sigy = 1, sigv = 0.2)$y
 #' test <- lmc_ar(y, p_null = 1, p_alt = 2, J = 10, N = 49)
 #' print(test)
 #' }
@@ -73,7 +76,7 @@
 #' @export
 lmc_ar <- function(y, p_null, p_alt, J = 10, N = 99, burnin = 500,
                    del = 1e-10, wDecay = FALSE, Bartlett = FALSE,
-                   sigvMethod = "factored") {
+                   Amat = NULL, sigvMethod = "factored") {
   cl <- match.call()
   y_vec <- as.numeric(y)
   .validate_test_common(y_vec, J, N, burnin, del)
@@ -81,11 +84,14 @@ lmc_ar <- function(y, p_null, p_alt, J = 10, N = 99, burnin = 500,
   if (p_null >= p_alt) stop("p_alt must be greater than p_null.")
   if (p_null < 1) stop("p_null must be >= 1.")
   sigvMethod <- match.arg(sigvMethod, c("hybrid", "direct", "factored"))
+  wt <- .resolve_weighting(Amat, Bartlett)
+  if (is.matrix(wt$Amat))
+    stop("User-supplied weighting matrices are not supported for AR order tests. Use Amat = 'Weighted' for HAC.")
   # Estimate models
   mdl_alt <- svp(y_vec, p = p_alt, J = J, leverage = FALSE, del = del, wDecay = wDecay, sigvMethod = sigvMethod)
   mdl_null_est <- svp(y_vec, p = p_null, J = J, leverage = FALSE, del = del, wDecay = wDecay, sigvMethod = sigvMethod)
   # Compute test statistic
-  if (isTRUE(Bartlett)) {
+  if (wt$use_hac) {
     M_null <- LRT_moment_ar_Amat(y_vec, mdl_null_est, del = del, Bartlett = TRUE)
     M_alt  <- LRT_moment_ar_Amat(y_vec, mdl_alt, del = del, Bartlett = TRUE)
     s0 <- Tsize * (M_null - M_alt)
@@ -96,9 +102,9 @@ lmc_ar <- function(y, p_null, p_alt, J = 10, N = 99, burnin = 500,
   # Simulate null distribution
   betasim_null <- c(mdl_null_est$phi, mdl_null_est$sigy, mdl_null_est$sigv)
   sN <- .simnull_ar(betasim_null, p_null, p_alt, J, Tsize, N, burnin,
-                    del, wDecay, Bartlett, sigvMethod = sigvMethod)
+                    del, wDecay, wt$use_hac, sigvMethod = sigvMethod)
   pval <- (N + 1 - sum(s0 >= sN)) / (N + 1)
-  test_label <- if (isTRUE(Bartlett)) {
+  test_label <- if (wt$use_hac) {
     sprintf("LMC AR Order Bartlett (p0=%d vs p=%d)", p_null, p_alt)
   } else {
     sprintf("LMC AR Order (p0=%d vs p=%d)", p_null, p_alt)
@@ -133,7 +139,7 @@ lmc_ar <- function(y, p_null, p_alt, J = 10, N = 99, burnin = 500,
 #'
 #' @examples
 #' \donttest{
-#' y <- sim_svp(1000, phi = 0.95, sigy = 1, sigv = 0.2)
+#' y <- sim_svp(1000, phi = 0.95, sigy = 1, sigv = 0.2)$y
 #' mmc <- mmc_ar(y, p_null = 1, p_alt = 2, J = 10, N = 19,
 #'               method = "pso", maxit = 10)
 #' mmc$value
@@ -143,7 +149,7 @@ lmc_ar <- function(y, p_null, p_alt, J = 10, N = 99, burnin = 500,
 mmc_ar <- function(y, p_null, p_alt, J = 10, N = 99, burnin = 500,
                    eps = NULL, threshold = 1, method = "pso", maxit = NULL,
                    del = 1e-10, wDecay = FALSE, Bartlett = FALSE,
-                   sigvMethod = "factored") {
+                   Amat = NULL, sigvMethod = "factored") {
   cl <- match.call()
   y_vec <- as.numeric(y)
   .validate_test_common(y_vec, J, N, burnin, del)
@@ -151,6 +157,9 @@ mmc_ar <- function(y, p_null, p_alt, J = 10, N = 99, burnin = 500,
   if (p_null >= p_alt) stop("p_alt must be greater than p_null.")
   if (p_null < 1) stop("p_null must be >= 1.")
   sigvMethod <- match.arg(sigvMethod, c("hybrid", "direct", "factored"))
+  wt <- .resolve_weighting(Amat, Bartlett)
+  if (is.matrix(wt$Amat))
+    stop("User-supplied weighting matrices are not supported for AR order tests. Use Amat = 'Weighted' for HAC.")
   # Estimate under alternative for test statistic
   mdl_alt <- svp(y_vec, p = p_alt, J = J, leverage = FALSE, del = del, wDecay = wDecay, sigvMethod = sigvMethod)
   mdl_null_est <- svp(y_vec, p = p_null, J = J, leverage = FALSE, del = del, wDecay = wDecay, sigvMethod = sigvMethod)
@@ -168,7 +177,7 @@ mmc_ar <- function(y, p_null, p_alt, J = 10, N = 99, burnin = 500,
              theta_0[p_null + 1] + eps[p_null + 1],
              theta_0[p_null + 2] + eps[p_null + 2])
   # Test statistic
-  if (isTRUE(Bartlett)) {
+  if (wt$use_hac) {
     M_null <- LRT_moment_ar_Amat(y_vec, mdl_null_est, del = del, Bartlett = TRUE)
     M_alt  <- LRT_moment_ar_Amat(y_vec, mdl_alt, del = del, Bartlett = TRUE)
     s0 <- Tsize * (M_null - M_alt)
@@ -187,7 +196,7 @@ mmc_ar <- function(y, p_null, p_alt, J = 10, N = 99, burnin = 500,
                             threshold, maxit,
                             y = y_vec, p_null = p_null, p_alt = p_alt,
                             j = J, N = N, s0 = s0, ini = burnin,
-                            del = del, wDecay = wDecay, Bartlett = Bartlett,
+                            del = del, wDecay = wDecay, Bartlett = wt$use_hac,
                             sigvMethod = sigvMethod,
                             innovations = innov_ar)
   out$value <- -out$value
@@ -220,6 +229,10 @@ mmc_ar <- function(y, p_null, p_alt, J = 10, N = 99, burnin = 500,
 #' @param wDecay Logical. Use decaying weights. Default \code{FALSE}.
 #' @param Bartlett Logical. If \code{TRUE}, use Bartlett kernel HAC weighting
 #'   matrix. If \code{FALSE}, use identity matrix. Default \code{FALSE}.
+#' @param Amat Weighting matrix specification. \code{NULL} (default) for identity
+#'   weighting, \code{"Weighted"} for data-driven HAC, or a numeric matrix of
+#'   dimension \code{(p+3)x(p+3)} (Gaussian) or \code{(p+4)x(p+4)} (heavy-tail).
+#'   Takes precedence over \code{Bartlett}.
 #' @param errorType Character. Error distribution: \code{"Gaussian"} (default),
 #'   \code{"Student-t"}, or \code{"GED"}.
 #' @param logNu Logical. Use log-space for nu estimation (Student-t only).
@@ -251,7 +264,8 @@ mmc_ar <- function(y, p_null, p_alt, J = 10, N = 99, burnin = 500,
 lmc_lev <- function(y, p = 1, J = 10, N = 99, rho_null = 0,
                     burnin = 500, rho_type = "pearson", del = 1e-10,
                     trunc_lev = TRUE, wDecay = FALSE,
-                    Bartlett = FALSE, errorType = "Gaussian",
+                    Bartlett = FALSE, Amat = NULL,
+                    errorType = "Gaussian",
                     logNu = FALSE, sigvMethod = "factored",
                     winsorize_eps = 0) {
   cl <- match.call()
@@ -263,6 +277,7 @@ lmc_lev <- function(y, p = 1, J = 10, N = 99, rho_null = 0,
   Tsize <- length(y_vec)
   errorType <- match.arg(errorType, c("Gaussian", "Student-t", "GED"))
   sigvMethod <- match.arg(sigvMethod, c("hybrid", "direct", "factored"))
+  wt <- .resolve_weighting(Amat, Bartlett)
   # Estimate model under alternative
   mdl_alt <- svp(y_vec, p, J, leverage = TRUE, errorType = errorType,
                  rho_type = rho_type, del = del, trunc_lev = trunc_lev,
@@ -272,85 +287,91 @@ lmc_lev <- function(y, p = 1, J = 10, N = 99, rho_null = 0,
   mdl_null$rho <- rho_null
   if (errorType == "Gaussian") {
     # --- Gaussian leverage test (p+3 moments) ---
-    if (isTRUE(Bartlett)) {
+    n_mom <- p + 3
+    if (wt$use_hac) {
       s0_tmp <- Tsize * (LRT_moment_lev_svp_Amat(y_mat, mdl_null, rho_type, del, TRUE) -
                            LRT_moment_lev_svp_Amat(y_mat, mdl_alt, rho_type, del, TRUE))
     } else {
-      Amat <- diag(p + 3)
-      s0_tmp <- Tsize * (LRT_moment_lev_svp(y_mat, mdl_null, Amat, rho_type, del) -
-                           LRT_moment_lev_svp(y_mat, mdl_alt, Amat, rho_type, del))
+      Amat_use <- if (is.matrix(wt$Amat)) wt$Amat else diag(n_mom)
+      s0_tmp <- Tsize * (LRT_moment_lev_svp(y_mat, mdl_null, Amat_use, rho_type, del) -
+                           LRT_moment_lev_svp(y_mat, mdl_alt, Amat_use, rho_type, del))
     }
     if (is.na(s0_tmp)) stop("Test statistic is NA.")
     if (s0_tmp < 0) warning("Test statistic is negative (", round(s0_tmp, 4), "); capped at 1e-10.")
     s0 <- max(s0_tmp, 1e-10)
     betasim_null <- c(mdl_alt$phi, mdl_alt$sigy, mdl_alt$sigv, rho_null)
-    if (isTRUE(Bartlett)) {
+    if (wt$use_hac) {
       sN <- .simnull_Amat(betasim_null, rho_null, p, J, Tsize, N, burnin,
                           rho_type, del, TRUE, wDecay = wDecay,
                           trunc_lev = trunc_lev,
                           sigvMethod = sigvMethod)
     } else {
+      Amat_use <- if (is.matrix(wt$Amat)) wt$Amat else diag(n_mom)
       sN <- .simnull(betasim_null, rho_null, p, J, Tsize, N, burnin,
-                     Amat, rho_type, del, wDecay = wDecay,
+                     Amat_use, rho_type, del, wDecay = wDecay,
                      trunc_lev = trunc_lev,
                      sigvMethod = sigvMethod)
     }
   } else if (errorType == "Student-t") {
     # --- Student-t leverage test (p+4 moments) ---
-    if (isTRUE(Bartlett) && !is.null(mdl_alt$v) && mdl_alt$v <= 4) {
+    n_mom <- p + 4
+    if (wt$use_hac && !is.null(mdl_alt$v) && mdl_alt$v <= 4) {
       warning("HAC weighting may be unreliable for Student-t with nu <= 4. ",
               "LMC/MMC p-values remain valid regardless.")
     }
-    if (isTRUE(Bartlett)) {
+    if (wt$use_hac) {
       s0_tmp <- Tsize * (LRT_moment_lev_t_Amat(y_mat, mdl_null, rho_type, del, TRUE) -
                            LRT_moment_lev_t_Amat(y_mat, mdl_alt, rho_type, del, TRUE))
     } else {
-      Amat <- diag(p + 4)
-      s0_tmp <- Tsize * (LRT_moment_lev_t(y_mat, mdl_null, Amat, rho_type, del) -
-                           LRT_moment_lev_t(y_mat, mdl_alt, Amat, rho_type, del))
+      Amat_use <- if (is.matrix(wt$Amat)) wt$Amat else diag(n_mom)
+      s0_tmp <- Tsize * (LRT_moment_lev_t(y_mat, mdl_null, Amat_use, rho_type, del) -
+                           LRT_moment_lev_t(y_mat, mdl_alt, Amat_use, rho_type, del))
     }
     if (is.na(s0_tmp)) stop("Test statistic is NA.")
     if (s0_tmp < 0) warning("Test statistic is negative (", round(s0_tmp, 4), "); capped at 1e-10.")
     s0 <- max(s0_tmp, 1e-10)
     betasim_null <- c(mdl_alt$phi, mdl_alt$sigy, mdl_alt$sigv,
                       mdl_alt$v, rho_null)
-    if (isTRUE(Bartlett)) {
+    if (wt$use_hac) {
       sN <- .simnull_lev_t_Amat(betasim_null, rho_null, p, J, Tsize, N, burnin,
                                  rho_type, del, TRUE, wDecay = wDecay,
                                  trunc_lev = trunc_lev, logNu = logNu,
                                  sigvMethod = sigvMethod,
                                  winsorize_eps = winsorize_eps)
     } else {
+      Amat_use <- if (is.matrix(wt$Amat)) wt$Amat else diag(n_mom)
       sN <- .simnull_lev_t(betasim_null, rho_null, p, J, Tsize, N, burnin,
-                            Amat, rho_type, del, wDecay = wDecay,
+                            Amat_use, rho_type, del, wDecay = wDecay,
                             trunc_lev = trunc_lev, logNu = logNu,
                             sigvMethod = sigvMethod,
                             winsorize_eps = winsorize_eps)
     }
   } else if (errorType == "GED") {
     # --- GED leverage test (p+4 moments) ---
-    if (isTRUE(Bartlett)) {
+    n_mom <- p + 4
+    if (wt$use_hac) {
       s0_tmp <- Tsize * (LRT_moment_lev_ged_Amat(y_mat, mdl_null, rho_type, del, TRUE) -
                            LRT_moment_lev_ged_Amat(y_mat, mdl_alt, rho_type, del, TRUE))
     } else {
-      Amat <- diag(p + 4)
-      s0_tmp <- Tsize * (LRT_moment_lev_ged(y_mat, mdl_null, Amat, rho_type, del) -
-                           LRT_moment_lev_ged(y_mat, mdl_alt, Amat, rho_type, del))
+      Amat_use <- if (is.matrix(wt$Amat)) wt$Amat else diag(n_mom)
+      s0_tmp <- Tsize * (LRT_moment_lev_ged(y_mat, mdl_null, Amat_use, rho_type, del) -
+                           LRT_moment_lev_ged(y_mat, mdl_alt, Amat_use, rho_type, del))
     }
     if (is.na(s0_tmp)) stop("Test statistic is NA.")
     if (s0_tmp < 0) warning("Test statistic is negative (", round(s0_tmp, 4), "); capped at 1e-10.")
     s0 <- max(s0_tmp, 1e-10)
     betasim_null <- c(mdl_alt$phi, mdl_alt$sigy, mdl_alt$sigv,
                       mdl_alt$v, rho_null)
-    if (isTRUE(Bartlett)) {
+    if (wt$use_hac) {
       sN <- .simnull_lev_ged_Amat(betasim_null, rho_null, p, J, Tsize, N, burnin,
                                    rho_type, del, TRUE, wDecay = wDecay,
                                    trunc_lev = trunc_lev,
                                    sigvMethod = sigvMethod,
                                    winsorize_eps = winsorize_eps)
     } else {
+      Amat_use <- if (is.matrix(wt$Amat)) wt$Amat else diag(n_mom)
       sN <- .simnull_lev_ged(betasim_null, rho_null, p, J, Tsize, N, burnin,
-                              Amat, rho_type, del, wDecay = wDecay,
+                              Amat_use, rho_type, del, wDecay = wDecay,
                               trunc_lev = trunc_lev,
                               sigvMethod = sigvMethod,
                               winsorize_eps = winsorize_eps)
@@ -409,7 +430,8 @@ mmc_lev <- function(y, p = 1, J = 10, N = 99, rho_null = 0,
                     method = "pso", maxit = NULL,
                     rho_type = "pearson", del = 1e-10,
                     trunc_lev = TRUE, wDecay = FALSE,
-                    Bartlett = FALSE, errorType = "Gaussian",
+                    Bartlett = FALSE, Amat = NULL,
+                    errorType = "Gaussian",
                     logNu = FALSE, sigvMethod = "factored",
                     winsorize_eps = 0) {
   cl <- match.call()
@@ -421,6 +443,7 @@ mmc_lev <- function(y, p = 1, J = 10, N = 99, rho_null = 0,
   Tsize <- length(y_vec)
   errorType <- match.arg(errorType, c("Gaussian", "Student-t", "GED"))
   sigvMethod <- match.arg(sigvMethod, c("hybrid", "direct", "factored"))
+  wt <- .resolve_weighting(Amat, Bartlett)
   # Estimate model under alternative
   mdl_alt <- svp(y_vec, p, J, leverage = TRUE, errorType = errorType,
                  rho_type = rho_type, del = del, trunc_lev = trunc_lev,
@@ -487,36 +510,36 @@ mmc_lev <- function(y, p = 1, J = 10, N = 99, rho_null = 0,
   mdl_null <- mdl_alt
   mdl_null$rho <- rho_null
   if (errorType == "Gaussian") {
-    if (isTRUE(Bartlett)) {
+    if (wt$use_hac) {
       s0_tmp <- Tsize * (LRT_moment_lev_svp_Amat(y_mat, mdl_null, rho_type, del, TRUE) -
                            LRT_moment_lev_svp_Amat(y_mat, mdl_alt, rho_type, del, TRUE))
     } else {
-      Amat <- diag(n_mom)
-      s0_tmp <- Tsize * (LRT_moment_lev_svp(y_mat, mdl_null, Amat, rho_type, del) -
-                           LRT_moment_lev_svp(y_mat, mdl_alt, Amat, rho_type, del))
+      Amat_use <- if (is.matrix(wt$Amat)) wt$Amat else diag(n_mom)
+      s0_tmp <- Tsize * (LRT_moment_lev_svp(y_mat, mdl_null, Amat_use, rho_type, del) -
+                           LRT_moment_lev_svp(y_mat, mdl_alt, Amat_use, rho_type, del))
     }
-    pval_fn <- if (isTRUE(Bartlett)) .mmc_pval_lev_Amat else .mmc_pval_lev
+    pval_fn <- if (wt$use_hac) .mmc_pval_lev_Amat else .mmc_pval_lev
   } else if (errorType == "Student-t") {
-    if (isTRUE(Bartlett) && !is.null(mdl_alt$v) && mdl_alt$v <= 4) {
+    if (wt$use_hac && !is.null(mdl_alt$v) && mdl_alt$v <= 4) {
       warning("HAC weighting may be unreliable for Student-t with nu <= 4.")
     }
-    if (isTRUE(Bartlett)) {
+    if (wt$use_hac) {
       s0_tmp <- Tsize * (LRT_moment_lev_t_Amat(y_mat, mdl_null, rho_type, del, TRUE) -
                            LRT_moment_lev_t_Amat(y_mat, mdl_alt, rho_type, del, TRUE))
     } else {
-      Amat <- diag(n_mom)
-      s0_tmp <- Tsize * (LRT_moment_lev_t(y_mat, mdl_null, Amat, rho_type, del) -
-                           LRT_moment_lev_t(y_mat, mdl_alt, Amat, rho_type, del))
+      Amat_use <- if (is.matrix(wt$Amat)) wt$Amat else diag(n_mom)
+      s0_tmp <- Tsize * (LRT_moment_lev_t(y_mat, mdl_null, Amat_use, rho_type, del) -
+                           LRT_moment_lev_t(y_mat, mdl_alt, Amat_use, rho_type, del))
     }
     pval_fn <- .mmc_pval_lev_t
   } else if (errorType == "GED") {
-    if (isTRUE(Bartlett)) {
+    if (wt$use_hac) {
       s0_tmp <- Tsize * (LRT_moment_lev_ged_Amat(y_mat, mdl_null, rho_type, del, TRUE) -
                            LRT_moment_lev_ged_Amat(y_mat, mdl_alt, rho_type, del, TRUE))
     } else {
-      Amat <- diag(n_mom)
-      s0_tmp <- Tsize * (LRT_moment_lev_ged(y_mat, mdl_null, Amat, rho_type, del) -
-                           LRT_moment_lev_ged(y_mat, mdl_alt, Amat, rho_type, del))
+      Amat_use <- if (is.matrix(wt$Amat)) wt$Amat else diag(n_mom)
+      s0_tmp <- Tsize * (LRT_moment_lev_ged(y_mat, mdl_null, Amat_use, rho_type, del) -
+                           LRT_moment_lev_ged(y_mat, mdl_alt, Amat_use, rho_type, del))
     }
     pval_fn <- .mmc_pval_lev_ged
   }
@@ -548,9 +571,9 @@ mmc_lev <- function(y, p = 1, J = 10, N = 99, rho_null = 0,
                    rho_null = rho_null, ini = burnin,
                    rho_type = rho_type, del = del,
                    wDecay = wDecay, trunc_lev = trunc_lev,
-                   Bartlett = Bartlett,
+                   Bartlett = wt$use_hac,
                    innovations = innov_lev)
-  opt_args$Amat <- diag(n_mom)
+  opt_args$Amat <- if (is.matrix(wt$Amat)) wt$Amat else diag(n_mom)
   if (errorType == "Student-t") {
     opt_args$logNu <- logNu
   }
@@ -586,10 +609,10 @@ mmc_lev <- function(y, p = 1, J = 10, N = 99, rho_null = 0,
 #' @param del Numeric. Small constant for log transformation. Default \code{1e-10}.
 #' @param wDecay Logical. Use decaying weights. Default \code{FALSE}.
 #' @param Bartlett Logical. Use Bartlett kernel HAC for weighting matrix.
-#'   Default \code{TRUE}.
-#' @param Amat Weighting matrix specification. \code{NULL} for identity,
-#'   \code{"Weighted"} for data-driven HAC, or a \code{(p+3)x(p+3)} matrix.
-#'   Default \code{NULL}.
+#'   Default \code{FALSE}.
+#' @param Amat Weighting matrix specification. \code{NULL} (default) for identity
+#'   weighting, \code{"Weighted"} for data-driven HAC, or a \code{(p+3)x(p+3)}
+#'   matrix. Takes precedence over \code{Bartlett}.
 #' @param logNu Logical. Use log-space for nu estimation. Default \code{TRUE}.
 #' @param direction Character. Test direction: \code{"two-sided"} (default),
 #'   \code{"less"} (H1: nu < nu_null), or \code{"greater"} (H1: nu > nu_null).
@@ -603,14 +626,14 @@ mmc_lev <- function(y, p = 1, J = 10, N = 99, rho_null = 0,
 #'
 #' @examples
 #' \donttest{
-#' y <- sim_svp(1000, phi = 0.95, sigy = 1, sigv = 0.2, errorType = "Student-t", nu = 5)
+#' y <- sim_svp(1000, phi = 0.95, sigy = 1, sigv = 0.2, errorType = "Student-t", nu = 5)$y
 #' test <- lmc_t(y, p = 1, J = 10, N = 49, nu_null = 5)
 #' print(test)
 #' }
 #'
 #' @export
 lmc_t <- function(y, p = 1, J = 10, N = 99, nu_null, burnin = 500,
-                  del = 1e-10, wDecay = FALSE, Bartlett = TRUE,
+                  del = 1e-10, wDecay = FALSE, Bartlett = FALSE,
                   Amat = NULL, logNu = TRUE,
                   direction = c("two-sided", "less", "greater"),
                   sigvMethod = "factored", winsorize_eps = 0) {
@@ -625,16 +648,26 @@ lmc_t <- function(y, p = 1, J = 10, N = 99, nu_null, burnin = 500,
   sigvMethod <- match.arg(sigvMethod, c("hybrid", "direct", "factored"))
   y_mat <- as.matrix(y_vec)
   Tsize <- length(y_vec)
+  # Resolve weighting: Amat takes precedence over Bartlett
+  wt <- .resolve_weighting(Amat, Bartlett)
+  if (wt$use_hac) {
+    wa <- .parse_Amat("Weighted", p)
+    Bartlett <- TRUE
+  } else if (is.matrix(wt$Amat)) {
+    wa <- list(Amat = wt$Amat, WAmat = FALSE)
+    Bartlett <- FALSE
+  } else {
+    wa <- .parse_Amat(NULL, p)
+    Bartlett <- FALSE
+  }
+  Amat_mat <- wa$Amat
+  WAmat <- wa$WAmat
   # Estimate model under alternative
   mdl_alt <- svp(y_vec, p = p, J = J, errorType = "Student-t", del = del,
                  logNu = logNu, wDecay = wDecay, sigvMethod = sigvMethod,
                  winsorize_eps = winsorize_eps)
   mdl_null <- mdl_alt
   mdl_null$v <- nu_null
-  # Handle Amat specification
-  wa <- .parse_Amat(Amat, p)
-  Amat_mat <- wa$Amat
-  WAmat <- wa$WAmat
   # Compute test statistic
   s0_tmp <- Tsize * (LRT_moment_t(y_mat, mdl_null, Amat_mat, WAmat, del, Bartlett) -
                        LRT_moment_t(y_mat, mdl_alt, Amat_mat, WAmat, del, Bartlett))
@@ -682,14 +715,14 @@ lmc_t <- function(y, p = 1, J = 10, N = 99, nu_null, burnin = 500,
 #'
 #' @examples
 #' \donttest{
-#' y <- sim_svp(1000, phi = 0.95, sigy = 1, sigv = 0.2, errorType = "GED", nu = 1.5)
+#' y <- sim_svp(1000, phi = 0.95, sigy = 1, sigv = 0.2, errorType = "GED", nu = 1.5)$y
 #' test <- lmc_ged(y, p = 1, J = 10, N = 49, nu_null = 2)
 #' print(test)
 #' }
 #'
 #' @export
 lmc_ged <- function(y, p = 1, J = 10, N = 99, nu_null, burnin = 500,
-                    del = 1e-10, wDecay = FALSE, Bartlett = TRUE,
+                    del = 1e-10, wDecay = FALSE, Bartlett = FALSE,
                     Amat = NULL,
                     direction = c("two-sided", "less", "greater"),
                     sigvMethod = "factored", winsorize_eps = 0) {
@@ -704,14 +737,25 @@ lmc_ged <- function(y, p = 1, J = 10, N = 99, nu_null, burnin = 500,
   sigvMethod <- match.arg(sigvMethod, c("hybrid", "direct", "factored"))
   y_mat <- as.matrix(y_vec)
   Tsize <- length(y_vec)
+  # Resolve weighting: Amat takes precedence over Bartlett
+  wt <- .resolve_weighting(Amat, Bartlett)
+  if (wt$use_hac) {
+    wa <- .parse_Amat("Weighted", p)
+    Bartlett <- TRUE
+  } else if (is.matrix(wt$Amat)) {
+    wa <- list(Amat = wt$Amat, WAmat = FALSE)
+    Bartlett <- FALSE
+  } else {
+    wa <- .parse_Amat(NULL, p)
+    Bartlett <- FALSE
+  }
+  Amat_mat <- wa$Amat
+  WAmat <- wa$WAmat
   mdl_alt <- svp(y_vec, p = p, J = J, errorType = "GED", del = del,
                  wDecay = wDecay, sigvMethod = sigvMethod,
                  winsorize_eps = winsorize_eps)
   mdl_null <- mdl_alt
   mdl_null$v <- nu_null
-  wa <- .parse_Amat(Amat, p)
-  Amat_mat <- wa$Amat
-  WAmat <- wa$WAmat
   s0_tmp <- Tsize * (LRT_moment_ged(y_mat, mdl_null, Amat_mat, WAmat, del, Bartlett) -
                        LRT_moment_ged(y_mat, mdl_alt, Amat_mat, WAmat, del, Bartlett))
   if (is.na(s0_tmp)) stop("Test statistic is NA.")
@@ -764,7 +808,7 @@ lmc_ged <- function(y, p = 1, J = 10, N = 99, nu_null, burnin = 500,
 #'
 #' @examples
 #' \donttest{
-#' y <- sim_svp(1000, phi = 0.95, sigy = 1, sigv = 0.2, errorType = "Student-t", nu = 5)
+#' y <- sim_svp(1000, phi = 0.95, sigy = 1, sigv = 0.2, errorType = "Student-t", nu = 5)$y
 #' mmc <- mmc_t(y, p = 1, J = 10, N = 19, nu_null = 5, method = "pso", maxit = 10)
 #' mmc$value
 #' }
@@ -772,7 +816,7 @@ lmc_ged <- function(y, p = 1, J = 10, N = 99, nu_null, burnin = 500,
 #' @export
 mmc_t <- function(y, p = 1, J = 10, N = 99, nu_null, burnin = 500,
                   eps = NULL, threshold = 1, method = "pso", maxit = NULL,
-                  del = 1e-10, wDecay = FALSE, Bartlett = TRUE,
+                  del = 1e-10, wDecay = FALSE, Bartlett = FALSE,
                   Amat = NULL, logNu = TRUE,
                   direction = c("two-sided", "less", "greater"),
                   sigvMethod = "factored", winsorize_eps = 0) {
@@ -787,18 +831,29 @@ mmc_t <- function(y, p = 1, J = 10, N = 99, nu_null, burnin = 500,
   sigvMethod <- match.arg(sigvMethod, c("hybrid", "direct", "factored"))
   y_mat <- as.matrix(y_vec)
   Tsize <- length(y_vec)
+  # Resolve weighting: Amat takes precedence over Bartlett
+  wt <- .resolve_weighting(Amat, Bartlett)
   mdl_alt <- svp(y_vec, p = p, J = J, errorType = "Student-t", del = del,
                  logNu = logNu, wDecay = wDecay, sigvMethod = sigvMethod,
                  winsorize_eps = winsorize_eps)
   p <- length(mdl_alt$phi)
+  if (wt$use_hac) {
+    wa <- .parse_Amat("Weighted", p)
+    Bartlett <- TRUE
+  } else if (is.matrix(wt$Amat)) {
+    wa <- list(Amat = wt$Amat, WAmat = FALSE)
+    Bartlett <- FALSE
+  } else {
+    wa <- .parse_Amat(NULL, p)
+    Bartlett <- FALSE
+  }
+  Amat_mat <- wa$Amat
+  WAmat <- wa$WAmat
   theta_0 <- c(mdl_alt$phi, mdl_alt$sigy, mdl_alt$sigv)
   if (is.null(eps)) eps <- rep(0.3, length(theta_0))
   if (length(eps) != length(theta_0))
     stop("eps must have length ", length(theta_0),
          " (p+2: one entry per nuisance parameter phi_1,...,phi_p, sigma_y, sigma_v).")
-  wa <- .parse_Amat(Amat, p)
-  Amat_mat <- wa$Amat
-  WAmat <- wa$WAmat
   lower <- c(pmax(theta_0[1:p] - eps[1:p], rep(-0.999, p)),
              max(theta_0[p + 1] - eps[p + 1], 0.01),
              max(theta_0[p + 2] - eps[p + 2], 0.01))
@@ -859,7 +914,7 @@ mmc_t <- function(y, p = 1, J = 10, N = 99, nu_null, burnin = 500,
 #'
 #' @examples
 #' \donttest{
-#' y <- sim_svp(1000, phi = 0.95, sigy = 1, sigv = 0.2, errorType = "GED", nu = 1.5)
+#' y <- sim_svp(1000, phi = 0.95, sigy = 1, sigv = 0.2, errorType = "GED", nu = 1.5)$y
 #' mmc <- mmc_ged(y, p = 1, J = 10, N = 19, nu_null = 2, method = "pso", maxit = 10)
 #' mmc$value
 #' }
@@ -867,7 +922,7 @@ mmc_t <- function(y, p = 1, J = 10, N = 99, nu_null, burnin = 500,
 #' @export
 mmc_ged <- function(y, p = 1, J = 10, N = 99, nu_null, burnin = 500,
                     eps = NULL, threshold = 1, method = "pso", maxit = NULL,
-                    del = 1e-10, wDecay = FALSE, Bartlett = TRUE,
+                    del = 1e-10, wDecay = FALSE, Bartlett = FALSE,
                     Amat = NULL,
                     direction = c("two-sided", "less", "greater"),
                     sigvMethod = "factored", winsorize_eps = 0) {
@@ -882,18 +937,29 @@ mmc_ged <- function(y, p = 1, J = 10, N = 99, nu_null, burnin = 500,
   sigvMethod <- match.arg(sigvMethod, c("hybrid", "direct", "factored"))
   y_mat <- as.matrix(y_vec)
   Tsize <- length(y_vec)
+  # Resolve weighting: Amat takes precedence over Bartlett
+  wt <- .resolve_weighting(Amat, Bartlett)
   mdl_alt <- svp(y_vec, p = p, J = J, errorType = "GED", del = del,
                  wDecay = wDecay, sigvMethod = sigvMethod,
                  winsorize_eps = winsorize_eps)
   p <- length(mdl_alt$phi)
+  if (wt$use_hac) {
+    wa <- .parse_Amat("Weighted", p)
+    Bartlett <- TRUE
+  } else if (is.matrix(wt$Amat)) {
+    wa <- list(Amat = wt$Amat, WAmat = FALSE)
+    Bartlett <- FALSE
+  } else {
+    wa <- .parse_Amat(NULL, p)
+    Bartlett <- FALSE
+  }
+  Amat_mat <- wa$Amat
+  WAmat <- wa$WAmat
   theta_0 <- c(mdl_alt$phi, mdl_alt$sigy, mdl_alt$sigv)
   if (is.null(eps)) eps <- rep(0.3, length(theta_0))
   if (length(eps) != length(theta_0))
     stop("eps must have length ", length(theta_0),
          " (p+2: one entry per nuisance parameter phi_1,...,phi_p, sigma_y, sigma_v).")
-  wa <- .parse_Amat(Amat, p)
-  Amat_mat <- wa$Amat
-  WAmat <- wa$WAmat
   lower <- c(pmax(theta_0[1:p] - eps[1:p], rep(-0.999, p)),
              max(theta_0[p + 1] - eps[p + 1], 0.01),
              max(theta_0[p + 2] - eps[p + 2], 0.01))

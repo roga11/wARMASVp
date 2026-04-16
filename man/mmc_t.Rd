@@ -17,7 +17,7 @@ mmc_t(
   maxit = NULL,
   del = 1e-10,
   wDecay = FALSE,
-  Bartlett = TRUE,
+  Bartlett = FALSE,
   Amat = NULL,
   logNu = TRUE,
   direction = c("two-sided", "less", "greater"),
@@ -54,11 +54,11 @@ Default \code{"pso"}.}
 \item{wDecay}{Logical. Use decaying weights. Default \code{FALSE}.}
 
 \item{Bartlett}{Logical. Use Bartlett kernel HAC for weighting matrix.
-Default \code{TRUE}.}
+Default \code{FALSE}.}
 
-\item{Amat}{Weighting matrix specification. \code{NULL} for identity,
-\code{"Weighted"} for data-driven HAC, or a \code{(p+3)x(p+3)} matrix.
-Default \code{NULL}.}
+\item{Amat}{Weighting matrix specification. \code{NULL} (default) for identity
+weighting, \code{"Weighted"} for data-driven HAC, or a \code{(p+3)x(p+3)}
+matrix. Takes precedence over \code{Bartlett}.}
 
 \item{logNu}{Logical. Use log-space for nu estimation. Default \code{TRUE}.}
 
@@ -82,7 +82,7 @@ by maximizing the MC p-value over nuisance parameters (phi, sigma_y, sigma_v).
 }
 \examples{
 \donttest{
-y <- sim_svp(1000, phi = 0.95, sigy = 1, sigv = 0.2, errorType = "Student-t", nu = 5)
+y <- sim_svp(1000, phi = 0.95, sigy = 1, sigv = 0.2, errorType = "Student-t", nu = 5)$y
 mmc <- mmc_t(y, p = 1, J = 10, N = 19, nu_null = 5, method = "pso", maxit = 10)
 mmc$value
 }

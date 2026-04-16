@@ -50,11 +50,16 @@ Default is \code{FALSE}.}
 \item{logNu}{Logical. Solve for \eqn{\nu} in log-space for numerical
 stability (Student-t only). Default is \code{FALSE}.}
 
-\item{sigvMethod}{Method for sigma_v estimation: \code{"factored"} (default),
-\code{"direct"}, or \code{"hybrid"}.}
+\item{sigvMethod}{Character. Method for estimating \eqn{\sigma_v}. One of:
+\code{"factored"} (default) — factored-variance estimator (recommended;
+dominates RMSE in most settings, see ADRR 2025);
+\code{"direct"} — direct variance decomposition;
+\code{"hybrid"} — AD2021 closed-form for \eqn{p = 1}, falls back to
+\code{"direct"} for \eqn{p \ge 2} (Student-t and GED only).}
 
-\item{winsorize_eps}{Number of extreme autocovariance lags to winsorize
-(0 = none). Used in Student-t/GED sigma_eps estimation.}
+\item{winsorize_eps}{Integer. Number of extreme autocovariance lags to
+winsorize (\code{0} = none). Used in Student-t and GED
+\eqn{\sigma_\varepsilon^2} estimation. Default \code{0}.}
 }
 \value{
 Depending on \code{errorType}:
@@ -100,7 +105,7 @@ via 1D root-finding with Gauss-Hermite quadrature.
 \examples{
 \donttest{
 # Gaussian SV(1) without leverage (default)
-y <- sim_svp(1000, phi = 0.95, sigy = 1, sigv = 0.2)
+y <- sim_svp(1000, phi = 0.95, sigy = 1, sigv = 0.2)$y
 fit <- svp(y)
 summary(fit)
 
@@ -110,7 +115,7 @@ fit2 <- svp(y2, leverage = TRUE)
 coef(fit2)
 
 # Student-t errors
-y3 <- sim_svp(1000, phi = 0.9, sigy = 1, sigv = 0.2, errorType = "Student-t", nu = 5)
+y3 <- sim_svp(1000, phi = 0.9, sigy = 1, sigv = 0.2, errorType = "Student-t", nu = 5)$y
 fit3 <- svp(y3, errorType = "Student-t")
 summary(fit3)
 }
