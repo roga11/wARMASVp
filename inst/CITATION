@@ -1,0 +1,38 @@
+bibentry(
+  bibtype  = "Article",
+  title    = "Simple estimators and inference for higher-order stochastic volatility models",
+  author   = c(
+    person("Nazmul", "Ahsan"),
+    person("Jean-Marie", "Dufour")
+  ),
+  journal  = "Journal of Econometrics",
+  year     = "2021",
+  volume   = "224",
+  number   = "1",
+  pages    = "181--197",
+  doi      = "10.1016/j.jeconom.2020.01.018"
+)
+
+bibentry(
+  bibtype  = "Article",
+  title    = "Estimation and inference for higher-order stochastic volatility models with leverage",
+  author   = c(
+    person("Nazmul", "Ahsan"),
+    person("Jean-Marie", "Dufour"),
+    person("Gabriel", "Rodriguez Rondon")
+  ),
+  journal  = "Journal of Time Series Analysis",
+  year     = "2025"
+)
+
+bibentry(
+  bibtype  = "Unpublished",
+  title    = "Estimation and inference for stochastic volatility models with heavy-tailed distributions",
+  author   = c(
+    person("Nazmul", "Ahsan"),
+    person("Jean-Marie", "Dufour"),
+    person("Gabriel", "Rodriguez Rondon")
+  ),
+  year     = "2025",
+  note     = "Working paper"
+)
