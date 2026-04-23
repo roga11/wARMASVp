@@ -1,3 +1,12 @@
+# wARMASVp 0.1.0.9000
+
+* MMC: Fixed observed test statistic S0 is now kept fixed during optimization,
+  per Dufour (2006, eq 4.22). Previously recomputed at each optimizer
+  evaluation in leverage, Student-t, and GED tests.
+* MMC: Default `eps[sigma_y] = 0` in all MMC functions (was 0.3). The null
+  distribution is sigma_y-invariant, so varying it is unnecessary.
+* DESCRIPTION: Added DOI for JTSA 2025 reference per CRAN reviewer feedback.
+
 # wARMASVp 0.1.0
 
 Initial release.

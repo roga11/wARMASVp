@@ -165,7 +165,10 @@ mmc_ar <- function(y, p_null, p_alt, J = 10, N = 99, burnin = 500,
   mdl_null_est <- svp(y_vec, p = p_null, J = J, leverage = FALSE, del = del, wDecay = wDecay, sigvMethod = sigvMethod)
   theta_0 <- c(mdl_null_est$phi, mdl_null_est$sigy, mdl_null_est$sigv)
   n_nuisance <- p_null + 2
-  if (is.null(eps)) eps <- rep(0.3, n_nuisance)
+  if (is.null(eps)) {
+    eps <- rep(0.3, n_nuisance)
+    eps[p_null + 1] <- 0  # sigma_y: test stat is scale-invariant, fixing avoids spurious optimization
+  }
   if (length(eps) != n_nuisance)
     stop("eps must have length ", n_nuisance,
          " (p_null+2: one entry per nuisance parameter phi_1,...,phi_p_null, sigma_y, sigma_v).")
@@ -454,7 +457,10 @@ mmc_lev <- function(y, p = 1, J = 10, N = 99, rho_null = 0,
     theta_0 <- c(mdl_alt$phi, mdl_alt$sigy, mdl_alt$sigv)
     n_nuisance <- p + 2
     n_mom <- p + 3
-    if (is.null(eps)) eps <- rep(0.3, n_nuisance)
+    if (is.null(eps)) {
+      eps <- rep(0.3, n_nuisance)
+      eps[p + 1] <- 0  # sigma_y: test stat is scale-invariant, fixing avoids spurious optimization
+    }
     if (length(eps) != n_nuisance)
       stop("eps must have length ", n_nuisance,
            " (p+2: one entry per nuisance parameter phi_1,...,phi_p, sigma_y, sigma_v).")
@@ -472,6 +478,7 @@ mmc_lev <- function(y, p = 1, J = 10, N = 99, rho_null = 0,
     nu_hat <- mdl_alt$v
     if (is.null(eps)) {
       eps <- rep(0.3, p + 2)  # default eps for phi, sigy, sigv only; nu gets proportional bounds
+      eps[p + 1] <- 0  # sigma_y: test stat is scale-invariant, fixing avoids spurious optimization
     }
     if (length(eps) == n_nuisance) {
       # User provided eps for all nuisance params including nu
@@ -567,7 +574,8 @@ mmc_lev <- function(y, p = 1, J = 10, N = 99, rho_null = 0,
   opt_args <- list(method = method, theta_0 = theta_0, fn = pval_fn,
                    lower = lower, upper = upper,
                    threshold = threshold, maxit = maxit,
-                   y = y_mat, j = J, N = N, mdl_alt = mdl_alt,
+                   y = y_mat, j = J, N = N, s0 = s0_tmp,
+                   mdl_alt = mdl_alt,
                    rho_null = rho_null, ini = burnin,
                    rho_type = rho_type, del = del,
                    wDecay = wDecay, trunc_lev = trunc_lev,
@@ -850,7 +858,10 @@ mmc_t <- function(y, p = 1, J = 10, N = 99, nu_null, burnin = 500,
   Amat_mat <- wa$Amat
   WAmat <- wa$WAmat
   theta_0 <- c(mdl_alt$phi, mdl_alt$sigy, mdl_alt$sigv)
-  if (is.null(eps)) eps <- rep(0.3, length(theta_0))
+  if (is.null(eps)) {
+    eps <- rep(0.3, length(theta_0))
+    eps[p + 1] <- 0  # sigma_y: test stat is scale-invariant, fixing avoids spurious optimization
+  }
   if (length(eps) != length(theta_0))
     stop("eps must have length ", length(theta_0),
          " (p+2: one entry per nuisance parameter phi_1,...,phi_p, sigma_y, sigma_v).")
@@ -879,7 +890,8 @@ mmc_t <- function(y, p = 1, J = 10, N = 99, nu_null, burnin = 500,
   }
   out <- .run_mmc_optimizer(method, theta_0, .mmc_pval_t, lower, upper,
                             threshold, maxit,
-                            y = y_mat, j = J, N = N, mdl_alt = mdl_alt,
+                            y = y_mat, j = J, N = N, s0 = s0_tmp,
+                            mdl_alt = mdl_alt,
                             nu_null = nu_null, ini = burnin, Amat = Amat_mat,
                             WAmat = WAmat,
                             del = del, Bartlett = Bartlett, logNu = logNu,
@@ -956,7 +968,10 @@ mmc_ged <- function(y, p = 1, J = 10, N = 99, nu_null, burnin = 500,
   Amat_mat <- wa$Amat
   WAmat <- wa$WAmat
   theta_0 <- c(mdl_alt$phi, mdl_alt$sigy, mdl_alt$sigv)
-  if (is.null(eps)) eps <- rep(0.3, length(theta_0))
+  if (is.null(eps)) {
+    eps <- rep(0.3, length(theta_0))
+    eps[p + 1] <- 0  # sigma_y: test stat is scale-invariant, fixing avoids spurious optimization
+  }
   if (length(eps) != length(theta_0))
     stop("eps must have length ", length(theta_0),
          " (p+2: one entry per nuisance parameter phi_1,...,phi_p, sigma_y, sigma_v).")
@@ -987,7 +1002,8 @@ mmc_ged <- function(y, p = 1, J = 10, N = 99, nu_null, burnin = 500,
   }
   out <- .run_mmc_optimizer(method, theta_0, .mmc_pval_ged, lower, upper,
                             threshold, maxit,
-                            y = y_mat, j = J, N = N, mdl_alt = mdl_alt,
+                            y = y_mat, j = J, N = N, s0 = s0_tmp,
+                            mdl_alt = mdl_alt,
                             nu_null = nu_null, ini = burnin, Amat = Amat_mat,
                             WAmat = WAmat,
                             del = del, Bartlett = Bartlett, wDecay = wDecay,

@@ -1,7 +1,7 @@
 Package: wARMASVp
 Type: Package
 Title: Winsorized ARMA Estimation for Higher-Order Stochastic Volatility Models
-Version: 0.1.0
+Version: 0.1.0.9000
 Authors@R: c(
     person("Gabriel", "Rodriguez Rondon",
            email = "gabriel.rodriguezrondon@mail.mcgill.ca",
@@ -19,7 +19,7 @@ Description: Estimation, simulation, hypothesis testing, and forecasting for
     and autoregressive order selection. Forecasting is based on Kalman
     filtering and smoothing. See Ahsan and Dufour (2021)
     <doi:10.1016/j.jeconom.2020.01.018>, Ahsan, Dufour, and Rodriguez Rondon
-    (2025) for details.
+    (2025) <doi:10.1111/jtsa.12851> for details.
 License: GPL (>= 3)
 URL: https://github.com/roga11/wARMASVp
 BugReports: https://github.com/roga11/wARMASVp/issues

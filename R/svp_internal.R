@@ -691,274 +691,182 @@ correction_factor_ged_approx <- function(nu, n_nodes = 200L) {
 }
 
 # MMC p-value for leverage test (identity Amat)
-.mmc_pval_lev <- function(theta, y, j, N, mdl_alt, rho_null, ini,
+# S0 is kept fixed per Dufour (2006, eq 4.22)
+.mmc_pval_lev <- function(theta, y, j, N, s0, mdl_alt, rho_null, ini,
                           Amat, rho_type, del = 1e-10, Bartlett = FALSE,
                           wDecay = FALSE, trunc_lev = TRUE,
                           logNu = FALSE, sigvMethod = "factored",
                           winsorize_eps = 0,
                           innovations = NULL) {
-  y <- as.matrix(as.numeric(y))
-  Tsize <- nrow(y)
   p <- length(mdl_alt$phi)
-  # Recompute gammatilde from candidate parameters (not mdl_alt)
-  phi_cand <- theta[1:p]
-  sigv_cand <- theta[p + 2]
-  rho_w_cand <- as.numeric(stats::ARMAacf(ar = phi_cand, lag.max = p)[-1])
-  gamma_w0_cand <- sigv_cand^2 / (1 - sum(phi_cand * rho_w_cand))
-  gt_cand <- gamma_w0_cand * (1 + rho_w_cand[1])
-  out_lev_null <- list(phi = phi_cand,
-                       sigy = theta[p + 1],
-                       sigv = sigv_cand,
-                       rho = rho_null,
-                       gammatilde = gt_cand)
-  s0_tmp <- Tsize * (LRT_moment_lev_svp(y, out_lev_null, Amat, rho_type, del) -
-                       LRT_moment_lev_svp(y, mdl_alt, Amat, rho_type, del))
+  Tsize <- length(as.numeric(y))
   stationary <- all(Mod(polyroot(c(1, -theta[1:p]))) > 1)
-  s0_tmp <- max(s0_tmp, 1e-10)
-  if (!is.na(s0_tmp) && stationary) {
-    betasim_null <- c(theta[1:p], theta[p + 1], theta[p + 2], rho_null)
-    sN <- .simnull(betasim_null, rho_null, p, j, Tsize, N, ini,
-                   Amat, rho_type, del, wDecay = wDecay,
-                   trunc_lev = trunc_lev, sigvMethod = sigvMethod,
-                   innovations = innovations)
-    pval <- -((N + 1 - sum(s0_tmp >= sN)) / (N + 1))
-  } else {
-    pval <- 9999999999999
+  if (!stationary || theta[p + 1] <= 0 || theta[p + 2] <= 0) {
+    return(9999999999999)
   }
+  betasim_null <- c(theta[1:p], theta[p + 1], theta[p + 2], rho_null)
+  sN <- .simnull(betasim_null, rho_null, p, j, Tsize, N, ini,
+                 Amat, rho_type, del, wDecay = wDecay,
+                 trunc_lev = trunc_lev, sigvMethod = sigvMethod,
+                 innovations = innovations)
+  pval <- -((N + 1 - sum(s0 >= sN)) / (N + 1))
   return(pval)
 }
 
 # MMC p-value for leverage test (Bartlett kernel Amat)
-.mmc_pval_lev_Amat <- function(theta, y, j, N, mdl_alt, rho_null, ini, innovations = NULL,
+# S0 is kept fixed per Dufour (2006, eq 4.22)
+.mmc_pval_lev_Amat <- function(theta, y, j, N, s0, mdl_alt, rho_null, ini, innovations = NULL,
                                Amat = NULL, rho_type, del = 1e-10, Bartlett = TRUE,
                                wDecay = FALSE, trunc_lev = TRUE,
                                logNu = FALSE, sigvMethod = "factored",
                                winsorize_eps = 0) {
-  y <- as.matrix(as.numeric(y))
-  Tsize <- nrow(y)
   p <- length(mdl_alt$phi)
-  # Recompute gammatilde from candidate parameters
-  phi_cand <- theta[1:p]
-  sigv_cand <- theta[p + 2]
-  rho_w_cand <- as.numeric(stats::ARMAacf(ar = phi_cand, lag.max = p)[-1])
-  gamma_w0_cand <- sigv_cand^2 / (1 - sum(phi_cand * rho_w_cand))
-  gt_cand <- gamma_w0_cand * (1 + rho_w_cand[1])
-  out_lev_null <- list(phi = phi_cand,
-                       sigy = theta[p + 1],
-                       sigv = sigv_cand,
-                       rho = rho_null,
-                       gammatilde = gt_cand)
-  s0_tmp <- Tsize * (LRT_moment_lev_svp_Amat(y, out_lev_null, rho_type, del, Bartlett) -
-                       LRT_moment_lev_svp_Amat(y, mdl_alt, rho_type, del, Bartlett))
+  Tsize <- length(as.numeric(y))
   stationary <- all(Mod(polyroot(c(1, -theta[1:p]))) > 1)
-  s0_tmp <- max(s0_tmp, 1e-10)
-  if (!is.na(s0_tmp) && stationary) {
-    betasim_null <- c(theta[1:p], theta[p + 1], theta[p + 2], rho_null)
-    sN <- .simnull_Amat(betasim_null, rho_null, p, j, Tsize, N, ini,
-                        rho_type, del, Bartlett, wDecay = wDecay,
-                        trunc_lev = trunc_lev, sigvMethod = sigvMethod,
-                        innovations = innovations)
-    pval <- -((N + 1 - sum(s0_tmp >= sN)) / (N + 1))
-  } else {
-    pval <- 9999999999999
+  if (!stationary || theta[p + 1] <= 0 || theta[p + 2] <= 0) {
+    return(9999999999999)
   }
+  betasim_null <- c(theta[1:p], theta[p + 1], theta[p + 2], rho_null)
+  sN <- .simnull_Amat(betasim_null, rho_null, p, j, Tsize, N, ini,
+                      rho_type, del, Bartlett, wDecay = wDecay,
+                      trunc_lev = trunc_lev, sigvMethod = sigvMethod,
+                      innovations = innovations)
+  pval <- -((N + 1 - sum(s0 >= sN)) / (N + 1))
   return(pval)
 }
 
 # MMC p-value for Student-t leverage test (returns negative for minimization)
 # theta = (phi_1,...,phi_p, sigy, sigv, nu) — nuisance under H0: rho = rho_null
-.mmc_pval_lev_t <- function(theta, y, j, N, mdl_alt, rho_null, ini, innovations = NULL,
+# S0 is kept fixed per Dufour (2006, eq 4.22)
+.mmc_pval_lev_t <- function(theta, y, j, N, s0, mdl_alt, rho_null, ini, innovations = NULL,
                              Amat, rho_type, del = 1e-10, Bartlett = FALSE,
                              wDecay = FALSE, trunc_lev = TRUE,
                              logNu = FALSE, sigvMethod = "factored",
                              winsorize_eps = FALSE) {
-  y <- as.matrix(as.numeric(y))
-  Tsize <- nrow(y)
   p <- length(mdl_alt$phi)
+  Tsize <- length(as.numeric(y))
   phi_cand <- theta[1:p]
   sigy_cand <- theta[p + 1]
   sigv_cand <- theta[p + 2]
   nu_cand <- theta[p + 3]
-  # Validate
   stationary <- all(Mod(polyroot(c(1, -phi_cand))) > 1)
   if (!stationary || sigy_cand <= 0 || sigv_cand <= 0 || nu_cand <= 2) {
     return(9999999999999)
   }
-  # Recompute gammatilde from candidate parameters
-  rho_w_cand <- as.numeric(stats::ARMAacf(ar = phi_cand, lag.max = p)[-1])
-  gamma_w0_cand <- sigv_cand^2 / (1 - sum(phi_cand * rho_w_cand))
-  gt_cand <- gamma_w0_cand * (1 + rho_w_cand[1])
-  out_lev_null <- list(phi = phi_cand, sigy = sigy_cand, sigv = sigv_cand,
-                       v = nu_cand, rho = rho_null, gammatilde = gt_cand)
-  s0_tmp <- tryCatch({
-    if (isTRUE(Bartlett)) {
-      Tsize * (LRT_moment_lev_t_Amat(y, out_lev_null, rho_type, del, TRUE) -
-                 LRT_moment_lev_t_Amat(y, mdl_alt, rho_type, del, TRUE))
-    } else {
-      Tsize * (LRT_moment_lev_t(y, out_lev_null, Amat, rho_type, del) -
-                 LRT_moment_lev_t(y, mdl_alt, Amat, rho_type, del))
-    }},
-    error = function(e) NA
-  )
-  s0_tmp <- max(s0_tmp, 1e-10)
-  if (is.finite(s0_tmp) && stationary) {
-    betasim_null <- c(phi_cand, sigy_cand, sigv_cand, nu_cand, rho_null)
-    if (isTRUE(Bartlett)) {
-      sN <- .simnull_lev_t_Amat(betasim_null, rho_null, p, j, Tsize, N, ini,
-                                 rho_type, del, TRUE, wDecay = wDecay,
-                                 trunc_lev = trunc_lev, logNu = logNu,
-                                 sigvMethod = sigvMethod,
-                                 winsorize_eps = winsorize_eps,
-                                 innovations = innovations)
-    } else {
-      sN <- .simnull_lev_t(betasim_null, rho_null, p, j, Tsize, N, ini,
-                            Amat, rho_type, del, wDecay = wDecay,
-                            trunc_lev = trunc_lev, logNu = logNu,
-                            sigvMethod = sigvMethod,
-                            winsorize_eps = winsorize_eps,
-                            innovations = innovations)
-    }
-    pval <- -((N + 1 - sum(s0_tmp >= sN)) / (N + 1))
+  betasim_null <- c(phi_cand, sigy_cand, sigv_cand, nu_cand, rho_null)
+  if (isTRUE(Bartlett)) {
+    sN <- .simnull_lev_t_Amat(betasim_null, rho_null, p, j, Tsize, N, ini,
+                               rho_type, del, TRUE, wDecay = wDecay,
+                               trunc_lev = trunc_lev, logNu = logNu,
+                               sigvMethod = sigvMethod,
+                               winsorize_eps = winsorize_eps,
+                               innovations = innovations)
   } else {
-    pval <- 9999999999999
+    sN <- .simnull_lev_t(betasim_null, rho_null, p, j, Tsize, N, ini,
+                          Amat, rho_type, del, wDecay = wDecay,
+                          trunc_lev = trunc_lev, logNu = logNu,
+                          sigvMethod = sigvMethod,
+                          winsorize_eps = winsorize_eps,
+                          innovations = innovations)
   }
+  pval <- -((N + 1 - sum(s0 >= sN)) / (N + 1))
   return(pval)
 }
 
 # MMC p-value for GED leverage test (returns negative for minimization)
 # theta = (phi_1,...,phi_p, sigy, sigv, nu) — nuisance under H0: rho = rho_null
-.mmc_pval_lev_ged <- function(theta, y, j, N, mdl_alt, rho_null, ini, innovations = NULL,
+# S0 is kept fixed per Dufour (2006, eq 4.22)
+.mmc_pval_lev_ged <- function(theta, y, j, N, s0, mdl_alt, rho_null, ini, innovations = NULL,
                                Amat, rho_type, del = 1e-10, Bartlett = FALSE,
                                wDecay = FALSE, trunc_lev = TRUE,
                                sigvMethod = "factored",
                                winsorize_eps = FALSE) {
-  y <- as.matrix(as.numeric(y))
-  Tsize <- nrow(y)
   p <- length(mdl_alt$phi)
   phi_cand <- theta[1:p]
   sigy_cand <- theta[p + 1]
   sigv_cand <- theta[p + 2]
   nu_cand <- theta[p + 3]
-  # Validate
   stationary <- all(Mod(polyroot(c(1, -phi_cand))) > 1)
   if (!stationary || sigy_cand <= 0 || sigv_cand <= 0 || nu_cand <= 0) {
     return(9999999999999)
   }
-  # Recompute gammatilde
-  rho_w_cand <- as.numeric(stats::ARMAacf(ar = phi_cand, lag.max = p)[-1])
-  gamma_w0_cand <- sigv_cand^2 / (1 - sum(phi_cand * rho_w_cand))
-  gt_cand <- gamma_w0_cand * (1 + rho_w_cand[1])
-  out_lev_null <- list(phi = phi_cand, sigy = sigy_cand, sigv = sigv_cand,
-                       v = nu_cand, rho = rho_null, gammatilde = gt_cand)
-  s0_tmp <- tryCatch({
-    if (isTRUE(Bartlett)) {
-      Tsize * (LRT_moment_lev_ged_Amat(y, out_lev_null, rho_type, del, TRUE) -
-                 LRT_moment_lev_ged_Amat(y, mdl_alt, rho_type, del, TRUE))
-    } else {
-      Tsize * (LRT_moment_lev_ged(y, out_lev_null, Amat, rho_type, del) -
-                 LRT_moment_lev_ged(y, mdl_alt, Amat, rho_type, del))
-    }},
-    error = function(e) NA
-  )
-  s0_tmp <- max(s0_tmp, 1e-10)
-  if (is.finite(s0_tmp) && stationary) {
-    betasim_null <- c(phi_cand, sigy_cand, sigv_cand, nu_cand, rho_null)
-    if (isTRUE(Bartlett)) {
-      sN <- .simnull_lev_ged_Amat(betasim_null, rho_null, p, j, Tsize, N, ini,
-                                   rho_type, del, TRUE, wDecay = wDecay,
-                                   trunc_lev = trunc_lev,
-                                   sigvMethod = sigvMethod,
-                                   winsorize_eps = winsorize_eps,
-                                   innovations = innovations)
-    } else {
-      sN <- .simnull_lev_ged(betasim_null, rho_null, p, j, Tsize, N, ini,
-                              Amat, rho_type, del, wDecay = wDecay,
-                              trunc_lev = trunc_lev,
-                              sigvMethod = sigvMethod,
-                              winsorize_eps = winsorize_eps,
-                              innovations = innovations)
-    }
-    pval <- -((N + 1 - sum(s0_tmp >= sN)) / (N + 1))
+  Tsize <- length(as.numeric(y))
+  betasim_null <- c(phi_cand, sigy_cand, sigv_cand, nu_cand, rho_null)
+  if (isTRUE(Bartlett)) {
+    sN <- .simnull_lev_ged_Amat(betasim_null, rho_null, p, j, Tsize, N, ini,
+                                 rho_type, del, TRUE, wDecay = wDecay,
+                                 trunc_lev = trunc_lev,
+                                 sigvMethod = sigvMethod,
+                                 winsorize_eps = winsorize_eps,
+                                 innovations = innovations)
   } else {
-    pval <- 9999999999999
+    sN <- .simnull_lev_ged(betasim_null, rho_null, p, j, Tsize, N, ini,
+                            Amat, rho_type, del, wDecay = wDecay,
+                            trunc_lev = trunc_lev,
+                            sigvMethod = sigvMethod,
+                            winsorize_eps = winsorize_eps,
+                            innovations = innovations)
   }
+  pval <- -((N + 1 - sum(s0 >= sN)) / (N + 1))
   return(pval)
 }
 
 # MMC p-value for Student-t (returns negative for minimization)
-.mmc_pval_t <- function(theta, y, j, N, mdl_alt, nu_null, ini,
+# S0 is kept fixed per Dufour (2006, eq 4.22)
+.mmc_pval_t <- function(theta, y, j, N, s0, mdl_alt, nu_null, ini,
                         Amat, WAmat = FALSE, del = 1e-10, Bartlett = TRUE,
                         logNu = TRUE, wDecay = FALSE,
                         sigvMethod = "factored", winsorize_eps = 0,
                         direction = "two-sided",
                         innovations = NULL) {
-  y <- as.matrix(as.numeric(y))
-  Tsize <- nrow(y)
   p <- length(mdl_alt$phi)
-  out_lev_null <- list(phi = theta[1:p], sigy = theta[p + 1],
-                       sigv = theta[p + 2], v = nu_null)
-  s0_tmp <- tryCatch(
-    Tsize * (LRT_moment_t(y, out_lev_null, Amat, WAmat, del, Bartlett) -
-               LRT_moment_t(y, mdl_alt, Amat, WAmat, del, Bartlett)),
-    error = function(e) NA
-  )
+  Tsize <- length(as.numeric(y))
   stationary <- all(Mod(polyroot(c(1, -theta[1:p]))) > 1)
-  s0_tmp <- max(s0_tmp, 1e-10)
-  if (is.finite(s0_tmp) && stationary) {
-    betasim_null <- c(theta[1:p], theta[p + 1], theta[p + 2], nu_null)
-    sN <- .simnull_t(betasim_null, nu_null, j, Tsize, N, ini,
-                     Amat, del, WAmat, Bartlett, logNu,
-                     wDecay = wDecay, sigvMethod = sigvMethod,
-                     winsorize_eps = winsorize_eps,
-                     direction = direction,
-                     innovations = innovations)
-    if (direction == "two-sided") {
-      pval <- -((N + 1 - sum(s0_tmp >= sN)) / (N + 1))
-    } else {
-      S_obs <- .signed_root(s0_tmp, mdl_alt$v, nu_null)
-      pval <- -.pvalue_directional(S_obs, sN, direction)
-    }
+  if (!stationary || theta[p + 1] <= 0 || theta[p + 2] <= 0) {
+    return(9999999999999)
+  }
+  betasim_null <- c(theta[1:p], theta[p + 1], theta[p + 2], nu_null)
+  sN <- .simnull_t(betasim_null, nu_null, j, Tsize, N, ini,
+                   Amat, del, WAmat, Bartlett, logNu,
+                   wDecay = wDecay, sigvMethod = sigvMethod,
+                   winsorize_eps = winsorize_eps,
+                   direction = direction,
+                   innovations = innovations)
+  if (direction == "two-sided") {
+    pval <- -((N + 1 - sum(s0 >= sN)) / (N + 1))
   } else {
-    pval <- 9999999999999
+    S_obs <- .signed_root(s0, mdl_alt$v, nu_null)
+    pval <- -.pvalue_directional(S_obs, sN, direction)
   }
   return(pval)
 }
 
 # MMC p-value for GED (returns negative for minimization)
-.mmc_pval_ged <- function(theta, y, j, N, mdl_alt, nu_null, ini,
+# S0 is kept fixed per Dufour (2006, eq 4.22)
+.mmc_pval_ged <- function(theta, y, j, N, s0, mdl_alt, nu_null, ini,
                           Amat, WAmat = FALSE, del = 1e-10, Bartlett = TRUE,
                           wDecay = FALSE, sigvMethod = "factored",
                           winsorize_eps = 0,
                           innovations = NULL,
                           direction = "two-sided") {
-  y <- as.matrix(as.numeric(y))
-  Tsize <- nrow(y)
   p <- length(mdl_alt$phi)
-  out_lev_null <- list(phi = theta[1:p], sigy = theta[p + 1],
-                       sigv = theta[p + 2], v = nu_null)
-  s0_tmp <- tryCatch(
-    Tsize * (LRT_moment_ged(y, out_lev_null, Amat, WAmat, del, Bartlett) -
-               LRT_moment_ged(y, mdl_alt, Amat, WAmat, del, Bartlett)),
-    error = function(e) NA
-  )
+  Tsize <- length(as.numeric(y))
   stationary <- all(Mod(polyroot(c(1, -theta[1:p]))) > 1)
-  s0_tmp <- max(s0_tmp, 1e-10)
-  if (is.finite(s0_tmp) && stationary) {
-    betasim_null <- c(theta[1:p], theta[p + 1], theta[p + 2], nu_null)
-    sN <- .simnull_ged(betasim_null, nu_null, j, Tsize, N, ini,
-                       Amat, del, WAmat, Bartlett, wDecay = wDecay,
-                       sigvMethod = sigvMethod,
-                       winsorize_eps = winsorize_eps,
-                       direction = direction,
-                       innovations = innovations)
-    if (direction == "two-sided") {
-      pval <- -((N + 1 - sum(s0_tmp >= sN)) / (N + 1))
-    } else {
-      S_obs <- .signed_root(s0_tmp, mdl_alt$v, nu_null)
-      pval <- -.pvalue_directional(S_obs, sN, direction)
-    }
+  if (!stationary || theta[p + 1] <= 0 || theta[p + 2] <= 0) {
+    return(9999999999999)
+  }
+  betasim_null <- c(theta[1:p], theta[p + 1], theta[p + 2], nu_null)
+  sN <- .simnull_ged(betasim_null, nu_null, j, Tsize, N, ini,
+                     Amat, del, WAmat, Bartlett, wDecay = wDecay,
+                     sigvMethod = sigvMethod,
+                     winsorize_eps = winsorize_eps,
+                     direction = direction,
+                     innovations = innovations)
+  if (direction == "two-sided") {
+    pval <- -((N + 1 - sum(s0 >= sN)) / (N + 1))
   } else {
-    pval <- 9999999999999
+    S_obs <- .signed_root(s0, mdl_alt$v, nu_null)
+    pval <- -.pvalue_directional(S_obs, sN, direction)
   }
   return(pval)
 }
