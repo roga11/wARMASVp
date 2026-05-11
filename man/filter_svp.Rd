@@ -7,7 +7,7 @@
 filter_svp(
   object,
   method = c("corrected", "mixture", "particle"),
-  proxy = c("u", "bayes_optimal"),
+  proxy = c("bayes_optimal", "u"),
   K = 7,
   M = 1000,
   seed = 42,
@@ -23,15 +23,20 @@ standard Kalman with distribution-specific \eqn{\sigma_\varepsilon^2(\nu)},
 \code{"mixture"} for the Gaussian Mixture Kalman Filter (GMKF), or
 \code{"particle"} for the Bootstrap Particle Filter (BPF).}
 
-\item{proxy}{Character. Leverage proxy for the state-space prediction.
-\code{"u"} (default) is paper-faithful — uses
-\eqn{\hat{z}_{t-1} = \hat{u}_{t-1}} per Remark 3.5 of Ahsan, Dufour and
-Rodriguez Rondon (forthcoming). \code{"bayes_optimal"} uses the posterior
-mean \eqn{E[\zeta_{t-1} \mid u_{t-1}]} for Student-t leverage, which
-removes the cumulative \eqn{O(T)} log-likelihood bias of the û-proxy and
-restores Schwarz consistency for QML/IC applications. Has no effect for
-Gaussian or for non-leverage models; deterministic for GED leverage.
-\code{\link{svp_IC}} defaults to \code{"bayes_optimal"} for this reason.}
+\item{proxy}{Character. Leverage proxy for the state-space prediction
+mean \eqn{\hat{z}_{t-1}} that enters the leverage shift
+\eqn{\sigma_\nu \delta_p \hat{z}_{t-1}} (the prediction covariance is
+independently \eqn{\sigma_\nu^2(1-\delta_p^2)} per eq.~32 of Ahsan,
+Dufour and Rodriguez Rondon (forthcoming), i.e.\ \code{var_zt = 0L}).
+\code{"bayes_optimal"} (default) uses the posterior mean
+\eqn{E[\zeta_{t-1} \mid u_{t-1}]} for Student-t leverage, which
+corrects the marginal variance inflation of using \eqn{\hat{u}_{t-1}}
+directly (\eqn{\mathrm{Var}(\hat{u}) = \nu/(\nu - 2) > 1}) and is
+what the IC functions \code{\link{svp_IC}} / \code{\link{svp_AR_order}}
+use internally. \code{"u"} reproduces the paper-faithful proxy of
+Remark~3.5 (\eqn{\hat{z}_{t-1} = \hat{u}_{t-1}}). Has no effect for
+Gaussian or GED leverage (the proxy is closed-form in both cases) and
+no effect when \code{leverage = FALSE}.}
 
 \item{K}{Integer. Number of mixture components for GMKF. Default 7.}
 

@@ -9,7 +9,7 @@ forecast_svp(
   H = 1,
   output = c("log-variance", "variance", "volatility"),
   filter_method = "corrected",
-  proxy = c("u", "bayes_optimal"),
+  proxy = c("bayes_optimal", "u"),
   K = 7,
   M = 1000,
   seed = 42,
@@ -32,9 +32,11 @@ controls which is used by \code{print} and \code{plot} methods.}
 \code{"mixture"} (GMKF), or \code{"particle"} (BPF).}
 
 \item{proxy}{Character. Leverage proxy for the filter and the h=1 forecast
-shift. \code{"u"} (default) is paper-faithful (Remark 3.5);
-\code{"bayes_optimal"} uses \eqn{E[\zeta_{t-1} \mid u_{t-1}]} for
-Student-t leverage. See \code{\link{filter_svp}} for details.}
+shift. \code{"bayes_optimal"} (default) uses the posterior mean
+\eqn{E[\zeta_{t-1} \mid u_{t-1}]} for Student-t leverage;
+\code{"u"} reproduces the paper-faithful proxy of Remark 3.5
+(\eqn{\hat{z}_{t-1} = \hat{u}_{t-1}}). Has no effect for Gaussian or
+GED leverage. See \code{\link{filter_svp}} for details.}
 
 \item{K}{Integer. Number of mixture components for GMKF. Default 7.}
 

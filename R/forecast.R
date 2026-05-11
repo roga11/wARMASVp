@@ -14,9 +14,11 @@
 #' @param filter_method Character. Filter method: \code{"corrected"} (default),
 #'   \code{"mixture"} (GMKF), or \code{"particle"} (BPF).
 #' @param proxy Character. Leverage proxy for the filter and the h=1 forecast
-#'   shift. \code{"u"} (default) is paper-faithful (Remark 3.5);
-#'   \code{"bayes_optimal"} uses \eqn{E[\zeta_{t-1} \mid u_{t-1}]} for
-#'   Student-t leverage. See \code{\link{filter_svp}} for details.
+#'   shift. \code{"bayes_optimal"} (default) uses the posterior mean
+#'   \eqn{E[\zeta_{t-1} \mid u_{t-1}]} for Student-t leverage;
+#'   \code{"u"} reproduces the paper-faithful proxy of Remark 3.5
+#'   (\eqn{\hat{z}_{t-1} = \hat{u}_{t-1}}). Has no effect for Gaussian or
+#'   GED leverage. See \code{\link{filter_svp}} for details.
 #' @param K Integer. Number of mixture components for GMKF. Default 7.
 #' @param M Integer. Number of particles for BPF. Default 1000.
 #' @param seed Integer. Random seed for BPF. Default 42.
@@ -53,7 +55,7 @@
 forecast_svp <- function(object, H = 1,
                          output = c("log-variance", "variance", "volatility"),
                          filter_method = "corrected",
-                         proxy = c("u", "bayes_optimal"),
+                         proxy = c("bayes_optimal", "u"),
                          K = 7, M = 1000, seed = 42, del = 1e-10) {
   if (!inherits(object, c("svp", "svp_t", "svp_ged"))) {
     stop("object must be an svp/svp_t/svp_ged model from svp(). ",
