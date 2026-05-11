@@ -34,6 +34,6 @@
 #' @importFrom Rcpp sourceCpp
 #' @importFrom gsignal poly
 #' @importFrom stats qnorm quantile var rnorm uniroot dnorm pgamma qgamma
-#'   rchisq rf rgamma rt runif
+#'   rchisq rf rgamma rt runif setNames
 #' @keywords internal
 "_PACKAGE"
