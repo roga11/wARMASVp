@@ -19,7 +19,10 @@ mmc_ar(
   wDecay = FALSE,
   Bartlett = FALSE,
   Amat = NULL,
-  sigvMethod = "factored"
+  errorType = "Gaussian",
+  sigvMethod = "factored",
+  logNu = TRUE,
+  winsorize_eps = 0
 )
 }
 \arguments{
@@ -57,8 +60,20 @@ the sum of squared extra AR coefficients.}
 weighting, or \code{"Weighted"} for data-driven HAC. Takes precedence over
 \code{Bartlett}. User-supplied matrices are not supported for AR order tests.}
 
+\item{errorType}{Character. Error distribution of the return innovations:
+\code{"Gaussian"} (default), \code{"Student-t"}, or \code{"GED"}. Heavy-tail
+options reuse the same moment-based GMM-LRT machinery as \code{lmc_t}/
+\code{lmc_ged}; \eqn{\nu} is held at the null MLE during the simulation
+(it is not a varied nuisance for the AR-order test).}
+
 \item{sigvMethod}{Character. Method for \eqn{\sigma_v} estimation:
 \code{"factored"} (default), \code{"hybrid"}, or \code{"direct"}.}
+
+\item{logNu}{Logical. Use log-space for \eqn{\nu} estimation (Student-t/GED
+only). Default \code{TRUE}.}
+
+\item{winsorize_eps}{Number of extreme autocovariance lags to winsorize
+(heavy-tail only). Default 0.}
 }
 \value{
 A list with optimization output including \code{value} (maximized p-value)

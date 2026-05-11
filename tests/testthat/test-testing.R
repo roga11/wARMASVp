@@ -401,3 +401,85 @@ test_that("lmc_t Amat='Weighted' gives HAC weighting", {
                                        Bartlett = TRUE))
   expect_equal(test_amat$s0, test_bart$s0)
 })
+
+
+# =========================================================================== #
+# Heavy-tail AR-order tests (v0.2.0)
+# =========================================================================== #
+
+test_that("lmc_ar with errorType='Student-t' runs", {
+  set.seed(42)
+  y <- sim_svp(400, phi = 0.95, sigy = 1, sigv = 0.5,
+               errorType = "Student-t", nu = 5)$y
+  test <- suppressWarnings(
+    lmc_ar(y, p_null = 1, p_alt = 2, J = 10, N = 19,
+           Bartlett = TRUE, errorType = "Student-t")
+  )
+  expect_s3_class(test, "svp_test")
+  expect_equal(test$errorType, "Student-t")
+  expect_true(test$pval >= 0 && test$pval <= 1)
+  expect_true(grepl("Student-t", test$test_type))
+  expect_true(test$s0 >= 0)  # capping enforces non-negative
+})
+
+test_that("lmc_ar with errorType='GED' runs", {
+  set.seed(42)
+  y <- sim_svp(400, phi = 0.95, sigy = 1, sigv = 0.5,
+               errorType = "GED", nu = 1.5)$y
+  test <- suppressWarnings(
+    lmc_ar(y, p_null = 1, p_alt = 2, J = 10, N = 19,
+           Bartlett = TRUE, errorType = "GED")
+  )
+  expect_s3_class(test, "svp_test")
+  expect_equal(test$errorType, "GED")
+  expect_true(test$pval >= 0 && test$pval <= 1)
+  expect_true(grepl("GED", test$test_type))
+  expect_true(test$s0 >= 0)
+})
+
+test_that("mmc_ar with errorType='Student-t' runs", {
+  skip_on_cran()
+  set.seed(42)
+  y <- sim_svp(400, phi = 0.95, sigy = 1, sigv = 0.5,
+               errorType = "Student-t", nu = 5)$y
+  test <- suppressWarnings(
+    mmc_ar(y, p_null = 1, p_alt = 2, J = 10, N = 9,
+           Bartlett = TRUE, errorType = "Student-t",
+           method = "pso", maxit = 5)
+  )
+  expect_equal(test$errorType, "Student-t")
+  expect_true(test$value >= 0 && test$value <= 1)
+  expect_true(test$s0 >= 0)
+})
+
+test_that("mmc_ar with errorType='GED' runs", {
+  skip_on_cran()
+  set.seed(42)
+  y <- sim_svp(400, phi = 0.95, sigy = 1, sigv = 0.5,
+               errorType = "GED", nu = 1.5)$y
+  test <- suppressWarnings(
+    mmc_ar(y, p_null = 1, p_alt = 2, J = 10, N = 9,
+           Bartlett = TRUE, errorType = "GED",
+           method = "pso", maxit = 5)
+  )
+  expect_equal(test$errorType, "GED")
+  expect_true(test$value >= 0 && test$value <= 1)
+  expect_true(test$s0 >= 0)
+})
+
+test_that("lmc_ar caps negative observed test statistic at 1e-10", {
+  set.seed(99)
+  y <- sim_svp(300, phi = 0.7, sigy = 1, sigv = 0.4)$y
+  test <- suppressWarnings(
+    lmc_ar(y, p_null = 1, p_alt = 2, J = 10, N = 19, Bartlett = TRUE)
+  )
+  expect_true(test$s0 >= 1e-10)  # always non-negative after capping
+})
+
+test_that("lmc_ar errorType validation rejects invalid argument", {
+  set.seed(42)
+  y <- sim_svp(200, phi = 0.9, sigy = 1, sigv = 0.3)$y
+  expect_error(
+    lmc_ar(y, p_null = 1, p_alt = 2, errorType = "Cauchy")
+  )
+})

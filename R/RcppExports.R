@@ -9,12 +9,12 @@ solve_lyapunov_discrete_cpp <- function(F_mat, Q) {
     .Call(`_wARMASVp_solve_lyapunov_discrete_cpp`, F_mat, Q)
 }
 
-kalman_filter_cpp <- function(y_star, y_raw, phi, sigma_y, sigma_v, delta_p, sig_eps2, var_zt, P0) {
-    .Call(`_wARMASVp_kalman_filter_cpp`, y_star, y_raw, phi, sigma_y, sigma_v, delta_p, sig_eps2, var_zt, P0)
+kalman_filter_cpp <- function(y_star, y_raw, phi, sigma_y, sigma_v, delta_p, sig_eps2, var_zt, P0, dist_code = 0L, nu = 0.0, proxy_type = 0L) {
+    .Call(`_wARMASVp_kalman_filter_cpp`, y_star, y_raw, phi, sigma_y, sigma_v, delta_p, sig_eps2, var_zt, P0, dist_code, nu, proxy_type)
 }
 
-gmkf_filter_cpp <- function(y_star, y_raw, phi, sigma_y, sigma_v, delta_p, var_zt, mix_weights, mix_means, mix_vars, mu_intercept, P0) {
-    .Call(`_wARMASVp_gmkf_filter_cpp`, y_star, y_raw, phi, sigma_y, sigma_v, delta_p, var_zt, mix_weights, mix_means, mix_vars, mu_intercept, P0)
+gmkf_filter_cpp <- function(y_star, y_raw, phi, sigma_y, sigma_v, delta_p, var_zt, mix_weights, mix_means, mix_vars, mu_intercept, P0, dist_code = 0L, nu = 0.0, proxy_type = 0L) {
+    .Call(`_wARMASVp_gmkf_filter_cpp`, y_star, y_raw, phi, sigma_y, sigma_v, delta_p, var_zt, mix_weights, mix_means, mix_vars, mu_intercept, P0, dist_code, nu, proxy_type)
 }
 
 fit_ksc_em_cpp <- function(eps, init_m, init_s2, init_q, max_iter = 500L, tol = 1e-8) {

@@ -41,17 +41,27 @@
 #' @param Amat Weighting matrix specification. \code{NULL} (default) for identity
 #'   weighting, or \code{"Weighted"} for data-driven HAC. Takes precedence over
 #'   \code{Bartlett}. User-supplied matrices are not supported for AR order tests.
+#' @param errorType Character. Error distribution of the return innovations:
+#'   \code{"Gaussian"} (default), \code{"Student-t"}, or \code{"GED"}. Heavy-tail
+#'   options reuse the same moment-based GMM-LRT machinery as \code{lmc_t}/
+#'   \code{lmc_ged}; \eqn{\nu} is held at the null MLE during the simulation
+#'   (it is not a varied nuisance for the AR-order test).
 #' @param sigvMethod Character. Method for \eqn{\sigma_v} estimation:
 #'   \code{"factored"} (default), \code{"hybrid"}, or \code{"direct"}.
+#' @param logNu Logical. Use log-space for \eqn{\nu} estimation (Student-t/GED
+#'   only). Default \code{TRUE}.
+#' @param winsorize_eps Number of extreme autocovariance lags to winsorize
+#'   (heavy-tail only). Default 0.
 #'
 #' @return An object of class \code{"svp_test"}, a list containing:
 #' \describe{
-#'   \item{s0}{Test statistic from observed data.}
+#'   \item{s0}{Test statistic from observed data (capped at 1e-10 if negative).}
 #'   \item{sN}{Simulated null distribution (vector of length N).}
 #'   \item{pval}{Monte Carlo p-value.}
 #'   \item{test_type}{Character string identifying the test.}
 #'   \item{null_param}{Name of the parameter(s) tested.}
 #'   \item{null_value}{Value(s) under the null hypothesis.}
+#'   \item{errorType}{Error distribution used.}
 #'   \item{call}{The matched call.}
 #' }
 #'
@@ -63,8 +73,11 @@
 #' When \code{Bartlett = TRUE}, the test statistic is based on the GMM-LRT
 #' approach with a Bartlett kernel HAC weighting matrix:
 #' \eqn{S = T \times (M_{H_0} - M_{H_1})}, where \eqn{M} denotes the
-#' GMM criterion evaluated at the null and alternative estimates. Simulations
-#' yielding negative test statistics are discarded and re-drawn.
+#' GMM criterion evaluated at the null and alternative estimates. Both the
+#' observed and simulated test statistics are capped at \code{1e-10} when
+#' negative; a negative observed statistic raises a warning (it indicates strong
+#' evidence in favour of the null, since the alternative does not improve the
+#' GMM criterion).
 #'
 #' @examples
 #' \donttest{
@@ -76,43 +89,93 @@
 #' @export
 lmc_ar <- function(y, p_null, p_alt, J = 10, N = 99, burnin = 500,
                    del = 1e-10, wDecay = FALSE, Bartlett = FALSE,
-                   Amat = NULL, sigvMethod = "factored") {
+                   Amat = NULL, errorType = "Gaussian",
+                   sigvMethod = "factored", logNu = TRUE,
+                   winsorize_eps = 0) {
   cl <- match.call()
   y_vec <- as.numeric(y)
   .validate_test_common(y_vec, J, N, burnin, del)
   Tsize <- length(y_vec)
   if (p_null >= p_alt) stop("p_alt must be greater than p_null.")
   if (p_null < 1) stop("p_null must be >= 1.")
+  errorType <- match.arg(errorType, c("Gaussian", "Student-t", "GED"))
   sigvMethod <- match.arg(sigvMethod, c("hybrid", "direct", "factored"))
   wt <- .resolve_weighting(Amat, Bartlett)
   if (is.matrix(wt$Amat))
     stop("User-supplied weighting matrices are not supported for AR order tests. Use Amat = 'Weighted' for HAC.")
-  # Estimate models
-  mdl_alt <- svp(y_vec, p = p_alt, J = J, leverage = FALSE, del = del, wDecay = wDecay, sigvMethod = sigvMethod)
-  mdl_null_est <- svp(y_vec, p = p_null, J = J, leverage = FALSE, del = del, wDecay = wDecay, sigvMethod = sigvMethod)
+
+  # Estimate models under null and alternative
+  if (errorType == "Gaussian") {
+    mdl_alt <- svp(y_vec, p = p_alt, J = J, leverage = FALSE, del = del,
+                   wDecay = wDecay, sigvMethod = sigvMethod)
+    mdl_null_est <- svp(y_vec, p = p_null, J = J, leverage = FALSE, del = del,
+                        wDecay = wDecay, sigvMethod = sigvMethod)
+  } else {
+    mdl_alt <- svp(y_vec, p = p_alt, J = J, leverage = FALSE,
+                   errorType = errorType, del = del, wDecay = wDecay,
+                   logNu = logNu, sigvMethod = sigvMethod,
+                   winsorize_eps = winsorize_eps)
+    mdl_null_est <- svp(y_vec, p = p_null, J = J, leverage = FALSE,
+                        errorType = errorType, del = del, wDecay = wDecay,
+                        logNu = logNu, sigvMethod = sigvMethod,
+                        winsorize_eps = winsorize_eps)
+  }
+
   # Compute test statistic
+  y_mat <- as.matrix(y_vec)
   if (wt$use_hac) {
-    M_null <- LRT_moment_ar_Amat(y_vec, mdl_null_est, del = del, Bartlett = TRUE)
-    M_alt  <- LRT_moment_ar_Amat(y_vec, mdl_alt, del = del, Bartlett = TRUE)
-    s0 <- Tsize * (M_null - M_alt)
+    if (errorType == "Gaussian") {
+      M_null <- LRT_moment_ar_Amat(y_vec, mdl_null_est, del = del, Bartlett = TRUE)
+      M_alt  <- LRT_moment_ar_Amat(y_vec, mdl_alt, del = del, Bartlett = TRUE)
+    } else if (errorType == "Student-t") {
+      wa_null <- .parse_Amat("Weighted", p_null)
+      wa_alt  <- .parse_Amat("Weighted", p_alt)
+      M_null <- LRT_moment_t(y_mat, mdl_null_est, wa_null$Amat, wa_null$WAmat, del, TRUE)
+      M_alt  <- LRT_moment_t(y_mat, mdl_alt, wa_alt$Amat, wa_alt$WAmat, del, TRUE)
+    } else {  # GED
+      wa_null <- .parse_Amat("Weighted", p_null)
+      wa_alt  <- .parse_Amat("Weighted", p_alt)
+      M_null <- LRT_moment_ged(y_mat, mdl_null_est, wa_null$Amat, wa_null$WAmat, del, TRUE)
+      M_alt  <- LRT_moment_ged(y_mat, mdl_alt, wa_alt$Amat, wa_alt$WAmat, del, TRUE)
+    }
+    s0_tmp <- Tsize * (M_null - M_alt)
   } else {
     phi_extra <- mdl_alt$phi[(p_null + 1):p_alt]
-    s0 <- Tsize * sum(phi_extra^2)
+    s0_tmp <- Tsize * sum(phi_extra^2)
   }
-  # Simulate null distribution
-  betasim_null <- c(mdl_null_est$phi, mdl_null_est$sigy, mdl_null_est$sigv)
-  sN <- .simnull_ar(betasim_null, p_null, p_alt, J, Tsize, N, burnin,
-                    del, wDecay, wt$use_hac, sigvMethod = sigvMethod)
-  pval <- (N + 1 - sum(s0 >= sN)) / (N + 1)
-  test_label <- if (wt$use_hac) {
-    sprintf("LMC AR Order Bartlett (p0=%d vs p=%d)", p_null, p_alt)
+
+  # Cap negative observed test statistic for consistency with simulated null
+  if (is.na(s0_tmp)) stop("Test statistic is NA.")
+  if (s0_tmp < 0) warning("Test statistic is negative (", round(s0_tmp, 4),
+                          "); capped at 1e-10. May indicate strong evidence for null.")
+  s0 <- max(s0_tmp, 1e-10)
+
+  # Build betasim_null (length p_null+2 for Gaussian; p_null+3 for heavy-tail)
+  if (errorType == "Gaussian") {
+    betasim_null <- c(mdl_null_est$phi, mdl_null_est$sigy, mdl_null_est$sigv)
   } else {
-    sprintf("LMC AR Order (p0=%d vs p=%d)", p_null, p_alt)
+    betasim_null <- c(mdl_null_est$phi, mdl_null_est$sigy, mdl_null_est$sigv,
+                      mdl_null_est$v)
+  }
+
+  # Simulate null distribution (nu fixed at null MLE for heavy-tail innovation draws)
+  nu_fixed <- if (errorType == "Gaussian") NA_real_ else mdl_null_est$v
+  sN <- .simnull_ar(betasim_null, p_null, p_alt, J, Tsize, N, burnin,
+                    del, wDecay, wt$use_hac, sigvMethod = sigvMethod,
+                    errorType = errorType, nu_fixed = nu_fixed,
+                    logNu = logNu, winsorize_eps = winsorize_eps)
+  pval <- (N + 1 - sum(s0 >= sN)) / (N + 1)
+  label_dist <- if (errorType == "Gaussian") "" else sprintf(" [%s]", errorType)
+  test_label <- if (wt$use_hac) {
+    sprintf("LMC AR Order Bartlett%s (p0=%d vs p=%d)", label_dist, p_null, p_alt)
+  } else {
+    sprintf("LMC AR Order%s (p0=%d vs p=%d)", label_dist, p_null, p_alt)
   }
   out <- list(s0 = s0, sN = as.numeric(sN), pval = pval,
               test_type = test_label,
               null_param = paste0("phi_", (p_null + 1):p_alt),
               null_value = rep(0, p_alt - p_null),
+              errorType = errorType,
               call = cl)
   class(out) <- "svp_test"
   return(out)
@@ -149,20 +212,41 @@ lmc_ar <- function(y, p_null, p_alt, J = 10, N = 99, burnin = 500,
 mmc_ar <- function(y, p_null, p_alt, J = 10, N = 99, burnin = 500,
                    eps = NULL, threshold = 1, method = "pso", maxit = NULL,
                    del = 1e-10, wDecay = FALSE, Bartlett = FALSE,
-                   Amat = NULL, sigvMethod = "factored") {
+                   Amat = NULL, errorType = "Gaussian",
+                   sigvMethod = "factored", logNu = TRUE,
+                   winsorize_eps = 0) {
   cl <- match.call()
   y_vec <- as.numeric(y)
   .validate_test_common(y_vec, J, N, burnin, del)
   Tsize <- length(y_vec)
   if (p_null >= p_alt) stop("p_alt must be greater than p_null.")
   if (p_null < 1) stop("p_null must be >= 1.")
+  errorType <- match.arg(errorType, c("Gaussian", "Student-t", "GED"))
   sigvMethod <- match.arg(sigvMethod, c("hybrid", "direct", "factored"))
   wt <- .resolve_weighting(Amat, Bartlett)
   if (is.matrix(wt$Amat))
     stop("User-supplied weighting matrices are not supported for AR order tests. Use Amat = 'Weighted' for HAC.")
-  # Estimate under alternative for test statistic
-  mdl_alt <- svp(y_vec, p = p_alt, J = J, leverage = FALSE, del = del, wDecay = wDecay, sigvMethod = sigvMethod)
-  mdl_null_est <- svp(y_vec, p = p_null, J = J, leverage = FALSE, del = del, wDecay = wDecay, sigvMethod = sigvMethod)
+
+  # Estimate under alternative and null for test statistic
+  if (errorType == "Gaussian") {
+    mdl_alt <- svp(y_vec, p = p_alt, J = J, leverage = FALSE, del = del,
+                   wDecay = wDecay, sigvMethod = sigvMethod)
+    mdl_null_est <- svp(y_vec, p = p_null, J = J, leverage = FALSE, del = del,
+                        wDecay = wDecay, sigvMethod = sigvMethod)
+    nu_fixed <- NA_real_
+  } else {
+    mdl_alt <- svp(y_vec, p = p_alt, J = J, leverage = FALSE,
+                   errorType = errorType, del = del, wDecay = wDecay,
+                   logNu = logNu, sigvMethod = sigvMethod,
+                   winsorize_eps = winsorize_eps)
+    mdl_null_est <- svp(y_vec, p = p_null, J = J, leverage = FALSE,
+                        errorType = errorType, del = del, wDecay = wDecay,
+                        logNu = logNu, sigvMethod = sigvMethod,
+                        winsorize_eps = winsorize_eps)
+    # nu held fixed at null MLE during optimization (not a varied nuisance for AR test)
+    nu_fixed <- mdl_null_est$v
+  }
+
   theta_0 <- c(mdl_null_est$phi, mdl_null_est$sigy, mdl_null_est$sigv)
   n_nuisance <- p_null + 2
   if (is.null(eps)) {
@@ -179,31 +263,71 @@ mmc_ar <- function(y, p_null, p_alt, J = 10, N = 99, burnin = 500,
   upper <- c(pmin(theta_0[1:p_null] + eps[1:p_null], rep(0.999, p_null)),
              theta_0[p_null + 1] + eps[p_null + 1],
              theta_0[p_null + 2] + eps[p_null + 2])
-  # Test statistic
+
+  # Observed test statistic (computed once, kept fixed during optimization per Dufour 2006 eq 4.22)
+  y_mat <- as.matrix(y_vec)
   if (wt$use_hac) {
-    M_null <- LRT_moment_ar_Amat(y_vec, mdl_null_est, del = del, Bartlett = TRUE)
-    M_alt  <- LRT_moment_ar_Amat(y_vec, mdl_alt, del = del, Bartlett = TRUE)
-    s0 <- Tsize * (M_null - M_alt)
+    if (errorType == "Gaussian") {
+      M_null <- LRT_moment_ar_Amat(y_vec, mdl_null_est, del = del, Bartlett = TRUE)
+      M_alt  <- LRT_moment_ar_Amat(y_vec, mdl_alt, del = del, Bartlett = TRUE)
+    } else if (errorType == "Student-t") {
+      wa_null <- .parse_Amat("Weighted", p_null)
+      wa_alt  <- .parse_Amat("Weighted", p_alt)
+      M_null <- LRT_moment_t(y_mat, mdl_null_est, wa_null$Amat, wa_null$WAmat, del, TRUE)
+      M_alt  <- LRT_moment_t(y_mat, mdl_alt, wa_alt$Amat, wa_alt$WAmat, del, TRUE)
+    } else {  # GED
+      wa_null <- .parse_Amat("Weighted", p_null)
+      wa_alt  <- .parse_Amat("Weighted", p_alt)
+      M_null <- LRT_moment_ged(y_mat, mdl_null_est, wa_null$Amat, wa_null$WAmat, del, TRUE)
+      M_alt  <- LRT_moment_ged(y_mat, mdl_alt, wa_alt$Amat, wa_alt$WAmat, del, TRUE)
+    }
+    s0_tmp <- Tsize * (M_null - M_alt)
   } else {
     phi_extra <- mdl_alt$phi[(p_null + 1):p_alt]
-    s0 <- Tsize * sum(phi_extra^2)
+    s0_tmp <- Tsize * sum(phi_extra^2)
   }
+
+  if (is.na(s0_tmp)) stop("Test statistic is NA.")
+  if (s0_tmp < 0) warning("Test statistic is negative (", round(s0_tmp, 4),
+                          "); capped at 1e-10. May indicate strong evidence for null.")
+  s0 <- max(s0_tmp, 1e-10)
+
   # Pre-draw innovations for fixed-error MMC (Dufour 2006)
   n_total <- burnin + Tsize
   N_draw <- ceiling(N * 1.5) + 10L
-  innov_ar <- list(
-    eta = matrix(rnorm(n_total * N_draw), nrow = n_total, ncol = N_draw),
-    eps = matrix(rnorm(n_total * N_draw), nrow = n_total, ncol = N_draw)
-  )
+  if (errorType == "Gaussian") {
+    innov_ar <- list(
+      eta = matrix(rnorm(n_total * N_draw), nrow = n_total, ncol = N_draw),
+      eps = matrix(rnorm(n_total * N_draw), nrow = n_total, ncol = N_draw)
+    )
+  } else if (errorType == "Student-t") {
+    innov_ar <- list(
+      eta = matrix(rnorm(n_total * N_draw), nrow = n_total, ncol = N_draw),
+      eps = matrix(rt(n_total * N_draw, df = nu_fixed),
+                   nrow = n_total, ncol = N_draw)
+    )
+  } else {  # GED
+    innov_ar <- list(
+      eta = matrix(rnorm(n_total * N_draw), nrow = n_total, ncol = N_draw),
+      eps = matrix(rged_cpp(n_total * N_draw, 0, 1, nu_fixed),
+                   nrow = n_total, ncol = N_draw)
+    )
+  }
+
   out <- .run_mmc_optimizer(method, theta_0, .mmc_pval_ar, lower, upper,
                             threshold, maxit,
                             y = y_vec, p_null = p_null, p_alt = p_alt,
                             j = J, N = N, s0 = s0, ini = burnin,
                             del = del, wDecay = wDecay, Bartlett = wt$use_hac,
                             sigvMethod = sigvMethod,
+                            errorType = errorType,
+                            nu_fixed = nu_fixed,
+                            logNu = logNu,
+                            winsorize_eps = winsorize_eps,
                             innovations = innov_ar)
   out$value <- -out$value
   out$s0 <- s0
+  out$errorType <- errorType
   out$call <- cl
   return(out)
 }

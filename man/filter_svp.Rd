@@ -7,6 +7,7 @@
 filter_svp(
   object,
   method = c("corrected", "mixture", "particle"),
+  proxy = c("u", "bayes_optimal"),
   K = 7,
   M = 1000,
   seed = 42,
@@ -21,6 +22,16 @@ from \code{\link{svp}}.}
 standard Kalman with distribution-specific \eqn{\sigma_\varepsilon^2(\nu)},
 \code{"mixture"} for the Gaussian Mixture Kalman Filter (GMKF), or
 \code{"particle"} for the Bootstrap Particle Filter (BPF).}
+
+\item{proxy}{Character. Leverage proxy for the state-space prediction.
+\code{"u"} (default) is paper-faithful — uses
+\eqn{\hat{z}_{t-1} = \hat{u}_{t-1}} per Remark 3.5 of Ahsan, Dufour and
+Rodriguez Rondon (forthcoming). \code{"bayes_optimal"} uses the posterior
+mean \eqn{E[\zeta_{t-1} \mid u_{t-1}]} for Student-t leverage, which
+removes the cumulative \eqn{O(T)} log-likelihood bias of the û-proxy and
+restores Schwarz consistency for QML/IC applications. Has no effect for
+Gaussian or for non-leverage models; deterministic for GED leverage.
+\code{\link{svp_IC}} defaults to \code{"bayes_optimal"} for this reason.}
 
 \item{K}{Integer. Number of mixture components for GMKF. Default 7.}
 

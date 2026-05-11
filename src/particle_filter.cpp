@@ -37,17 +37,9 @@ static double log_density_eps_ged(double eps, double nu, double a, double mu_bar
          std::pow(u_abs / a, nu) + x / 2.0;
 }
 
-// --------------------------------------------------------------------------- //
-// CDF of standardized GED(nu) — needed for exact z recovery
-// --------------------------------------------------------------------------- //
-static double pged_std_cpp(double u, double nu) {
-  double a = std::exp(0.5 * (R::lgammafn(1.0 / nu) - R::lgammafn(3.0 / nu)));
-  if (u >= 0.0) {
-    return 0.5 + 0.5 * R::pgamma(std::pow(u / a, nu), 1.0 / nu, 1.0, 1, 0);
-  } else {
-    return 0.5 - 0.5 * R::pgamma(std::pow(-u / a, nu), 1.0 / nu, 1.0, 1, 0);
-  }
-}
+// pged_std_cpp moved to utils_cpp.cpp (now shared with kalman_filter.cpp).
+// Forward declaration only.
+double pged_std_cpp(double u, double nu);
 
 // --------------------------------------------------------------------------- //
 // Systematic resampling
@@ -238,8 +230,15 @@ List particle_filter_svp_cpp(
           // Gaussian: u = z (exact)
           z_particles(i) = u_i;
         } else if (dist_code == 1) {
-          // Student-t: sample lambda ~ Gamma(nu/2, nu/2), z = u * sqrt(lambda)
-          double lambda = R::rgamma(nu / 2.0, 2.0 / nu);
+          // Student-t: sample lambda from POSTERIOR given u_i.  Under the
+          // scale-mixture u_i = zeta_i * lambda_i^{-1/2} with zeta ~ N(0,1)
+          // and lambda ~ Gamma(nu/2, rate=nu/2), Bayes' rule gives
+          //   lambda | u_i ~ Gamma((nu+1)/2, rate=(nu + u_i^2)/2).
+          // Then zeta = u_i * sqrt(lambda) is the conditional draw.
+          // (Previous code sampled from the prior Gamma(nu/2, nu/2), which
+          // overshoots leverage feedback in the tails.  Bug fix 2026-05-09.)
+          double lambda = R::rgamma((nu + 1.0) / 2.0,
+                                     2.0 / (nu + u_i * u_i));
           z_particles(i) = u_i * std::sqrt(lambda);
         } else {
           // GED: z = Phi^{-1}(F_GED(u))

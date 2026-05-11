@@ -39,8 +39,8 @@ BEGIN_RCPP
 END_RCPP
 }
 // kalman_filter_cpp
-List kalman_filter_cpp(const arma::vec& y_star, const arma::vec& y_raw, const arma::vec& phi, double sigma_y, double sigma_v, double delta_p, double sig_eps2, double var_zt, const arma::mat& P0);
-RcppExport SEXP _wARMASVp_kalman_filter_cpp(SEXP y_starSEXP, SEXP y_rawSEXP, SEXP phiSEXP, SEXP sigma_ySEXP, SEXP sigma_vSEXP, SEXP delta_pSEXP, SEXP sig_eps2SEXP, SEXP var_ztSEXP, SEXP P0SEXP) {
+List kalman_filter_cpp(const arma::vec& y_star, const arma::vec& y_raw, const arma::vec& phi, double sigma_y, double sigma_v, double delta_p, double sig_eps2, double var_zt, const arma::mat& P0, int dist_code, double nu, int proxy_type);
+RcppExport SEXP _wARMASVp_kalman_filter_cpp(SEXP y_starSEXP, SEXP y_rawSEXP, SEXP phiSEXP, SEXP sigma_ySEXP, SEXP sigma_vSEXP, SEXP delta_pSEXP, SEXP sig_eps2SEXP, SEXP var_ztSEXP, SEXP P0SEXP, SEXP dist_codeSEXP, SEXP nuSEXP, SEXP proxy_typeSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
@@ -53,13 +53,16 @@ BEGIN_RCPP
     Rcpp::traits::input_parameter< double >::type sig_eps2(sig_eps2SEXP);
     Rcpp::traits::input_parameter< double >::type var_zt(var_ztSEXP);
     Rcpp::traits::input_parameter< const arma::mat& >::type P0(P0SEXP);
-    rcpp_result_gen = Rcpp::wrap(kalman_filter_cpp(y_star, y_raw, phi, sigma_y, sigma_v, delta_p, sig_eps2, var_zt, P0));
+    Rcpp::traits::input_parameter< int >::type dist_code(dist_codeSEXP);
+    Rcpp::traits::input_parameter< double >::type nu(nuSEXP);
+    Rcpp::traits::input_parameter< int >::type proxy_type(proxy_typeSEXP);
+    rcpp_result_gen = Rcpp::wrap(kalman_filter_cpp(y_star, y_raw, phi, sigma_y, sigma_v, delta_p, sig_eps2, var_zt, P0, dist_code, nu, proxy_type));
     return rcpp_result_gen;
 END_RCPP
 }
 // gmkf_filter_cpp
-List gmkf_filter_cpp(const arma::vec& y_star, const arma::vec& y_raw, const arma::vec& phi, double sigma_y, double sigma_v, double delta_p, double var_zt, const arma::vec& mix_weights, const arma::vec& mix_means, const arma::vec& mix_vars, double mu_intercept, const arma::mat& P0);
-RcppExport SEXP _wARMASVp_gmkf_filter_cpp(SEXP y_starSEXP, SEXP y_rawSEXP, SEXP phiSEXP, SEXP sigma_ySEXP, SEXP sigma_vSEXP, SEXP delta_pSEXP, SEXP var_ztSEXP, SEXP mix_weightsSEXP, SEXP mix_meansSEXP, SEXP mix_varsSEXP, SEXP mu_interceptSEXP, SEXP P0SEXP) {
+List gmkf_filter_cpp(const arma::vec& y_star, const arma::vec& y_raw, const arma::vec& phi, double sigma_y, double sigma_v, double delta_p, double var_zt, const arma::vec& mix_weights, const arma::vec& mix_means, const arma::vec& mix_vars, double mu_intercept, const arma::mat& P0, int dist_code, double nu, int proxy_type);
+RcppExport SEXP _wARMASVp_gmkf_filter_cpp(SEXP y_starSEXP, SEXP y_rawSEXP, SEXP phiSEXP, SEXP sigma_ySEXP, SEXP sigma_vSEXP, SEXP delta_pSEXP, SEXP var_ztSEXP, SEXP mix_weightsSEXP, SEXP mix_meansSEXP, SEXP mix_varsSEXP, SEXP mu_interceptSEXP, SEXP P0SEXP, SEXP dist_codeSEXP, SEXP nuSEXP, SEXP proxy_typeSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
@@ -75,7 +78,10 @@ BEGIN_RCPP
     Rcpp::traits::input_parameter< const arma::vec& >::type mix_vars(mix_varsSEXP);
     Rcpp::traits::input_parameter< double >::type mu_intercept(mu_interceptSEXP);
     Rcpp::traits::input_parameter< const arma::mat& >::type P0(P0SEXP);
-    rcpp_result_gen = Rcpp::wrap(gmkf_filter_cpp(y_star, y_raw, phi, sigma_y, sigma_v, delta_p, var_zt, mix_weights, mix_means, mix_vars, mu_intercept, P0));
+    Rcpp::traits::input_parameter< int >::type dist_code(dist_codeSEXP);
+    Rcpp::traits::input_parameter< double >::type nu(nuSEXP);
+    Rcpp::traits::input_parameter< int >::type proxy_type(proxy_typeSEXP);
+    rcpp_result_gen = Rcpp::wrap(gmkf_filter_cpp(y_star, y_raw, phi, sigma_y, sigma_v, delta_p, var_zt, mix_weights, mix_means, mix_vars, mu_intercept, P0, dist_code, nu, proxy_type));
     return rcpp_result_gen;
 END_RCPP
 }
@@ -536,8 +542,8 @@ END_RCPP
 static const R_CallMethodDef CallEntries[] = {
     {"_wARMASVp_svpCpp_nolev", (DL_FUNC) &_wARMASVp_svpCpp_nolev, 5},
     {"_wARMASVp_solve_lyapunov_discrete_cpp", (DL_FUNC) &_wARMASVp_solve_lyapunov_discrete_cpp, 2},
-    {"_wARMASVp_kalman_filter_cpp", (DL_FUNC) &_wARMASVp_kalman_filter_cpp, 9},
-    {"_wARMASVp_gmkf_filter_cpp", (DL_FUNC) &_wARMASVp_gmkf_filter_cpp, 12},
+    {"_wARMASVp_kalman_filter_cpp", (DL_FUNC) &_wARMASVp_kalman_filter_cpp, 12},
+    {"_wARMASVp_gmkf_filter_cpp", (DL_FUNC) &_wARMASVp_gmkf_filter_cpp, 15},
     {"_wARMASVp_fit_ksc_em_cpp", (DL_FUNC) &_wARMASVp_fit_ksc_em_cpp, 6},
     {"_wARMASVp_LRT_moment_lev_svp_cpp", (DL_FUNC) &_wARMASVp_LRT_moment_lev_svp_cpp, 5},
     {"_wARMASVp_LRT_moment_lev_t_cpp", (DL_FUNC) &_wARMASVp_LRT_moment_lev_t_cpp, 5},

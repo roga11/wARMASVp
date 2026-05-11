@@ -182,12 +182,13 @@ fit_ksc_mixture <- function(distribution = c("gaussian", "student_t", "ged"),
     sig_eps2 <- (pi^2) / 2
   }
 
-  # Var(z_t) for leverage prediction covariance
-  var_zt <- 1.0
-  if (inherits(model, "svp_t") && isTRUE(model$leverage) &&
-      !is.null(model$v) && is.finite(model$v) && model$v > 2) {
-    var_zt <- model$v / (model$v - 2)
-  }
+  # Var(z_t) for the leverage prediction covariance.  Per SVHT Remark 3.5
+  # (eq:ckf_leverage_prediction), the *conditional* state-innovation
+  # covariance at one-step-ahead under the u-proxy is sigma_v^2 * (1-delta^2),
+  # corresponding to var_zt = 0 (z_t is treated as observed at filter time t,
+  # so its conditional variance is zero).  This applies uniformly across all
+  # error types and leverage configurations.
+  var_zt <- 0.0
 
   # Measurement intercept mu_bar
   if (inherits(model, "svp_t") && !is.null(model$v) && is.finite(model$v)) {
@@ -228,6 +229,15 @@ fit_ksc_mixture <- function(distribution = c("gaussian", "student_t", "ged"),
 #'   standard Kalman with distribution-specific \eqn{\sigma_\varepsilon^2(\nu)},
 #'   \code{"mixture"} for the Gaussian Mixture Kalman Filter (GMKF), or
 #'   \code{"particle"} for the Bootstrap Particle Filter (BPF).
+#' @param proxy Character. Leverage proxy for the state-space prediction.
+#'   \code{"u"} (default) is paper-faithful — uses
+#'   \eqn{\hat{z}_{t-1} = \hat{u}_{t-1}} per Remark 3.5 of Ahsan, Dufour and
+#'   Rodriguez Rondon (forthcoming). \code{"bayes_optimal"} uses the posterior
+#'   mean \eqn{E[\zeta_{t-1} \mid u_{t-1}]} for Student-t leverage, which
+#'   removes the cumulative \eqn{O(T)} log-likelihood bias of the û-proxy and
+#'   restores Schwarz consistency for QML/IC applications. Has no effect for
+#'   Gaussian or for non-leverage models; deterministic for GED leverage.
+#'   \code{\link{svp_IC}} defaults to \code{"bayes_optimal"} for this reason.
 #' @param K Integer. Number of mixture components for GMKF. Default 7.
 #' @param M Integer. Number of particles for BPF. Default 1000.
 #' @param seed Integer. Random seed for BPF. Default 42.
@@ -258,11 +268,13 @@ fit_ksc_mixture <- function(distribution = c("gaussian", "student_t", "ged"),
 #'
 #' @export
 filter_svp <- function(object, method = c("corrected", "mixture", "particle"),
+                       proxy = c("u", "bayes_optimal"),
                        K = 7, M = 1000, seed = 42, del = 1e-10) {
   if (!inherits(object, c("svp", "svp_t", "svp_ged"))) {
     stop("object must be of class 'svp', 'svp_t', or 'svp_ged'.")
   }
   method <- match.arg(method)
+  proxy <- match.arg(proxy)
   if (!is.numeric(K) || length(K) != 1L || K < 1L)
     stop("'K' must be a positive integer (>= 1).")
   if (!is.numeric(M) || length(M) != 1L || M < 1L)
@@ -271,6 +283,11 @@ filter_svp <- function(object, method = c("corrected", "mixture", "particle"),
     stop("'del' must be a positive number.")
   y_vec <- as.numeric(object$y)
   params <- .get_filter_params(object)
+  proxy_type <- if (proxy == "u") 0L else 1L
+  dist_code  <- switch(params$dist_name, "gaussian" = 0L,
+                                          "student_t" = 1L,
+                                          "ged" = 2L)
+  nu_val     <- if (is.null(params$nu)) 0.0 else as.numeric(params$nu)
 
   # Build companion matrix F
   p <- params$p
@@ -299,7 +316,10 @@ filter_svp <- function(object, method = c("corrected", "mixture", "particle"),
       delta_p = params$delta_p,
       sig_eps2 = params$sig_eps2,
       var_zt = params$var_zt,
-      P0 = P0
+      P0 = P0,
+      dist_code = dist_code,
+      nu = nu_val,
+      proxy_type = proxy_type
     )
 
   } else if (method == "mixture") {
@@ -334,7 +354,10 @@ filter_svp <- function(object, method = c("corrected", "mixture", "particle"),
       mix_means = mixture$means,
       mix_vars = mixture$vars,
       mu_intercept = mu_intercept_gmkf,
-      P0 = P0
+      P0 = P0,
+      dist_code = dist_code,
+      nu = nu_val,
+      proxy_type = proxy_type
     )
     result$mixture <- mixture
 

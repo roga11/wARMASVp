@@ -15,7 +15,10 @@ lmc_ar(
   wDecay = FALSE,
   Bartlett = FALSE,
   Amat = NULL,
-  sigvMethod = "factored"
+  errorType = "Gaussian",
+  sigvMethod = "factored",
+  logNu = TRUE,
+  winsorize_eps = 0
 )
 }
 \arguments{
@@ -43,18 +46,31 @@ the sum of squared extra AR coefficients.}
 weighting, or \code{"Weighted"} for data-driven HAC. Takes precedence over
 \code{Bartlett}. User-supplied matrices are not supported for AR order tests.}
 
+\item{errorType}{Character. Error distribution of the return innovations:
+\code{"Gaussian"} (default), \code{"Student-t"}, or \code{"GED"}. Heavy-tail
+options reuse the same moment-based GMM-LRT machinery as \code{lmc_t}/
+\code{lmc_ged}; \eqn{\nu} is held at the null MLE during the simulation
+(it is not a varied nuisance for the AR-order test).}
+
 \item{sigvMethod}{Character. Method for \eqn{\sigma_v} estimation:
 \code{"factored"} (default), \code{"hybrid"}, or \code{"direct"}.}
+
+\item{logNu}{Logical. Use log-space for \eqn{\nu} estimation (Student-t/GED
+only). Default \code{TRUE}.}
+
+\item{winsorize_eps}{Number of extreme autocovariance lags to winsorize
+(heavy-tail only). Default 0.}
 }
 \value{
 An object of class \code{"svp_test"}, a list containing:
 \describe{
-  \item{s0}{Test statistic from observed data.}
+  \item{s0}{Test statistic from observed data (capped at 1e-10 if negative).}
   \item{sN}{Simulated null distribution (vector of length N).}
   \item{pval}{Monte Carlo p-value.}
   \item{test_type}{Character string identifying the test.}
   \item{null_param}{Name of the parameter(s) tested.}
   \item{null_value}{Value(s) under the null hypothesis.}
+  \item{errorType}{Error distribution used.}
   \item{call}{The matched call.}
 }
 }
@@ -71,8 +87,11 @@ AR coefficients scaled by sample size.
 When \code{Bartlett = TRUE}, the test statistic is based on the GMM-LRT
 approach with a Bartlett kernel HAC weighting matrix:
 \eqn{S = T \times (M_{H_0} - M_{H_1})}, where \eqn{M} denotes the
-GMM criterion evaluated at the null and alternative estimates. Simulations
-yielding negative test statistics are discarded and re-drawn.
+GMM criterion evaluated at the null and alternative estimates. Both the
+observed and simulated test statistics are capped at \code{1e-10} when
+negative; a negative observed statistic raises a warning (it indicates strong
+evidence in favour of the null, since the alternative does not improve the
+GMM criterion).
 }
 \examples{
 \donttest{

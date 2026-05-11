@@ -673,6 +673,10 @@ correction_factor_ged_approx <- function(nu, n_nodes = 200L) {
 .mmc_pval_ar <- function(theta, y, p_null, p_alt, j, N, s0, ini,
                          del = 1e-10, wDecay = FALSE, Bartlett = FALSE,
                          sigvMethod = "factored",
+                         errorType = "Gaussian",
+                         nu_fixed = NA_real_,
+                         logNu = TRUE,
+                         winsorize_eps = 0,
                          innovations = NULL) {
   Tsize <- length(y)
   phi_null <- theta[1:p_null]
@@ -685,6 +689,8 @@ correction_factor_ged_approx <- function(nu, n_nodes = 200L) {
   betasim_null <- c(phi_null, sigy_null, sigv_null)
   sN <- .simnull_ar(betasim_null, p_null, p_alt, j, Tsize, N, ini,
                     del, wDecay, Bartlett, sigvMethod = sigvMethod,
+                    errorType = errorType, nu_fixed = nu_fixed,
+                    logNu = logNu, winsorize_eps = winsorize_eps,
                     innovations = innovations)
   pval <- -((N + 1 - sum(s0 >= sN)) / (N + 1))
   return(pval)
@@ -1026,46 +1032,93 @@ LRT_moment_lev_ged_Amat <- function(y, mdl_out, rho_type, del = 1e-10,
 .simnull_ar <- function(betasim_null, p_null, p_alt, j, Tsize, N, ini,
                         del = 1e-10, wDecay = FALSE, Bartlett = FALSE,
                         sigvMethod = "factored",
+                        errorType = "Gaussian",
+                        nu_fixed = NA_real_,
+                        logNu = TRUE,
+                        winsorize_eps = 0,
                         innovations = NULL) {
   phi_sim <- betasim_null[seq_len(p_null)]
   sigy_sim <- betasim_null[p_null + 1]
   sigv_sim <- betasim_null[p_null + 2]
   n_total <- ini + Tsize
 
+  # Pre-draw innovations if not supplied (errorType-specific eps distribution)
   if (is.null(innovations)) {
     N_draw <- ceiling(N * 1.5) + 10L
     innovations <- list(
       eta = matrix(rnorm(n_total * N_draw), nrow = n_total, ncol = N_draw),
-      eps = matrix(rnorm(n_total * N_draw), nrow = n_total, ncol = N_draw)
+      eps = if (errorType == "Gaussian") {
+        matrix(rnorm(n_total * N_draw), nrow = n_total, ncol = N_draw)
+      } else if (errorType == "Student-t") {
+        matrix(rt(n_total * N_draw, df = nu_fixed), nrow = n_total, ncol = N_draw)
+      } else {  # GED
+        matrix(rged_cpp(n_total * N_draw, 0, 1, nu_fixed), nrow = n_total, ncol = N_draw)
+      }
     )
+  }
+
+  # Helper closures for distribution-specific simulation, fitting, and stat computation
+  sim_one <- function(eta_vec, eps_vec) {
+    if (errorType == "Gaussian") {
+      sim_from_innov_gaussian_cpp(phi = phi_sim, sigma_y = sigy_sim,
+                                  sigma_v = sigv_sim,
+                                  eta_vec = eta_vec, eps_vec = eps_vec,
+                                  p = p_null, T_out = Tsize, burnin = ini)
+    } else if (errorType == "Student-t") {
+      sim_from_innov_t_cpp(phi = phi_sim, sigma_y = sigy_sim,
+                           sigma_v = sigv_sim,
+                           eta_vec = eta_vec, eps_vec = eps_vec,
+                           p = p_null, T_out = Tsize, burnin = ini)
+    } else {
+      sim_from_innov_ged_cpp(phi = phi_sim, sigma_y = sigy_sim,
+                             sigma_v = sigv_sim,
+                             eta_vec = eta_vec, eps_vec = eps_vec,
+                             p = p_null, T_out = Tsize, burnin = ini)
+    }
+  }
+  fit_one <- function(u, p_use) {
+    if (errorType == "Gaussian") {
+      svp(u, p = p_use, J = j, leverage = FALSE, del = del, wDecay = wDecay,
+          sigvMethod = sigvMethod)
+    } else {
+      svp(u, p = p_use, J = j, leverage = FALSE, errorType = errorType,
+          del = del, wDecay = wDecay, logNu = logNu, sigvMethod = sigvMethod,
+          winsorize_eps = winsorize_eps)
+    }
+  }
+  stat_bartlett <- function(u_vec, mdl_null_tmp, mdl_alt_tmp) {
+    if (errorType == "Gaussian") {
+      M_n <- LRT_moment_ar_Amat(u_vec, mdl_null_tmp, del = del, Bartlett = TRUE)
+      M_a <- LRT_moment_ar_Amat(u_vec, mdl_alt_tmp, del = del, Bartlett = TRUE)
+    } else {
+      u_mat <- as.matrix(u_vec)
+      wa_n <- .parse_Amat("Weighted", p_null)
+      wa_a <- .parse_Amat("Weighted", p_alt)
+      if (errorType == "Student-t") {
+        M_n <- LRT_moment_t(u_mat, mdl_null_tmp, wa_n$Amat, wa_n$WAmat, del, TRUE)
+        M_a <- LRT_moment_t(u_mat, mdl_alt_tmp, wa_a$Amat, wa_a$WAmat, del, TRUE)
+      } else {  # GED
+        M_n <- LRT_moment_ged(u_mat, mdl_null_tmp, wa_n$Amat, wa_n$WAmat, del, TRUE)
+        M_a <- LRT_moment_ged(u_mat, mdl_alt_tmp, wa_a$Amat, wa_a$WAmat, del, TRUE)
+      }
+    }
+    Tsize * (M_n - M_a)
   }
 
   sN <- numeric(N)
   xn <- 1
   b <- 1
   while (xn <= N && b <= ncol(innovations$eta)) {
-    u <- as.numeric(sim_from_innov_gaussian_cpp(
-      phi = phi_sim, sigma_y = sigy_sim, sigma_v = sigv_sim,
-      eta_vec = innovations$eta[, b], eps_vec = innovations$eps[, b],
-      p = p_null, T_out = Tsize, burnin = ini
-    ))
-    mdl_alt_tmp <- tryCatch(
-      svp(u, p = p_alt, J = j, leverage = FALSE, del = del, wDecay = wDecay,
-          sigvMethod = sigvMethod),
-      error = function(e) NULL
-    )
+    u <- as.numeric(sim_one(innovations$eta[, b], innovations$eps[, b]))
+    mdl_alt_tmp <- tryCatch(fit_one(u, p_alt), error = function(e) NULL)
     b <- b + 1
     if (is.null(mdl_alt_tmp) || isTRUE(mdl_alt_tmp$nonstationary_ind)) next
     if (isTRUE(Bartlett)) {
-      mdl_null_tmp <- tryCatch(
-        svp(u, p = p_null, J = j, leverage = FALSE, del = del, wDecay = wDecay,
-            sigvMethod = sigvMethod),
-        error = function(e) NULL
-      )
+      mdl_null_tmp <- tryCatch(fit_one(u, p_null), error = function(e) NULL)
       if (is.null(mdl_null_tmp) || isTRUE(mdl_null_tmp$nonstationary_ind)) next
-      M_null <- LRT_moment_ar_Amat(u, mdl_null_tmp, del = del, Bartlett = TRUE)
-      M_alt  <- LRT_moment_ar_Amat(u, mdl_alt_tmp, del = del, Bartlett = TRUE)
-      stat <- Tsize * (M_null - M_alt)
+      stat <- tryCatch(stat_bartlett(u, mdl_null_tmp, mdl_alt_tmp),
+                       error = function(e) NA_real_)
+      if (is.na(stat)) next
       sN[xn] <- max(stat, 1e-10)
     } else {
       phi_extra <- mdl_alt_tmp$phi[(p_null + 1):p_alt]
@@ -1073,29 +1126,21 @@ LRT_moment_lev_ged_Amat <- function(y, mdl_out, rho_type, del = 1e-10,
     }
     xn <- xn + 1
   }
-  # Fallback
+  # Fallback: draw fresh innovations if pre-drawn pool exhausted
   while (xn <= N) {
-    u <- as.numeric(sim_from_innov_gaussian_cpp(
-      phi = phi_sim, sigma_y = sigy_sim, sigma_v = sigv_sim,
-      eta_vec = rnorm(n_total), eps_vec = rnorm(n_total),
-      p = p_null, T_out = Tsize, burnin = ini
-    ))
-    mdl_alt_tmp <- tryCatch(
-      svp(u, p = p_alt, J = j, leverage = FALSE, del = del, wDecay = wDecay,
-          sigvMethod = sigvMethod),
-      error = function(e) NULL
-    )
+    eta_extra <- rnorm(n_total)
+    eps_extra <- if (errorType == "Gaussian") rnorm(n_total)
+                 else if (errorType == "Student-t") rt(n_total, df = nu_fixed)
+                 else rged_cpp(n_total, 0, 1, nu_fixed)
+    u <- as.numeric(sim_one(eta_extra, eps_extra))
+    mdl_alt_tmp <- tryCatch(fit_one(u, p_alt), error = function(e) NULL)
     if (is.null(mdl_alt_tmp) || isTRUE(mdl_alt_tmp$nonstationary_ind)) next
     if (isTRUE(Bartlett)) {
-      mdl_null_tmp <- tryCatch(
-        svp(u, p = p_null, J = j, leverage = FALSE, del = del, wDecay = wDecay,
-            sigvMethod = sigvMethod),
-        error = function(e) NULL
-      )
+      mdl_null_tmp <- tryCatch(fit_one(u, p_null), error = function(e) NULL)
       if (is.null(mdl_null_tmp) || isTRUE(mdl_null_tmp$nonstationary_ind)) next
-      M_null <- LRT_moment_ar_Amat(u, mdl_null_tmp, del = del, Bartlett = TRUE)
-      M_alt  <- LRT_moment_ar_Amat(u, mdl_alt_tmp, del = del, Bartlett = TRUE)
-      stat <- Tsize * (M_null - M_alt)
+      stat <- tryCatch(stat_bartlett(u, mdl_null_tmp, mdl_alt_tmp),
+                       error = function(e) NA_real_)
+      if (is.na(stat)) next
       sN[xn] <- max(stat, 1e-10)
     } else {
       phi_extra <- mdl_alt_tmp$phi[(p_null + 1):p_alt]

@@ -58,6 +58,23 @@ double qged_std_cpp(double p, double nu) {
   }
 }
 
+// CDF of standardized GED(nu) with Var=1.  Companion to qged_std_cpp.
+// F_GED(u) for u >= 0:  0.5 + 0.5 * F_Gamma((u/a)^nu; 1/nu, 1)
+// For u < 0 use symmetry.   a = sqrt(Gamma(1/nu) / Gamma(3/nu)).
+// Clamp tail probabilities to [1e-15, 1-1e-15] to match qged_std_cpp.
+double pged_std_cpp(double u, double nu) {
+  double a = std::exp(0.5 * (R::lgammafn(1.0 / nu) - R::lgammafn(3.0 / nu)));
+  double p;
+  if (u >= 0.0) {
+    p = 0.5 + 0.5 * R::pgamma(std::pow(u / a, nu), 1.0 / nu, 1.0, 1, 0);
+  } else {
+    p = 0.5 - 0.5 * R::pgamma(std::pow(-u / a, nu), 1.0 / nu, 1.0, 1, 0);
+  }
+  if (p < 1e-15)        p = 1e-15;
+  if (p > 1.0 - 1e-15)  p = 1.0 - 1e-15;
+  return p;
+}
+
 // [[Rcpp::export]]
 arma::vec rged_cpp(int n, double mean = 0.0, double sd = 1.0, double nu = 2.0) {
   // Generalized Error Distribution random deviates

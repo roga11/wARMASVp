@@ -5,6 +5,44 @@
 // [[Rcpp::depends(RcppArmadillo)]]
 using namespace Rcpp;
 
+// Forward declaration: GED CDF, defined in utils_cpp.cpp
+double pged_std_cpp(double u, double nu);
+
+// --------------------------------------------------------------------------- //
+// Compute the leverage-shift proxy zeta_hat from the observed u, by error type.
+// dist_code:    0 = Gaussian, 1 = Student-t, 2 = GED
+// proxy_type:   0 = "u" (paper-faithful per SVHT Remark 3.5)
+//               1 = "bayes_optimal" (Bayes posterior mean for Student-t)
+// For Gaussian, u = zeta exactly (no choice).
+// For GED, u = qged_std(Phi(zeta)) so zeta = Phi^{-1}(F_GED(u;nu)) (exact;
+//   the proxy_type flag has no effect).
+// For Student-t, u = zeta * lambda^{-1/2}.  The "u" proxy uses zeta_hat = u
+//   (paper choice).  The "bayes_optimal" proxy uses
+//     E[zeta | u] = u * sqrt((nu+1)/(nu+u^2)) * Gamma((nu+2)/2)/Gamma((nu+1)/2)
+//                * sqrt(2/(nu+1))
+//             = u * sqrt(2/(nu+u^2)) * Gamma((nu+2)/2)/Gamma((nu+1)/2).
+// --------------------------------------------------------------------------- //
+static inline double leverage_zeta_proxy(double u, int dist_code, double nu,
+                                          int proxy_type) {
+  if (dist_code == 0) {
+    return u;                       // Gaussian: zeta = u exactly
+  } else if (dist_code == 2) {
+    double p = pged_std_cpp(u, nu); // GED: invert the copula
+    return R::qnorm(p, 0.0, 1.0, 1, 0);
+  } else {
+    // Student-t
+    if (proxy_type == 0) {
+      return u;                     // paper-faithful (Remark 3.5)
+    } else {
+      // Bayes-optimal: posterior mean of zeta given u
+      double factor = std::sqrt(2.0 / (nu + u * u))
+                    * std::exp(R::lgammafn((nu + 2.0) / 2.0)
+                             - R::lgammafn((nu + 1.0) / 2.0));
+      return u * factor;
+    }
+  }
+}
+
 // --------------------------------------------------------------------------- //
 // Discrete Lyapunov solver: X = F X F' + Q
 // Uses vectorization: vec(X) = (I - F ⊗ F)^{-1} vec(Q)
@@ -34,7 +72,10 @@ List kalman_filter_cpp(const arma::vec& y_star,
                        double delta_p,
                        double sig_eps2,
                        double var_zt,
-                       const arma::mat& P0) {
+                       const arma::mat& P0,
+                       int dist_code = 0,
+                       double nu = 0.0,
+                       int proxy_type = 0) {
   int p = phi.n_elem;
   int T = y_star.n_elem;
 
@@ -85,7 +126,12 @@ List kalman_filter_cpp(const arma::vec& y_star,
     } else {
       xi_p = F_mat * xi_filt.col(t - 1);
       if (delta_p != 0.0) {
-        xi_p += sigma_v * delta_p * zt(t - 1) * h_vec;
+        // Apply distribution-aware leverage proxy: zeta_hat = u for Gaussian
+        // (exact), Phi^{-1}(F_GED(u;nu)) for GED (exact), and either u
+        // (paper-faithful) or E[zeta|u] (Bayes-optimal) for Student-t.
+        double zeta_hat = leverage_zeta_proxy(zt(t - 1), dist_code, nu,
+                                               proxy_type);
+        xi_p += sigma_v * delta_p * zeta_hat * h_vec;
       }
       P_p = F_mat * P_filt_arr.slice(t - 1) * F_mat.t() + Q_eff + Q_lev;
     }
@@ -168,7 +214,10 @@ List gmkf_filter_cpp(const arma::vec& y_star,
                      const arma::vec& mix_means,
                      const arma::vec& mix_vars,
                      double mu_intercept,
-                     const arma::mat& P0) {
+                     const arma::mat& P0,
+                     int dist_code = 0,
+                     double nu = 0.0,
+                     int proxy_type = 0) {
   int p = phi.n_elem;
   int T = y_star.n_elem;
   int K = mix_weights.n_elem;
@@ -215,7 +264,9 @@ List gmkf_filter_cpp(const arma::vec& y_star,
     } else {
       xi_p = F_mat * xi_filt.col(t - 1);
       if (delta_p != 0.0) {
-        xi_p += sigma_v * delta_p * zt(t - 1) * h_vec;
+        double zeta_hat = leverage_zeta_proxy(zt(t - 1), dist_code, nu,
+                                               proxy_type);
+        xi_p += sigma_v * delta_p * zeta_hat * h_vec;
       }
       P_p = F_mat * P_filt_arr.slice(t - 1) * F_mat.t() + Q_eff + Q_lev;
     }
