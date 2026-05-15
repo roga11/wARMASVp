@@ -26,8 +26,8 @@ standard Kalman with distribution-specific \eqn{\sigma_\varepsilon^2(\nu)},
 \item{proxy}{Character. Leverage proxy for the state-space prediction
 mean \eqn{\hat{z}_{t-1}} that enters the leverage shift
 \eqn{\sigma_\nu \delta_p \hat{z}_{t-1}} (the prediction covariance is
-independently \eqn{\sigma_\nu^2(1-\delta_p^2)} per eq.~32 of Ahsan,
-Dufour and Rodriguez Rondon (forthcoming), i.e.\ \code{var_zt = 0L}).
+independently \eqn{\sigma_\nu^2(1-\delta_p^2)} per Rodriguez-Rondon,
+Dufour and Ahsan (2026), i.e.\ \code{var_zt = 0L}).
 \code{"bayes_optimal"} (default) uses the posterior mean
 \eqn{E[\zeta_{t-1} \mid u_{t-1}]} for Student-t leverage, which
 corrects the marginal variance inflation of using \eqn{\hat{u}_{t-1}}

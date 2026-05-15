@@ -7,3 +7,15 @@
 *.RData
 *.rds
 *.Rds
+
+# Compiled objects / shared libraries
+src/*.o
+src/*.so
+src/*.dll
+*.o
+*.so
+*.dll
+
+# Test-run artifacts
+tests/testthat/Rplots.pdf
+Rplots.pdf

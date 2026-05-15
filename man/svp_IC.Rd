@@ -63,8 +63,9 @@ returned by default} — \code{BIC_Kalman}, \code{AIC_Kalman},
 and Hannan--Rissanen two-stage ARMA) and two penalty philosophies
 (Schwarz-consistent BIC / Shibata-efficient AIC), and were selected as
 the most informative criteria across the simulation grid of the
-companion methodology paper (ADRR 2026b). The remaining four are
-available on request via the \code{criteria} argument.
+SVHT methodology paper (Ahsan, Dufour and Rodriguez-Rondon 2026).
+The remaining four are available on request via the \code{criteria}
+argument.
 }
 \details{
 \strong{Default criteria (returned by \code{svp_IC(fit)}):}
@@ -77,7 +78,8 @@ available on request via the \code{criteria} argument.
         is the primary recommended criterion: Schwarz-consistent under
         the Bayes-optimal leverage proxy (see \code{proxy} argument)
         and strong finite-sample performance across the simulation
-        grid (ADRR 2026b, Thm. 2). \code{AIC_Kalman} is Shibata-efficient
+        grid (Ahsan, Dufour and Rodriguez-Rondon 2026).
+        \code{AIC_Kalman} is Shibata-efficient
         and often selects larger \eqn{p} sooner at \eqn{p_{\mathrm{true}}
         \ge 2}.
   \item \code{BIC_HR}, \code{AIC_HR}: Hannan--Rissanen (1982) two-stage
@@ -90,7 +92,7 @@ available on request via the \code{criteria} argument.
         (2p{+}1)\log T_{\mathrm{eff}}\}}. Filter-free anchor, robust to
         mis-specification of the GMKF mixture. \code{BIC_HR} is
         Schwarz-consistent for ARMA(\eqn{p,p}) (Hannan & Rissanen
-        1982; Pötscher 1989; ADRR 2026b, Thm. 1).
+        1982; Pötscher 1989).
 }
 
 \strong{Opt-in criteria (request via \code{criteria = ...}):}
@@ -106,7 +108,8 @@ available on request via the \code{criteria} argument.
                        + \sigma_\varepsilon^2(\nu)}.
         Schwarz-consistent but collapses to \eqn{\hat p = 1} in 98--100\%
         of cells at \eqn{p_{\mathrm{true}} \ge 2} under near-unit-root
-        persistence (ADRR 2026b, Section 5.3). Useful as a conservative
+        persistence (Ahsan, Dufour and Rodriguez-Rondon 2026). Useful
+        as a conservative
         diagnostic: a Whittle selection of \eqn{p > 1} is strong
         evidence against \eqn{p = 1}.
   \item \code{AIC_YW}, \code{BIC_YW}: \emph{Legacy / not recommended.}
@@ -122,8 +125,8 @@ available on request via the \code{criteria} argument.
         non-monotone (sometimes anti-Schwarz) behaviour in \eqn{T}.
         Simulation evidence: 0--29\% correct selection at
         \eqn{p_{\mathrm{true}} = 2} across all DGP cells and
-        \eqn{T \le 10{,}000} (ADRR 2026b, Proposition 1 and
-        Section 5.4). Retained for paper-reproducibility of the
+        \eqn{T \le 10{,}000} (Ahsan, Dufour and Rodriguez-Rondon
+        2026). Retained for paper-reproducibility of the
         documented failure-case results; \strong{use \code{BIC_HR} /
         \code{AIC_HR} for theoretically consistent AR-order selection.}
 }
@@ -200,14 +203,9 @@ likelihood inference and comparison with ARCH models.
 White, H. (1982). Maximum likelihood estimation of misspecified models.
 \emph{Econometrica} 50(1), 1--25. \doi{10.2307/1912526}
 
-Ahsan, M., Dufour, J.-M., and Rodriguez Rondon, G. (forthcoming).
-Estimation and inference for SV(\eqn{p}) models with heavy-tailed
-innovations. Working paper.
-
-Ahsan, M., Dufour, J.-M., and Rodriguez Rondon, G. (2026b).
-AR-order selection for stochastic volatility models with heavy-tailed
-innovations and leverage: a comparison of information criteria.
-Companion methodology note. (Cited as ADRR 2026b.)
+Ahsan, M. N., Dufour, J.-M., and Rodriguez-Rondon, G. (2026). Estimation and
+inference for stochastic volatility models with heavy-tailed distributions.
+Bank of Canada Staff Working Paper 2026-8. \doi{10.34989/swp-2026-8}
 }
 \seealso{
 \code{\link{svp_AR_order}}, \code{\link{svp}}, \code{\link{filter_svp}}

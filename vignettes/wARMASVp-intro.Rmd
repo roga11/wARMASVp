@@ -133,6 +133,33 @@ test_t_dir <- lmc_t(yt, nu_null = 10, N = 49, Amat = "Weighted", direction = "le
 print(test_t_dir)
 ```
 
+## AR Order Selection via Information Criteria
+
+In addition to the LMC/MMC pairwise AR-order test above, the package selects the
+SV(p) lag order by information criteria. `svp_IC()` computes the criteria for a
+single fitted model; `svp_AR_order()` sweeps over `p = 1, ..., pmax` and reports
+the argmin for each criterion.
+
+```{r ic-single}
+fit_ic <- svp(y_test, p = 2, J = 10)
+svp_IC(fit_ic)
+```
+
+```{r ic-sweep}
+sel <- svp_AR_order(y_test, pmax = 4, J = 10)
+sel$argmin
+```
+
+Four criteria are returned by default, spanning two estimation families and two
+penalty philosophies: `BIC_Kalman` / `AIC_Kalman` use the QML log-likelihood from
+the Gaussian mixture Kalman filter, while `BIC_HR` / `AIC_HR` use a two-stage
+Hannan-Rissanen ARMA(p, p) residual variance. Additional criteria (`AICc_Kalman`,
+`BIC_Whittle`, and the Yule-Walker variants) are available opt-in via the
+`criteria` argument. Both functions read `errorType` and `leverage` from the
+fitted model, so heavy-tailed and leverage specifications are handled
+automatically. See Ahsan, Dufour, and Rodriguez-Rondon (2026) for the
+theoretical motivation and consistency simulations.
+
 ## Filtering
 
 Three methods are available via `filter_svp()`, which takes a fitted model:
@@ -167,12 +194,16 @@ Output scales can be chosen: `"log-variance"` (default), `"variance"`, or
 
 ## References
 
-- Ahsan, N. and Dufour, J.-M. (2021). Simple estimators and inference for
+- Ahsan, M. N. and Dufour, J.-M. (2021). Simple estimators and inference for
   higher-order stochastic volatility models. *Journal of Econometrics*,
   224(1), 181-197.
-- Ahsan, N., Dufour, J.-M., Rodriguez Rondon, G., and Romero, A. (2025).
-  Estimation and inference for higher-order stochastic volatility models with
-  leverage. *Journal of Time Series Analysis*.
+- Ahsan, M. N., Dufour, J.-M., and Rodriguez-Rondon, G. (2025). Estimation and
+  inference for higher-order stochastic volatility models with leverage.
+  *Journal of Time Series Analysis*, 46(6), 1064-1084.
+- Ahsan, M. N., Dufour, J.-M., and Rodriguez-Rondon, G. (2026). Estimation and
+  inference for stochastic volatility models with heavy-tailed distributions.
+  Bank of Canada Staff Working Paper 2026-8.
+  [doi:10.34989/swp-2026-8](https://doi.org/10.34989/swp-2026-8)
 - Dufour, J.-M. (2006). Monte Carlo tests with nuisance parameters: A general
   approach to finite-sample inference and nonstandard asymptotics.
   *Journal of Econometrics*, 133(2), 443-477.

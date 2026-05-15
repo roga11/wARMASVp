@@ -3,11 +3,11 @@ Type: Package
 Title: Winsorized ARMA Estimation for Higher-Order Stochastic Volatility Models
 Version: 0.2.0
 Authors@R: c(
-    person("Gabriel", "Rodriguez Rondon",
+    person("Gabriel", "Rodriguez-Rondon",
            email = "gabriel.rodriguezrondon@mail.mcgill.ca",
            role = c("aut", "cre"),
            comment = c(ORCID = "0009-0005-3769-9921")),
-    person("Nazmul", "Ahsan", role = "aut"),
+    person("Md. Nazmul", "Ahsan", role = "aut"),
     person("Jean-Marie", "Dufour", role = "aut"))
 Description: Estimation, simulation, hypothesis testing, and forecasting for
     univariate higher-order stochastic volatility SV(p) models. Supports
@@ -18,7 +18,7 @@ Description: Estimation, simulation, hypothesis testing, and forecasting for
     Maximized Monte Carlo (MMC) procedures for leverage effects, heavy tails,
     and autoregressive order selection. Forecasting is based on Kalman
     filtering and smoothing. See Ahsan and Dufour (2021)
-    <doi:10.1016/j.jeconom.2020.01.018>, Ahsan, Dufour, and Rodriguez Rondon
+    <doi:10.1016/j.jeconom.2021.03.008>, Ahsan, Dufour, and Rodriguez-Rondon
     (2025) <doi:10.1111/jtsa.12851> for details.
 License: GPL (>= 3)
 URL: https://github.com/roga11/wARMASVp

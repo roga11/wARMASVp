@@ -26,16 +26,18 @@ The main user-facing functions are:
 }
 }
 \references{
-Ahsan, N. and Dufour, J.-M. (2021). Simple estimators and inference for
+Ahsan, M. N. and Dufour, J.-M. (2021). Simple estimators and inference for
 higher-order stochastic volatility models. \emph{Journal of Econometrics},
-224(1), 181-197.
+224(1), 181-197. \doi{10.1016/j.jeconom.2021.03.008}
 
-Ahsan, N., Dufour, J.-M., and Rodriguez Rondon, G. (2025). Estimation and
+Ahsan, M. N., Dufour, J.-M., and Rodriguez-Rondon, G. (2025). Estimation and
 inference for higher-order stochastic volatility models with leverage.
-\emph{Journal of Time Series Analysis}.
+\emph{Journal of Time Series Analysis}, 46(6), 1064-1084.
+\doi{10.1111/jtsa.12851}
 
-Ahsan, N., Dufour, J.-M., and Rodriguez Rondon, G. (2025). Estimation and
+Ahsan, M. N., Dufour, J.-M., and Rodriguez-Rondon, G. (2026). Estimation and
 inference for stochastic volatility models with heavy-tailed distributions.
+Bank of Canada Staff Working Paper 2026-8. \doi{10.34989/swp-2026-8}
 }
 \seealso{
 Useful links:
@@ -46,11 +48,11 @@ Useful links:
 
 }
 \author{
-\strong{Maintainer}: Gabriel Rodriguez Rondon \email{gabriel.rodriguezrondon@mail.mcgill.ca} (\href{https://orcid.org/0009-0005-3769-9921}{ORCID})
+\strong{Maintainer}: Gabriel Rodriguez-Rondon \email{gabriel.rodriguezrondon@mail.mcgill.ca} (\href{https://orcid.org/0009-0005-3769-9921}{ORCID})
 
 Authors:
 \itemize{
-  \item Nazmul Ahsan
+  \item Md. Nazmul Ahsan
   \item Jean-Marie Dufour
 }
 

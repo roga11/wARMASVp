@@ -49,11 +49,11 @@ plot(fc)
 
 ## References
 
-- Ahsan, N. and Dufour, J.-M. (2021). Simple estimators and inference for higher-order stochastic volatility models. *Journal of Econometrics*, 224(1), 181-197. [doi:10.1016/j.jeconom.2020.01.018](https://doi.org/10.1016/j.jeconom.2020.01.018)
+- Ahsan, M. N. and Dufour, J.-M. (2021). Simple estimators and inference for higher-order stochastic volatility models. *Journal of Econometrics*, 224(1), 181-197. [doi:10.1016/j.jeconom.2021.03.008](https://doi.org/10.1016/j.jeconom.2021.03.008)
 
-- Ahsan, N., Dufour, J.-M., and Rodriguez Rondon, G. (2025). Estimation and testing for higher-order stochastic volatility models with leverage and heavy tails. *Journal of Time Series Analysis*.
+- Ahsan, M. N., Dufour, J.-M., and Rodriguez-Rondon, G. (2025). Estimation and inference for higher-order stochastic volatility models with leverage. *Journal of Time Series Analysis*, 46(6), 1064-1084. [doi:10.1111/jtsa.12851](https://doi.org/10.1111/jtsa.12851)
 
-- Ahsan, N., Dufour, J.-M., and Rodriguez Rondon, G. (2026). wARMASVp: An R package for higher-order stochastic volatility models. Working paper.
+- Ahsan, M. N., Dufour, J.-M., and Rodriguez-Rondon, G. (2026). Estimation and inference for stochastic volatility models with heavy-tailed distributions. Bank of Canada Staff Working Paper 2026-8. [doi:10.34989/swp-2026-8](https://doi.org/10.34989/swp-2026-8)
 
 ## License
 
