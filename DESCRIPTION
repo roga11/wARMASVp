@@ -9,17 +9,20 @@ Authors@R: c(
            comment = c(ORCID = "0009-0005-3769-9921")),
     person("Md. Nazmul", "Ahsan", role = "aut"),
     person("Jean-Marie", "Dufour", role = "aut"))
-Description: Estimation, simulation, hypothesis testing, and forecasting for
-    univariate higher-order stochastic volatility SV(p) models. Supports
-    Gaussian, Student-t, and Generalized Error Distribution (GED) innovations,
-    with optional leverage effects. Estimation uses closed-form Winsorized
-    ARMA-SV (W-ARMA-SV) moment-based methods that avoid numerical
-    optimization. Hypothesis testing includes Local Monte Carlo (LMC) and
-    Maximized Monte Carlo (MMC) procedures for leverage effects, heavy tails,
-    and autoregressive order selection. Forecasting is based on Kalman
-    filtering and smoothing. See Ahsan and Dufour (2021)
-    <doi:10.1016/j.jeconom.2021.03.008>, Ahsan, Dufour, and Rodriguez-Rondon
-    (2025) <doi:10.1111/jtsa.12851> for details.
+Description: Estimation, simulation, hypothesis testing, AR-order selection,
+    and forecasting for univariate higher-order stochastic volatility SV(p)
+    models. Supports Gaussian, Student-t, and Generalized Error Distribution
+    (GED) innovations, with optional leverage effects. Estimation uses
+    closed-form Winsorized ARMA-SV (W-ARMA-SV) moment-based methods that
+    avoid numerical optimization. Hypothesis testing includes Local Monte
+    Carlo (LMC) and Maximized Monte Carlo (MMC) procedures for leverage
+    effects, heavy tails, and autoregressive order. AR-order selection is
+    also available via information criteria (BIC/AIC) using the Kalman-filter
+    quasi-likelihood and the Hannan-Rissanen ARMA residual variance.
+    Forecasting is based on Kalman filtering and smoothing. See Ahsan and
+    Dufour (2021) <doi:10.1016/j.jeconom.2021.03.008>, Ahsan, Dufour, and
+    Rodriguez-Rondon (2025) <doi:10.1111/jtsa.12851>, and Ahsan, Dufour, and
+    Rodriguez-Rondon (2026) <doi:10.34989/swp-2026-8> for details.
 License: GPL (>= 3)
 URL: https://github.com/roga11/wARMASVp
 BugReports: https://github.com/roga11/wARMASVp/issues
