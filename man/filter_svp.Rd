@@ -26,17 +26,21 @@ standard Kalman with distribution-specific \eqn{\sigma_\varepsilon^2(\nu)},
 \item{proxy}{Character. Leverage proxy for the state-space prediction
 mean \eqn{\hat{z}_{t-1}} that enters the leverage shift
 \eqn{\sigma_\nu \delta_p \hat{z}_{t-1}} (the prediction covariance is
-independently \eqn{\sigma_\nu^2(1-\delta_p^2)} per Rodriguez-Rondon,
-Dufour and Ahsan (2026), i.e.\ \code{var_zt = 0L}).
+independently \eqn{\sigma_\nu^2(1-\delta_p^2)} per Ahsan, Dufour and
+Rodriguez-Rondon (2026), i.e.\ \code{var_zt = 0L}).
 \code{"bayes_optimal"} (default) uses the posterior mean
-\eqn{E[\zeta_{t-1} \mid u_{t-1}]} for Student-t leverage, which
-corrects the marginal variance inflation of using \eqn{\hat{u}_{t-1}}
-directly (\eqn{\mathrm{Var}(\hat{u}) = \nu/(\nu - 2) > 1}) and is
-what the IC functions \code{\link{svp_IC}} / \code{\link{svp_AR_order}}
-use internally. \code{"u"} reproduces the paper-faithful proxy of
-Remark~3.5 (\eqn{\hat{z}_{t-1} = \hat{u}_{t-1}}). Has no effect for
-Gaussian or GED leverage (the proxy is closed-form in both cases) and
-no effect when \code{leverage = FALSE}.}
+\eqn{E[\zeta_{t-1} \mid u_{t-1}]} for Student-t leverage; this is the
+prescribed proxy in Ahsan, Dufour and Rodriguez-Rondon (2026), and
+corrects the marginal variance inflation that arises from using
+\eqn{\hat{u}_{t-1}} directly (\eqn{\mathrm{Var}(\hat{u}) =
+\nu/(\nu - 2) > 1}). It is also what the IC functions
+\code{\link{svp_IC}} / \code{\link{svp_AR_order}} use internally.
+\code{"u"} is a simpler alternative that uses the raw filtered
+residual \eqn{\hat{u}_{t-1}} as the proxy (\eqn{\hat{z}_{t-1} =
+\hat{u}_{t-1}}); under Student-t leverage it does not correct the
+variance inflation above. Has no effect for Gaussian or GED leverage
+(the proxy is closed-form in both cases) and no effect when
+\code{leverage = FALSE}.}
 
 \item{K}{Integer. Number of mixture components for GMKF. Default 7.}
 

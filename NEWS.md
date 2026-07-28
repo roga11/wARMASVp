@@ -1,3 +1,35 @@
+# wARMASVp (development version)
+
+## Bug fixes
+
+* GED degrees-of-freedom estimation (`svp(..., errorType = "GED")`): the
+  `nu` root-finder now uses the fixed bracket `[0.1, 20]` instead of a
+  data-scale-dependent bracket derived from `mean|log(y^2)| / sd|log(y^2)|`.
+  Because `|log(y^2)|` is not scale invariant, the old bracket made `nu-hat`
+  differ by ~1e-8 under a pure rescaling `y -> c*y` (Brent stopped at a
+  different point inside its tolerance ball), even though the estimating
+  equation's root is scale invariant. The fixed bracket — already the
+  fallback interval inside the C++ solver, and matching the boundary warnings
+  — restores exact scale invariance and harmonizes GED with the fixed-bracket
+  Student-t solver. Brent's convergence tolerance in both `nu` solvers
+  (Student-t and GED) was tightened from `1e-6` to `1e-12`. On real-data
+  scales the effect on estimates is below display precision (per-path
+  `|Delta nu-hat|` <= ~5e-7; reported means/RMSE shift <= ~2e-8); AR
+  coefficients are unaffected. Boundary classification and rates are
+  preserved. Added regression tests (`test-ged-nu-bracket.R`).
+
+## Documentation
+
+* `filter_svp()`, `forecast_svp()`, `svp_IC()`, `svp_AR_order()`: corrected
+  the `proxy` argument description. `"bayes_optimal"` is the prescribed
+  proxy in Ahsan, Dufour and Rodriguez-Rondon (2026) and is the default
+  everywhere; `"u"` is a simpler alternative that does not correct the
+  `Var(u-hat) > 1` marginal inflation under Student-t leverage. Removed
+  outdated "paper-faithful (Remark 3.5)" framing of `"u"` and an
+  inconsistent author order (`Rodriguez-Rondon, Dufour and Ahsan` →
+  `Ahsan, Dufour and Rodriguez-Rondon`, alphabetical).
+
+
 # wARMASVp 0.2.0
 
 ## New features

@@ -61,11 +61,11 @@ particle_filter_svp_cpp <- function(y_raw, phi, sigma_y, sigma_v, nu, dist_code,
     .Call(`_wARMASVp_particle_filter_svp_cpp`, y_raw, phi, sigma_y, sigma_v, nu, dist_code, delta, M, seed, del)
 }
 
-find_nu_t_cpp <- function(se2b, nu_lower = 2.01, nu_upper = 500.0, logNu = FALSE, tol = 1e-6, maxiter = 1000L) {
+find_nu_t_cpp <- function(se2b, nu_lower = 2.01, nu_upper = 500.0, logNu = FALSE, tol = 1e-12, maxiter = 1000L) {
     .Call(`_wARMASVp_find_nu_t_cpp`, se2b, nu_lower, nu_upper, logNu, tol, maxiter)
 }
 
-find_nu_ged_cpp <- function(se2, lower, upper, tol = 1e-6, maxiter = 1000L) {
+find_nu_ged_cpp <- function(se2, lower, upper, tol = 1e-12, maxiter = 1000L) {
     .Call(`_wARMASVp_find_nu_ged_cpp`, se2, lower, upper, tol, maxiter)
 }
 

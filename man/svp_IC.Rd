@@ -33,11 +33,13 @@ opt-in criterion.}
 \code{"particle"}.}
 
 \item{proxy}{Character. Leverage proxy passed to \code{\link{filter_svp}}.
-\code{"bayes_optimal"} (default here, unlike \code{filter_svp})
-removes the \eqn{O(T)} log-likelihood bias of the û-proxy under
-Student-t leverage and restores Schwarz consistency of \code{BIC_Kalman}.
-\code{"u"} reproduces the paper-faithful (Remark 3.5) Kalman likelihood;
-set this if you need IC values that match the filter's default behavior.}
+\code{"bayes_optimal"} (default) is the prescribed proxy in Ahsan,
+Dufour and Rodriguez-Rondon (2026); it removes the \eqn{O(T)}
+log-likelihood bias of the raw \eqn{\hat u}-proxy under Student-t
+leverage and restores Schwarz consistency of \code{BIC_Kalman}.
+\code{"u"} is a simpler alternative using \eqn{\hat u_{t-1}} directly;
+provided for compatibility but not recommended for IC computation
+under Student-t leverage.}
 
 \item{K}{Integer. Number of mixture components for
 \code{filter_method = "mixture"}. Default 7 (KSC).}

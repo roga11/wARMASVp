@@ -425,11 +425,24 @@ correction_factor_ged_approx <- function(nu, n_nodes = 200L) {
     se2 <- as.numeric(var_ly2 - gam1 / rho_w1)
   }
   # Estimate nu: solve (2/nu)^2 * psigamma(1/nu, 1) = se2 (C++)
-  m1 <- sum(abs(ly2)) / N
-  m2 <- sqrt(sum((abs(ly2) - m1)^2) / N)
-  x0 <- m1 / m2
-  lower <- max(1e-6, x0 / 5)
-  upper <- x0 * 5
+  # GED nu root-finding bracket. The historical data-scale-DEPENDENT bracket
+  # (x0 = mean|ly2| / sd|ly2|, retained below for reference) made nu-hat
+  # non-scale-invariant: |log(y^2)| is not scale-invariant, so a rescaling
+  # y -> c*y shifts the bracket and Brent stops at a different point inside its
+  # tolerance ball (Delta nu-hat ~ 5e-9 under scaling), which propagates into
+  # the GMKF QML-LR statistic. The equation's root is scale-invariant (se2 is),
+  # so the FIXED [0.1, 20] bracket -- already the fallback interval inside
+  # find_nu_ged_cpp and matching the boundary warnings below -- gives
+  # bit-identical nu-hat under scaling and harmonizes GED with the fixed-bracket
+  # Student-t solver (.svp_t, bracket [2.01, 500]). See SVpHeavyTails
+  # lessons_learned L91 / SVpTest LAB_NOTES 2026-07-28. (Changed 2026-07-28.)
+  # m1 <- sum(abs(ly2)) / N
+  # m2 <- sqrt(sum((abs(ly2) - m1)^2) / N)
+  # x0 <- m1 / m2
+  # lower <- max(1e-6, x0 / 5)
+  # upper <- x0 * 5
+  lower <- 0.1
+  upper <- 20
   ged_nuh <- find_nu_ged_cpp(as.numeric(se2), lower, upper)
   if (ged_nuh >= 20) {
     warning("Estimated GED nu at upper boundary (20); tails indistinguishable from Gaussian.")

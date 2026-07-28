@@ -15,9 +15,11 @@
 #'   \code{"mixture"} (GMKF), or \code{"particle"} (BPF).
 #' @param proxy Character. Leverage proxy for the filter and the h=1 forecast
 #'   shift. \code{"bayes_optimal"} (default) uses the posterior mean
-#'   \eqn{E[\zeta_{t-1} \mid u_{t-1}]} for Student-t leverage;
-#'   \code{"u"} reproduces the paper-faithful proxy of Remark 3.5
-#'   (\eqn{\hat{z}_{t-1} = \hat{u}_{t-1}}). Has no effect for Gaussian or
+#'   \eqn{E[\zeta_{t-1} \mid u_{t-1}]} for Student-t leverage; this is the
+#'   prescribed proxy in Ahsan, Dufour and Rodriguez-Rondon (2026) and
+#'   corrects the \eqn{\mathrm{Var}(\hat u) = \nu/(\nu-2) > 1} marginal
+#'   inflation of the raw residual. \code{"u"} is a simpler alternative
+#'   that uses \eqn{\hat{u}_{t-1}} directly. Has no effect for Gaussian or
 #'   GED leverage. See \code{\link{filter_svp}} for details.
 #' @param K Integer. Number of mixture components for GMKF. Default 7.
 #' @param M Integer. Number of particles for BPF. Default 1000.
@@ -93,8 +95,10 @@ forecast_svp <- function(object, H = 1,
   # Apply leverage proxy transform consistent with the filter's choice:
   #   Gaussian: zeta = u (exact)
   #   GED:      zeta = Phi^{-1}(F_GED(u; nu)) (exact via copula)
-  #   Student-t with proxy="u": zeta = u (paper-faithful, Remark 3.5)
-  #   Student-t with proxy="bayes_optimal": zeta = E[zeta|u]
+  #   Student-t with proxy="bayes_optimal": zeta = E[zeta|u]  (prescribed
+  #       by Ahsan, Dufour and Rodriguez-Rondon 2026; default)
+  #   Student-t with proxy="u": zeta = u  (simpler alternative; does not
+  #       correct the Var(u-hat) = nu/(nu-2) > 1 marginal inflation)
   zT <- .leverage_zeta_proxy_R(zT_raw, mdl, proxy)
 
   # Build companion matrix
@@ -104,9 +108,11 @@ forecast_svp <- function(object, H = 1,
 
   # State noise covariance — horizon-dependent under leverage.
   #
-  # h = 1: predicting w_{T+1} from F_T.  z_T is observed (computed from y_T
-  #        and the filtered h_T), so the conditional Var[z_T | F_T] = 0 under
-  #        the u-proxy convention.  Per SVHT Remark 3.5:
+  # h = 1: predicting w_{T+1} from F_T.  The proxy z-hat_T is computed
+  #        deterministically from F_T (either proxy choice), so the
+  #        leverage shift sigma_v * delta_p * z-hat_T is treated as a known
+  #        input and the conditional Var[z_T | F_T] = 0.  Per Ahsan, Dufour
+  #        and Rodriguez-Rondon (2026):
   #            Q_1 = sigma_v^2 * (1 - delta_p^2).
   #
   # h >= 2: predicting w_{T+h} from F_T.  z_{T+h-1} is unobserved future

@@ -89,7 +89,7 @@ static double brent_zero(F f, double a, double b, double tol, int maxiter) {
 
 // [[Rcpp::export]]
 double find_nu_t_cpp(double se2b, double nu_lower = 2.01, double nu_upper = 500.0,
-                      bool logNu = false, double tol = 1e-6, int maxiter = 1000) {
+                      bool logNu = false, double tol = 1e-12, int maxiter = 1000) {
   // Boundary checks (same as R)
   if (se2b <= R::psigamma(nu_upper / 2.0, 1)) {
     return nu_upper;
@@ -121,7 +121,7 @@ double find_nu_t_cpp(double se2b, double nu_lower = 2.01, double nu_upper = 500.
 
 // [[Rcpp::export]]
 double find_nu_ged_cpp(double se2, double lower, double upper,
-                        double tol = 1e-6, int maxiter = 1000) {
+                        double tol = 1e-12, int maxiter = 1000) {
   auto f = [se2](double x) -> double {
     return std::pow(2.0 / x, 2) * R::psigamma(1.0 / x, 1) - se2;
   };

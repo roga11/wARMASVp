@@ -33,9 +33,11 @@ controls which is used by \code{print} and \code{plot} methods.}
 
 \item{proxy}{Character. Leverage proxy for the filter and the h=1 forecast
 shift. \code{"bayes_optimal"} (default) uses the posterior mean
-\eqn{E[\zeta_{t-1} \mid u_{t-1}]} for Student-t leverage;
-\code{"u"} reproduces the paper-faithful proxy of Remark 3.5
-(\eqn{\hat{z}_{t-1} = \hat{u}_{t-1}}). Has no effect for Gaussian or
+\eqn{E[\zeta_{t-1} \mid u_{t-1}]} for Student-t leverage; this is the
+prescribed proxy in Ahsan, Dufour and Rodriguez-Rondon (2026) and
+corrects the \eqn{\mathrm{Var}(\hat u) = \nu/(\nu-2) > 1} marginal
+inflation of the raw residual. \code{"u"} is a simpler alternative
+that uses \eqn{\hat{u}_{t-1}} directly. Has no effect for Gaussian or
 GED leverage. See \code{\link{filter_svp}} for details.}
 
 \item{K}{Integer. Number of mixture components for GMKF. Default 7.}
