@@ -2,6 +2,24 @@
 
 ## Bug fixes
 
+* Filtering no longer resets the caller's random-number stream as a side
+  effect. `fit_ksc_mixture()` (used by `filter_svp(method = "mixture")` for
+  Student-t / GED) and the bootstrap particle filter
+  (`filter_svp(method = "particle")`, all error types) each call `set.seed()`
+  internally to make their own draws reproducible, but previously left the
+  global `.Random.seed` in that fixed state on return. Any caller that drew
+  random numbers *after* a `filter_svp()` / `svp_IC()` / `svp_AR_order()` /
+  `forecast_svp()` call — e.g. a Monte Carlo loop simulating data from the
+  ambient stream between statistic evaluations — would get a repeated draw.
+  Both sites now save and restore `.Random.seed` around the internal seeding
+  (new internal helper `.with_preserved_seed()`), so these functions are
+  side-effect-free with respect to the caller's RNG. **All numerical outputs
+  (log-likelihoods, IC values, forecasts) are bit-identical** — only the
+  side effect is removed. Added regression tests (`test-rng-hygiene.R`).
+  *Reproducibility note:* a script that (incorrectly) relied on the ambient
+  stream being reset after a filter call will now see different draws than
+  under previous versions; seed each replication explicitly.
+
 * GED degrees-of-freedom estimation (`svp(..., errorType = "GED")`): the
   `nu` root-finder now uses the fixed bracket `[0.1, 20]` instead of a
   data-scale-dependent bracket derived from `mean|log(y^2)| / sd|log(y^2)|`.

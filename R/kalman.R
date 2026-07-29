@@ -75,6 +75,29 @@ density_eps_ged <- function(y, nu) {
 # KSC Gaussian Mixture Fitting
 # --------------------------------------------------------------------------- #
 
+# Evaluate `expr` while preserving the caller's global RNG stream. Package
+# routines that seed an internal computation for reproducibility -- the
+# fit_ksc_mixture() EM sample and the bootstrap particle filter -- must remain
+# reproducible via their own `seed` argument WITHOUT resetting the user's
+# ambient `.Random.seed` as a side effect. Such a reset silently corrupts
+# callers that draw random numbers between calls (e.g. Monte Carlo loops that
+# simulate a dataset, evaluate a filter/IC statistic, then simulate the next
+# dataset from the ambient stream). Saves `.Random.seed` before evaluating and
+# restores it on exit via `on.exit` (all paths, including errors); if no seed
+# existed beforehand, removes the one the internal `set.seed()` created.
+# Internal; not exported.
+.with_preserved_seed <- function(expr) {
+  if (exists(".Random.seed", envir = globalenv(), inherits = FALSE)) {
+    old_seed <- get(".Random.seed", envir = globalenv(), inherits = FALSE)
+    on.exit(assign(".Random.seed", old_seed, envir = globalenv()), add = TRUE)
+  } else {
+    on.exit(if (exists(".Random.seed", envir = globalenv(), inherits = FALSE)) {
+      rm(".Random.seed", envir = globalenv())
+    }, add = TRUE)
+  }
+  expr
+}
+
 #' Fit K-Component Gaussian Mixture to Measurement Noise Density
 #'
 #' Uses EM algorithm to approximate the measurement noise density with a
@@ -111,45 +134,50 @@ fit_ksc_mixture <- function(distribution = c("gaussian", "student_t", "ged"),
     ))
   }
 
-  # Generate large sample from exact density
-  set.seed(seed)
-  eps <- switch(distribution,
-    gaussian = {
-      log(rchisq(n_sample, 1)) - (digamma(0.5) + log(2))
-    },
-    student_t = {
-      if (is.null(nu) || nu <= 0) stop("nu must be positive for Student-t.")
-      mu_bar <- digamma(0.5) - digamma(nu / 2) + log(nu)
-      log(rf(n_sample, 1, nu)) - mu_bar
-    },
-    ged = {
-      if (is.null(nu) || nu <= 0) stop("nu must be positive for GED.")
-      a <- exp(0.5 * (lgamma(1 / nu) - lgamma(3 / nu)))
-      x_gam <- rgamma(n_sample, shape = 1 / nu, rate = 1)
-      u <- sign(runif(n_sample) - 0.5) * a * x_gam^(1 / nu)
-      mu_bar_g <- (2 / nu) * digamma(1 / nu) + lgamma(1 / nu) - lgamma(3 / nu)
-      log(u^2 + 1e-300) - mu_bar_g
+  # Generate large sample from exact density and fit the mixture. The internal
+  # EM sample is seeded (via `seed`) for reproducibility of the returned
+  # mixture, but the caller's ambient RNG stream is preserved around all
+  # sampling so this function does not reset .Random.seed as a side effect.
+  fit <- .with_preserved_seed({
+    set.seed(seed)
+    eps <- switch(distribution,
+      gaussian = {
+        log(rchisq(n_sample, 1)) - (digamma(0.5) + log(2))
+      },
+      student_t = {
+        if (is.null(nu) || nu <= 0) stop("nu must be positive for Student-t.")
+        mu_bar <- digamma(0.5) - digamma(nu / 2) + log(nu)
+        log(rf(n_sample, 1, nu)) - mu_bar
+      },
+      ged = {
+        if (is.null(nu) || nu <= 0) stop("nu must be positive for GED.")
+        a <- exp(0.5 * (lgamma(1 / nu) - lgamma(3 / nu)))
+        x_gam <- rgamma(n_sample, shape = 1 / nu, rate = 1)
+        u <- sign(runif(n_sample) - 0.5) * a * x_gam^(1 / nu)
+        mu_bar_g <- (2 / nu) * digamma(1 / nu) + lgamma(1 / nu) - lgamma(3 / nu)
+        log(u^2 + 1e-300) - mu_bar_g
+      }
+    )
+
+    # EM algorithm for K-component Gaussian mixture
+    # Initialize with K-means-style quantile-based initialization
+    breaks <- quantile(eps, probs = seq(0, 1, length.out = K + 1))
+    m <- numeric(K)
+    s2 <- numeric(K)
+    q <- rep(1 / K, K)
+    for (k in 1:K) {
+      idx <- which(eps >= breaks[k] & eps < breaks[k + 1])
+      if (k == K) idx <- which(eps >= breaks[k])
+      if (length(idx) < 2) idx <- sample(length(eps), max(2, length(eps) %/% K))
+      m[k] <- mean(eps[idx])
+      s2[k] <- var(eps[idx])
+      q[k] <- length(idx) / n_sample
     }
-  )
 
-  # EM algorithm for K-component Gaussian mixture
-  # Initialize with K-means-style quantile-based initialization
-  breaks <- quantile(eps, probs = seq(0, 1, length.out = K + 1))
-  m <- numeric(K)
-  s2 <- numeric(K)
-  q <- rep(1 / K, K)
-  for (k in 1:K) {
-    idx <- which(eps >= breaks[k] & eps < breaks[k + 1])
-    if (k == K) idx <- which(eps >= breaks[k])
-    if (length(idx) < 2) idx <- sample(length(eps), max(2, length(eps) %/% K))
-    m[k] <- mean(eps[idx])
-    s2[k] <- var(eps[idx])
-    q[k] <- length(idx) / n_sample
-  }
-
-  # EM loop in C++ (returns sorted weights/means/vars)
-  fit <- fit_ksc_em_cpp(eps = eps, init_m = m, init_s2 = s2, init_q = q,
-                        max_iter = max_iter, tol = tol)
+    # EM loop in C++ (returns sorted weights/means/vars)
+    fit_ksc_em_cpp(eps = eps, init_m = m, init_s2 = s2, init_q = q,
+                   max_iter = max_iter, tol = tol)
+  })
 
   list(
     weights = fit$weights,
@@ -380,7 +408,10 @@ filter_svp <- function(object, method = c("corrected", "mixture", "particle"),
     )
     nu_val <- if (is.null(params$nu)) 0.0 else params$nu
 
-    result <- particle_filter_svp_cpp(
+    # The BPF seeds R's RNG internally (via `seed`) for reproducible particle
+    # draws; preserve the caller's ambient RNG stream around it so the filter
+    # is side-effect-free w.r.t. .Random.seed (matches fit_ksc_mixture).
+    result <- .with_preserved_seed(particle_filter_svp_cpp(
       y_raw = y_vec,
       phi = params$phi,
       sigma_y = params$sigma_y,
@@ -391,7 +422,7 @@ filter_svp <- function(object, method = c("corrected", "mixture", "particle"),
       M = as.integer(M),
       seed = as.integer(seed),
       del = del
-    )
+    ))
 
     # BPF doesn't produce smoothed states — use filtered as placeholder
     T_obs <- length(y_vec)
