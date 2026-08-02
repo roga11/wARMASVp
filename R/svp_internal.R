@@ -445,7 +445,16 @@ correction_factor_ged_approx <- function(nu, n_nodes = 200L) {
   upper <- 20
   ged_nuh <- find_nu_ged_cpp(as.numeric(se2), lower, upper)
   if (ged_nuh >= 20) {
-    warning("Estimated GED nu at upper boundary (20); tails indistinguishable from Gaussian.")
+    warning("Estimated GED nu at upper boundary (20). The shape is not ",
+            "identified near this bound: nu in [20, Inf) spans a range of the ",
+            "matched moment (2/nu)^2*trigamma(1/nu) of width ~0.015, within ",
+            "sampling error, so read this as 'nu is large and indistinguishable ",
+            "from infinity', not as nu = 20. Substantively GED(20) implies ",
+            "near-uniform, bounded innovations that are THINNER-tailed than ",
+            "Gaussian (kurtosis ~1.82 vs 3; Gaussian is GED(2), mid-range) -- ",
+            "implausible for asset returns and usually a sign that the AR order, ",
+            "leverage specification or error family is misspecified. Consider ",
+            "comparing against errorType = \"Student-t\".")
   } else if (ged_nuh <= 0.1) {
     warning("Estimated GED nu at lower boundary (0.1); extremely heavy tails.")
   }
@@ -1132,7 +1141,8 @@ LRT_moment_lev_ged_Amat <- function(y, mdl_out, rho_type, del = 1e-10,
       stat <- tryCatch(stat_bartlett(u, mdl_null_tmp, mdl_alt_tmp),
                        error = function(e) NA_real_)
       if (is.na(stat)) next
-      sN[xn] <- max(stat, 1e-10)
+      # Not capped -- see lmc_ar.
+      sN[xn] <- stat
     } else {
       phi_extra <- mdl_alt_tmp$phi[(p_null + 1):p_alt]
       sN[xn] <- Tsize * sum(phi_extra^2)
@@ -1154,7 +1164,8 @@ LRT_moment_lev_ged_Amat <- function(y, mdl_out, rho_type, del = 1e-10,
       stat <- tryCatch(stat_bartlett(u, mdl_null_tmp, mdl_alt_tmp),
                        error = function(e) NA_real_)
       if (is.na(stat)) next
-      sN[xn] <- max(stat, 1e-10)
+      # Not capped -- see lmc_ar.
+      sN[xn] <- stat
     } else {
       phi_extra <- mdl_alt_tmp$phi[(p_null + 1):p_alt]
       sN[xn] <- Tsize * sum(phi_extra^2)

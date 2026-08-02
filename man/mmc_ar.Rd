@@ -76,14 +76,28 @@ only). Default \code{TRUE}.}
 (heavy-tail only). Default 0.}
 }
 \value{
-A list with optimization output including \code{value} (maximized p-value)
-  and \code{par} (nuisance parameters at the maximum).
+A list with optimization output, including \code{value} (maximized
+  p-value), \code{par} (nuisance parameters at the maximum), and \code{s0}
+  (test statistic from observed data).
 }
 \description{
 Performs a Maximized Monte Carlo (MMC) test of
 \eqn{H_0: \phi_{p_0+1} = \cdots = \phi_p = 0}
 by maximizing the MC p-value over nuisance parameters
 (\eqn{\phi_1, \ldots, \phi_{p_0}, \sigma_y, \sigma_v}).
+}
+\details{
+When \code{Bartlett = FALSE} (default), the test statistic is
+\eqn{T \sum_{j=p_0+1}^{p} \hat\phi_j^2}, i.e., the sum of squared extra
+AR coefficients scaled by sample size.
+
+When \code{Bartlett = TRUE}, the test statistic is based on the GMM-LRT
+approach with a Bartlett kernel HAC weighting matrix:
+\eqn{S = T \times (M_{H_0} - M_{H_1})}, where \eqn{M} denotes the
+GMM criterion evaluated at the null and alternative estimates. Because the
+criteria are moment-based rather than maximized likelihoods, the statistic
+may be negative; this indicates evidence in favour of the null, and raises
+a warning.
 }
 \examples{
 \donttest{

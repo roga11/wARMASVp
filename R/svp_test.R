@@ -55,7 +55,7 @@
 #'
 #' @return An object of class \code{"svp_test"}, a list containing:
 #' \describe{
-#'   \item{s0}{Test statistic from observed data (capped at 1e-10 if negative).}
+#'   \item{s0}{Test statistic from observed data.}
 #'   \item{sN}{Simulated null distribution (vector of length N).}
 #'   \item{pval}{Monte Carlo p-value.}
 #'   \item{test_type}{Character string identifying the test.}
@@ -73,11 +73,10 @@
 #' When \code{Bartlett = TRUE}, the test statistic is based on the GMM-LRT
 #' approach with a Bartlett kernel HAC weighting matrix:
 #' \eqn{S = T \times (M_{H_0} - M_{H_1})}, where \eqn{M} denotes the
-#' GMM criterion evaluated at the null and alternative estimates. Both the
-#' observed and simulated test statistics are capped at \code{1e-10} when
-#' negative; a negative observed statistic raises a warning (it indicates strong
-#' evidence in favour of the null, since the alternative does not improve the
-#' GMM criterion).
+#' GMM criterion evaluated at the null and alternative estimates. Because the
+#' criteria are moment-based rather than maximized likelihoods, the statistic
+#' may be negative; this indicates evidence in favour of the null, and raises
+#' a warning.
 #'
 #' @examples
 #' \donttest{
@@ -144,11 +143,12 @@ lmc_ar <- function(y, p_null, p_alt, J = 10, N = 99, burnin = 500,
     s0_tmp <- Tsize * sum(phi_extra^2)
   }
 
-  # Cap negative observed test statistic for consistency with simulated null
+  # Not capped: the criteria are moment-based, not maximized likelihoods, so
+  # S < 0 is possible and informative.
   if (is.na(s0_tmp)) stop("Test statistic is NA.")
   if (s0_tmp < 0) warning("Test statistic is negative (", round(s0_tmp, 4),
-                          "); capped at 1e-10. May indicate strong evidence for null.")
-  s0 <- max(s0_tmp, 1e-10)
+                          "); may indicate strong evidence for null.")
+  s0 <- s0_tmp
 
   # Build betasim_null (length p_null+2 for Gaussian; p_null+3 for heavy-tail)
   if (errorType == "Gaussian") {
@@ -190,6 +190,7 @@ lmc_ar <- function(y, p_null, p_alt, J = 10, N = 99, burnin = 500,
 #' (\eqn{\phi_1, \ldots, \phi_{p_0}, \sigma_y, \sigma_v}).
 #'
 #' @inheritParams lmc_ar
+#' @inherit lmc_ar details
 #' @param eps Numeric vector. Half-width of search region around estimated
 #'   nuisance parameters. Default \code{rep(0.3, p_null+2)}.
 #' @param threshold Numeric. Target p-value. Default 1.
@@ -197,8 +198,9 @@ lmc_ar <- function(y, p_null, p_alt, J = 10, N = 99, burnin = 500,
 #'   Default \code{"pso"}.
 #' @param maxit Integer. Maximum iterations/evaluations. Default depends on method.
 #'
-#' @return A list with optimization output including \code{value} (maximized p-value)
-#'   and \code{par} (nuisance parameters at the maximum).
+#' @return A list with optimization output, including \code{value} (maximized
+#'   p-value), \code{par} (nuisance parameters at the maximum), and \code{s0}
+#'   (test statistic from observed data).
 #'
 #' @examples
 #' \donttest{
@@ -287,10 +289,11 @@ mmc_ar <- function(y, p_null, p_alt, J = 10, N = 99, burnin = 500,
     s0_tmp <- Tsize * sum(phi_extra^2)
   }
 
+  # Not capped -- see lmc_ar.
   if (is.na(s0_tmp)) stop("Test statistic is NA.")
   if (s0_tmp < 0) warning("Test statistic is negative (", round(s0_tmp, 4),
-                          "); capped at 1e-10. May indicate strong evidence for null.")
-  s0 <- max(s0_tmp, 1e-10)
+                          "); may indicate strong evidence for null.")
+  s0 <- s0_tmp
 
   # Pre-draw innovations for fixed-error MMC (Dufour 2006)
   n_total <- burnin + Tsize

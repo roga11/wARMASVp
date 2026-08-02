@@ -2,6 +2,60 @@
 
 ## Bug fixes
 
+* The warning issued when the GED shape parameter hits its upper bound was
+  **factually backwards**. It stated that the tails were "indistinguishable
+  from Gaussian"; in fact GED(20) is close to *uniform* and has tails roughly
+  a million times **thinner** than Gaussian (kurtosis 1.82 versus 3, and
+  `P(|z| > 2)` of 4.2e-08 versus 0.0455). Gaussian is GED(2), in the middle of
+  the admissible range, not at its top. The message appears to have been copied
+  from the Student-t boundary warning, where `nu -> Inf` genuinely *is* Gaussian
+  and the wording is correct.
+
+  The replacement says what a boundary estimate actually means: the shape is
+  **not identified** there, because `nu` in `[20, Inf)` spans a range of the
+  matched moment `(2/nu)^2 * trigamma(1/nu)` of width only ~0.015 — within
+  sampling error at typical sample sizes — so `nu_hat = 20` should be read as
+  "large and indistinguishable from infinity" rather than as an estimate of 20.
+  It also notes that near-uniform, thinner-than-Gaussian innovations are
+  implausible for asset returns and usually indicate that the AR order,
+  leverage specification, or error family is misspecified, and suggests
+  comparing against `errorType = "Student-t"`.
+
+  The Student-t boundary warning is unchanged and remains correct.
+
+* `lmc_ar()` and `mmc_ar()` no longer cap the test statistic at `1e-10`. Both
+  the observed statistic and every simulated null draw are now retained
+  uncapped, so the simulated null distribution is continuous.
+
+  The `Bartlett = TRUE` (HAC) statistic is an LR-type test built from GMM
+  criteria rather than maximized likelihoods, and the null and alternative
+  criteria are formed under separately estimated models with their own implied
+  long-run variances. Nothing is maximized over a nesting parameter space, so
+  the non-negativity of a genuine likelihood ratio does not carry over:
+  negative values are structurally possible and informative — they indicate
+  the null fits the moment conditions better than the alternative — so forcing
+  `S >= 0` was not justified.
+
+  Capping was also mildly anti-conservative. It placed a point mass at
+  `1e-10` (measured: 71% of draws on a Gaussian SV(1) DGP with `T = 1000`,
+  `p_null = 1` vs `p_alt = 2`), and the right-tailed Monte Carlo p-value
+  `(N + 1 - #{s0 >= sN})/(N + 1)` is algebraically `(1 + #{sN > s0})/(N + 1)`,
+  which *excludes* ties from the numerator. When the observed statistic also
+  sat at the cap, the p-value was pulled down. On the example above the same
+  simulated draws give `p = 0.24` capped versus `p = 0.79` uncapped; the latter
+  is correct, since a negative observed statistic is evidence *for* the null.
+
+  Note the cap was provably a no-op whenever `s0 > 1e-10`: capping only moves
+  draws upward to the cap and they remain strictly below `s0`, leaving
+  `#{sN > s0}` unchanged. Results with a strictly positive observed statistic
+  are therefore **unaffected**, as are all results using the default
+  `Bartlett = FALSE` statistic `T * sum(phi_extra^2)`, which is non-negative by
+  construction and was never capped.
+
+  The other six testing functions (`lmc_t`/`mmc_t`, `lmc_ged`/`mmc_ged`,
+  `lmc_lev`/`mmc_lev`) still cap; whether to remove it there is under review.
+  Added regression tests to `test-testing.R`.
+
 * Filtering no longer resets the caller's random-number stream as a side
   effect. `fit_ksc_mixture()` (used by `filter_svp(method = "mixture")` for
   Student-t / GED) and the bootstrap particle filter

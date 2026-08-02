@@ -419,7 +419,7 @@ test_that("lmc_ar with errorType='Student-t' runs", {
   expect_equal(test$errorType, "Student-t")
   expect_true(test$pval >= 0 && test$pval <= 1)
   expect_true(grepl("Student-t", test$test_type))
-  expect_true(test$s0 >= 0)  # capping enforces non-negative
+  expect_true(is.finite(test$s0))  # uncapped: may be negative under Bartlett
 })
 
 test_that("lmc_ar with errorType='GED' runs", {
@@ -434,7 +434,7 @@ test_that("lmc_ar with errorType='GED' runs", {
   expect_equal(test$errorType, "GED")
   expect_true(test$pval >= 0 && test$pval <= 1)
   expect_true(grepl("GED", test$test_type))
-  expect_true(test$s0 >= 0)
+  expect_true(is.finite(test$s0))
 })
 
 test_that("mmc_ar with errorType='Student-t' runs", {
@@ -449,7 +449,7 @@ test_that("mmc_ar with errorType='Student-t' runs", {
   )
   expect_equal(test$errorType, "Student-t")
   expect_true(test$value >= 0 && test$value <= 1)
-  expect_true(test$s0 >= 0)
+  expect_true(is.finite(test$s0))
 })
 
 test_that("mmc_ar with errorType='GED' runs", {
@@ -464,16 +464,39 @@ test_that("mmc_ar with errorType='GED' runs", {
   )
   expect_equal(test$errorType, "GED")
   expect_true(test$value >= 0 && test$value <= 1)
-  expect_true(test$s0 >= 0)
+  expect_true(is.finite(test$s0))
 })
 
-test_that("lmc_ar caps negative observed test statistic at 1e-10", {
+test_that("lmc_ar/mmc_ar do NOT cap statistics at 1e-10 (atom-free null)", {
+  # Regression test. The HAC (Bartlett) statistic is a difference of GMM criteria
+  # from two separately weighted models, so it can be negative. Capping at 1e-10
+  # put a large point mass there (measured 71% of draws), and the right-tailed
+  # p-value excludes ties -- anti-conservative when s0 also sits at the cap.
+  # These assertions fail on the pre-fix code.
   set.seed(99)
   y <- sim_svp(300, phi = 0.7, sigy = 1, sigv = 0.4)$y
   test <- suppressWarnings(
     lmc_ar(y, p_null = 1, p_alt = 2, J = 10, N = 19, Bartlett = TRUE)
   )
-  expect_true(test$s0 >= 1e-10)  # always non-negative after capping
+  expect_true(is.finite(test$s0))
+  # Negative draws must survive into the simulated null rather than collapse.
+  # This is the load-bearing assertion: under the pre-fix code every negative
+  # draw became exactly 1e-10, so any(sN < 0) was necessarily FALSE.
+  expect_true(any(test$sN < 0))
+  expect_true(test$pval >= 0 && test$pval <= 1)
+
+  # Bartlett = FALSE statistic is T * sum(phi_extra^2), non-negative by
+  # construction and never capped -- unchanged by the fix.
+  test_id <- lmc_ar(y, p_null = 1, p_alt = 2, J = 10, N = 19, Bartlett = FALSE)
+  expect_true(test_id$s0 >= 0)
+  expect_true(all(test_id$sN >= 0))
+
+  skip_on_cran()
+  mtest <- suppressWarnings(
+    mmc_ar(y, p_null = 1, p_alt = 2, J = 10, N = 9, Bartlett = TRUE,
+           method = "pso", maxit = 5)
+  )
+  expect_true(is.finite(mtest$s0))
 })
 
 test_that("lmc_ar errorType validation rejects invalid argument", {
