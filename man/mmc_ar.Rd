@@ -99,6 +99,51 @@ criteria are moment-based rather than maximized likelihoods, the statistic
 may be negative; this indicates evidence in favour of the null, and raises
 a warning.
 }
+\section{Nuisance parameters and the role of nu}{
+
+For \code{mmc_ar}, the maximization runs over
+\eqn{(\phi_1,\ldots,\phi_{p_0}, \sigma_y, \sigma_v)}. The shape parameter
+\eqn{\nu} is held fixed at its null estimate and is not varied, and
+\eqn{\sigma_y} is present but given a zero half-width by default.
+
+The reason for excluding \eqn{\nu} is a property of the moment conditions
+rather than a computational shortcut. Writing the linearized model as
+\eqn{y^*_t = \log(y_t^2) - \mu = h_t + x_t}, with \eqn{h_t} the AR(\eqn{p})
+log-volatility state and \eqn{x_t} an i.i.d. measurement error independent
+of \eqn{h}, the autocovariances separate as
+\deqn{\gamma_{y^*}(0) = \gamma_h(0) + \sigma_\varepsilon^2(\nu), \qquad
+      \gamma_{y^*}(k) = \gamma_h(k) \;\; (k \ge 1).}
+The error distribution enters only through \eqn{\sigma_\varepsilon^2(\nu)}
+(\eqn{\pi^2/2} for Gaussian, \eqn{\psi'(1/2) + \psi'(\nu/2)} for
+Student-t, \eqn{(2/\nu)^2 \psi'(1/\nu)} for GED), and that term appears at
+lag zero only.
+
+The AR-order moment conditions are the Yule-Walker equations
+\deqn{m_j = \gamma_{y^*}(p+j) - \sum_{i=1}^{p} \phi_i\,\gamma_{y^*}(p+j-i),
+      \qquad j = 1,\ldots,p,}
+whose smallest lag is \eqn{p+j-p = j \ge 1}. Lag zero never appears, so the
+conditions do not involve \eqn{\nu}. Since \eqn{\gamma_h(k) = \sigma_v^2
+c_k(\boldsymbol\phi)}, they are also homogeneous in \eqn{\sigma_v^2}, which
+cancels; in population they depend on \eqn{\boldsymbol\phi} alone.
+
+What \eqn{\nu} still influences is the sampling variability of the estimated
+autocovariances, through the signal-to-noise ratio
+\eqn{\gamma_h(0)/\sigma_\varepsilon^2(\nu)}. In that ratio \eqn{\sigma_v}
+and \eqn{\nu} appear only as \eqn{\sigma_v^2/\sigma_\varepsilon^2(\nu)}, so
+varying \eqn{\sigma_v} over its interval already traverses the same family
+of null distributions that varying \eqn{\nu} would; the two are redundant.
+This covers the second-moment behaviour exactly. It does not cover the
+fourth moment of \eqn{x_t}, which depends on \eqn{\nu} beyond
+\eqn{\sigma_\varepsilon^2}, so the redundancy is exact in population and
+approximate in finite samples.
+
+This reasoning is specific to the AR-order test. In \code{mmc_t} and
+\code{mmc_ged}, \eqn{\nu} is the parameter under test and is fixed at the
+hypothesized value by construction. In \code{mmc_lev}, \eqn{\nu} enters the
+leverage moment condition directly through the correction factor, not only
+at lag zero, and is therefore carried as a varied nuisance.
+}
+
 \examples{
 \donttest{
 y <- sim_svp(1000, phi = 0.95, sigy = 1, sigv = 0.2)$y
