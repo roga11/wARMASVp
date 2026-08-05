@@ -7,6 +7,12 @@
 *.RData
 *.rds
 *.Rds
+# but the shipped GMKF mixture tables must be tracked
+!inst/extdata/*.rds
+
+# Artifacts if the shipped GMKF build scripts are ever run in place
+inst/gmkf-tables/logs/
+inst/gmkf-tables/csvTables/
 
 # Compiled objects / shared libraries
 src/*.o

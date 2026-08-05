@@ -31,7 +31,8 @@ fit_ksc_mixture(
 \item{seed}{Integer. Random seed. Default 42.}
 }
 \value{
-List with \code{weights}, \code{means}, \code{vars}, \code{KL_div}.
+List with \code{weights}, \code{means}, \code{vars}, \code{nu},
+  \code{distribution}.
 }
 \description{
 Uses EM algorithm to approximate the measurement noise density with a

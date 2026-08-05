@@ -19,10 +19,15 @@ fits <- list(
 methods <- c("corrected", "mixture", "particle")
 
 test_that("filter evaluations do not reset the caller's ambient RNG stream", {
+  # mixture = "em" throughout this file: these tests guard the seeded EM /
+  # BPF paths (.with_preserved_seed wiring). Under the default "optimal"
+  # tables the mixture path uses no RNG at all and the tests would pass
+  # vacuously. The optimal path's own hygiene is in test-gmkf-tables.R.
   draw_after <- function(fit, method, pre) {
     set.seed(pre)
     invisible(suppressWarnings(
-      filter_svp(fit, method = method, K = 7, M = 200, seed = 42)$loglik))
+      filter_svp(fit, method = method, mixture = "em",
+                 K = 7, M = 200, seed = 42)$loglik))
     runif(3)
   }
   for (et in names(fits)) {
@@ -41,11 +46,11 @@ test_that("filter log-likelihood is independent of the ambient RNG state", {
   for (et in names(fits)) {
     for (m in methods) {
       set.seed(111)
-      l1 <- suppressWarnings(filter_svp(fits[[et]], method = m, K = 7,
-                                        M = 200, seed = 42)$loglik)
+      l1 <- suppressWarnings(filter_svp(fits[[et]], method = m, mixture = "em",
+                                        K = 7, M = 200, seed = 42)$loglik)
       set.seed(222)
-      l2 <- suppressWarnings(filter_svp(fits[[et]], method = m, K = 7,
-                                        M = 200, seed = 42)$loglik)
+      l2 <- suppressWarnings(filter_svp(fits[[et]], method = m, mixture = "em",
+                                        K = 7, M = 200, seed = 42)$loglik)
       expect_equal(l1, l2,
         info = sprintf("%s / %s: loglik depends on ambient seed", et, m))
     }
@@ -58,9 +63,10 @@ test_that("svp_IC / forecast_svp also leave the ambient RNG stream intact", {
   }
   fit <- fits[["GED"]]
   ic_call <- function() svp_IC(fit, criteria = "BIC_Kalman",
-                               filter_method = "mixture", seed = 42)
+                               filter_method = "mixture", mixture = "em",
+                               seed = 42)
   fc_call <- function() forecast_svp(fit, H = 2, filter_method = "mixture",
-                                     seed = 42)
+                                     mixture = "em", seed = 42)
   expect_false(identical(draw_after(ic_call, 1), draw_after(ic_call, 2)))
   expect_false(identical(draw_after(fc_call, 1), draw_after(fc_call, 2)))
 })
@@ -94,7 +100,8 @@ test_that("ambient RNG is preserved under RNGkind('L'Ecuyer-CMRG')", {
   set.seed(7)
   s_api <- get(".Random.seed", envir = globalenv(), inherits = FALSE)
   invisible(suppressWarnings(
-    filter_svp(fits[["GED"]], method = "mixture", K = 7, seed = 42)$loglik))
+    filter_svp(fits[["GED"]], method = "mixture", mixture = "em",
+               K = 7, seed = 42)$loglik))
   invisible(suppressWarnings(
     filter_svp(fits[["GED"]], method = "particle", M = 200, seed = 42)$loglik))
   expect_identical(get(".Random.seed", envir = globalenv(), inherits = FALSE), s_api)

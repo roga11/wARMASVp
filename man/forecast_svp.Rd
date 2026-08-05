@@ -10,6 +10,7 @@ forecast_svp(
   output = c("log-variance", "variance", "volatility"),
   filter_method = "corrected",
   proxy = c("bayes_optimal", "u"),
+  mixture = c("optimal", "ksc", "em"),
   K = 7,
   M = 1000,
   seed = 42,
@@ -40,11 +41,19 @@ inflation of the raw residual. \code{"u"} is a simpler alternative
 that uses \eqn{\hat{u}_{t-1}} directly. Has no effect for Gaussian or
 GED leverage. See \code{\link{filter_svp}} for details.}
 
-\item{K}{Integer. Number of mixture components for GMKF. Default 7.}
+\item{mixture}{Character. Source of the GMKF measurement mixture when
+\code{filter_method = "mixture"}: \code{"optimal"} (default, precomputed
+tables — deterministic), \code{"ksc"} (published KSC table; Gaussian,
+\code{K = 7} only) or \code{"em"} (legacy sampled EM fit; any \code{K}).
+See \code{\link{filter_svp}} for details.}
+
+\item{K}{Integer. Number of mixture components for GMKF. Default 7.
+Under \code{mixture = "optimal"} only 7, 10, 12 or 16 are available.}
 
 \item{M}{Integer. Number of particles for BPF. Default 1000.}
 
-\item{seed}{Integer. Random seed for BPF. Default 42.}
+\item{seed}{Integer. Random seed for BPF and the \code{mixture = "em"}
+fit. Default 42.}
 
 \item{del}{Numeric. Small constant for log transformation. Default \code{1e-10}.}
 }

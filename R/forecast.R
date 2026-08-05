@@ -21,9 +21,16 @@
 #'   inflation of the raw residual. \code{"u"} is a simpler alternative
 #'   that uses \eqn{\hat{u}_{t-1}} directly. Has no effect for Gaussian or
 #'   GED leverage. See \code{\link{filter_svp}} for details.
+#' @param mixture Character. Source of the GMKF measurement mixture when
+#'   \code{filter_method = "mixture"}: \code{"optimal"} (default, precomputed
+#'   tables — deterministic), \code{"ksc"} (published KSC table; Gaussian,
+#'   \code{K = 7} only) or \code{"em"} (legacy sampled EM fit; any \code{K}).
+#'   See \code{\link{filter_svp}} for details.
 #' @param K Integer. Number of mixture components for GMKF. Default 7.
+#'   Under \code{mixture = "optimal"} only 7, 10, 12 or 16 are available.
 #' @param M Integer. Number of particles for BPF. Default 1000.
-#' @param seed Integer. Random seed for BPF. Default 42.
+#' @param seed Integer. Random seed for BPF and the \code{mixture = "em"}
+#'   fit. Default 42.
 #' @param del Numeric. Small constant for log transformation. Default \code{1e-10}.
 #'
 #' @return An object of class \code{"svp_forecast"}, a list containing:
@@ -58,6 +65,7 @@ forecast_svp <- function(object, H = 1,
                          output = c("log-variance", "variance", "volatility"),
                          filter_method = "corrected",
                          proxy = c("bayes_optimal", "u"),
+                         mixture = c("optimal", "ksc", "em"),
                          K = 7, M = 1000, seed = 42, del = 1e-10) {
   if (!inherits(object, c("svp", "svp_t", "svp_ged"))) {
     stop("object must be an svp/svp_t/svp_ged model from svp(). ",
@@ -75,6 +83,7 @@ forecast_svp <- function(object, H = 1,
   output <- match.arg(output)
   filter_method <- match.arg(filter_method, c("corrected", "mixture", "particle"))
   proxy <- match.arg(proxy)
+  mixture <- match.arg(mixture)
 
   mdl <- object
   y_vec <- as.numeric(mdl$y)
@@ -86,7 +95,7 @@ forecast_svp <- function(object, H = 1,
 
   # Filter (forward proxy choice — relevant only for Student-t leverage)
   filt <- filter_svp(mdl, method = filter_method, proxy = proxy,
-                     K = K, M = M, seed = seed, del = del)
+                     mixture = mixture, K = K, M = M, seed = seed, del = del)
   Tsize <- length(filt$w_filtered)
 
   # Extract final state and residual

@@ -165,8 +165,13 @@ theoretical motivation and consistency simulations.
 Three methods are available via `filter_svp()`, which takes a fitted model:
 
 - **Corrected Kalman Filter (CKF)**: Gaussian approximation, fast.
-- **Gaussian Mixture Kalman Filter (GMKF)**: KSC (1998) 7-component mixture.
-  Recommended — dominates CKF even under Gaussianity.
+- **Gaussian Mixture Kalman Filter (GMKF)**: mixture approximation to the
+  exact measurement-noise density. Recommended — dominates CKF even under
+  Gaussianity. By default the mixture comes from precomputed optimal tables
+  (`mixture = "optimal"`: deterministic, fast, fitted against the exact
+  density for every error family); the KSC (1998) 7-component table
+  (`mixture = "ksc"`, Gaussian only) and the sampled EM fit
+  (`mixture = "em"`) remain available.
 - **Bootstrap Particle Filter (BPF)**: Exact density weights. Gold-standard benchmark.
 
 ```{r filtering}

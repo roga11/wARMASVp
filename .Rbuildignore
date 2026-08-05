@@ -1,6 +1,7 @@
 ^.*\.Rproj$
 ^\.Rproj\.user$
-^\.DS_Store$
+(^|/)\.DS_Store$
+^inst/gmkf-tables/(logs|csvTables)$
 ^cran-comments\.md$
 ^\.Rhistory$
 ^\.RData$

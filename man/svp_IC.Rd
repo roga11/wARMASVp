@@ -9,6 +9,7 @@ svp_IC(
   criteria = c("BIC_Kalman", "AIC_Kalman", "BIC_HR", "AIC_HR"),
   filter_method = c("mixture", "corrected", "particle"),
   proxy = c("bayes_optimal", "u"),
+  mixture = c("optimal", "ksc", "em"),
   K = 7L,
   M = 1000L,
   seed = 42L,
@@ -41,15 +42,26 @@ leverage and restores Schwarz consistency of \code{BIC_Kalman}.
 provided for compatibility but not recommended for IC computation
 under Student-t leverage.}
 
+\item{mixture}{Character. Source of the GMKF measurement mixture when
+\code{filter_method = "mixture"}: \code{"optimal"} (default,
+precomputed tables), \code{"ksc"} (published KSC table; Gaussian,
+\code{K = 7} only) or \code{"em"} (legacy sampled EM fit). With the
+default, the Kalman criteria are fully deterministic — the sampled EM's
+seed sensitivity (which could move \code{BIC_Kalman} differences across
+\eqn{p} by several nats at large \eqn{T}) is gone. See
+\code{\link{filter_svp}}.}
+
 \item{K}{Integer. Number of mixture components for
-\code{filter_method = "mixture"}. Default 7 (KSC).}
+\code{filter_method = "mixture"}. Default 7. Under
+\code{mixture = "optimal"} only 7, 10, 12 or 16 are available.}
 
 \item{M}{Integer. Number of particles for
 \code{filter_method = "particle"}. Default 1000. Ignored for other
 filter methods.}
 
-\item{seed}{Integer. Random seed for the bootstrap particle filter.
-Default 42. Ignored for non-particle filters.}
+\item{seed}{Integer. Random seed for the bootstrap particle filter and
+the \code{mixture = "em"} fit. Default 42. Has no effect under the
+default \code{mixture = "optimal"}.}
 
 \item{del}{Numeric. Small constant added inside \eqn{\log} to avoid
 \eqn{\log 0}. Default \code{1e-10}.}

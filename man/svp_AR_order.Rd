@@ -19,6 +19,7 @@ svp_AR_order(
   winsorize_eps = 0L,
   filter_method = "mixture",
   proxy = c("bayes_optimal", "u"),
+  mixture = c("optimal", "ksc", "em"),
   K = 7L,
   M = 1000L,
   seed = 42L,
@@ -47,6 +48,11 @@ criteria. Default \code{"mixture"}.}
 
 \item{proxy}{Character. Leverage proxy. Default \code{"bayes_optimal"}
 for IC consistency under Student-t leverage. See \code{\link{svp_IC}}.}
+
+\item{mixture}{Character. Source of the GMKF measurement mixture:
+\code{"optimal"} (default, precomputed tables — the whole sweep is then
+deterministic), \code{"ksc"} or \code{"em"}. See \code{\link{svp_IC}}
+and \code{\link{filter_svp}}.}
 
 \item{K, M, seed}{Filter arguments passed to \code{\link{filter_svp}}.}
 

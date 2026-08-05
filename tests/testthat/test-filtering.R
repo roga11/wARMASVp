@@ -196,7 +196,8 @@ test_that("GMKF with K=1 approximates CKF", {
   filt_ckf <- filter_svp(m$fit, method = "corrected")
   # K=1 mixture should be very close to CKF
   # (Not exact match due to different y_star centering, but correlation should be high)
-  filt_gmkf1 <- filter_svp(m$fit, method = "mixture", K = 1)
+  # K=1 only exists on the EM path; the optimal tables start at K=7
+  filt_gmkf1 <- filter_svp(m$fit, method = "mixture", mixture = "em", K = 1)
   cor_val <- cor(filt_ckf$w_filtered, filt_gmkf1$w_filtered)
   expect_true(cor_val > 0.95)
 })
@@ -212,13 +213,13 @@ test_that("GMKF K=7 runs without error (Gaussian)", {
 
 test_that("GMKF runs without error (Student-t)", {
   m <- .fit_model(n = 200, errorType = "Student-t", nu = 5)
-  filt <- filter_svp(m$fit, method = "mixture", K = 3)
+  filt <- filter_svp(m$fit, method = "mixture", mixture = "em", K = 3)
   expect_true(all(is.finite(filt$w_filtered)))
 })
 
 test_that("GMKF runs without error (GED)", {
   m <- .fit_model(n = 200, errorType = "GED", nu = 1.5)
-  filt <- filter_svp(m$fit, method = "mixture", K = 3)
+  filt <- filter_svp(m$fit, method = "mixture", mixture = "em", K = 3)
   expect_true(all(is.finite(filt$w_filtered)))
 })
 
@@ -238,7 +239,7 @@ test_that("filter_svp: very persistent SV(1) doesn't diverge", {
 
 test_that("filter_svp: heavy tails Student-t nu=3 doesn't collapse", {
   m <- .fit_model(n = 300, errorType = "Student-t", nu = 3)
-  filt <- filter_svp(m$fit, method = "mixture", K = 3)
+  filt <- filter_svp(m$fit, method = "mixture", mixture = "em", K = 3)
   expect_true(all(is.finite(filt$w_filtered)))
 })
 

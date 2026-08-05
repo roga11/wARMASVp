@@ -112,7 +112,8 @@ density_eps_ged <- function(y, nu) {
 #' @param max_iter Integer. Maximum EM iterations. Default 500.
 #' @param tol Numeric. Convergence tolerance. Default 1e-8.
 #' @param seed Integer. Random seed. Default 42.
-#' @return List with \code{weights}, \code{means}, \code{vars}, \code{KL_div}.
+#' @return List with \code{weights}, \code{means}, \code{vars}, \code{nu},
+#'   \code{distribution}.
 #' @keywords internal
 fit_ksc_mixture <- function(distribution = c("gaussian", "student_t", "ged"),
                             nu = NULL, K = 7, n_sample = 10000,
@@ -128,7 +129,6 @@ fit_ksc_mixture <- function(distribution = c("gaussian", "student_t", "ged"),
       weights = w_ksc,
       means   = c(-11.40039, -5.24321, -9.83726, 1.50746, -0.65098, 0.52478, -2.35859),
       vars    = c(5.79596, 2.61369, 5.17950, 0.16735, 0.64009, 0.34023, 1.26261),
-      KL_div  = NA_real_,
       nu      = NULL,
       distribution = "gaussian"
     ))
@@ -183,7 +183,6 @@ fit_ksc_mixture <- function(distribution = c("gaussian", "student_t", "ged"),
     weights = fit$weights,
     means   = fit$means,
     vars    = fit$vars,
-    KL_div  = NA_real_,
     nu      = nu,
     distribution = distribution
   )
@@ -276,9 +275,40 @@ fit_ksc_mixture <- function(distribution = c("gaussian", "student_t", "ged"),
 #'   variance inflation above. Has no effect for Gaussian or GED leverage
 #'   (the proxy is closed-form in both cases) and no effect when
 #'   \code{leverage = FALSE}.
+#' @param mixture Character. Source of the GMKF measurement mixture (only
+#'   used when \code{method = "mixture"}):
+#'   \describe{
+#'     \item{\code{"optimal"} (default)}{Precomputed tables fitted by
+#'       minimising Kullback-Leibler divergence against the exact density of
+#'       the measurement noise (see \code{\link{gmkf_table}}), evaluated at
+#'       the fitted \eqn{\nu} by spline interpolation. Deterministic (the
+#'       \code{seed} argument has no effect), roughly 30 times faster per
+#'       filter call than the sampled EM, and measured closer to the exact
+#'       density at every \eqn{\nu} tested. Available for
+#'       \code{K} in \{7, 10, 12, 16\}.}
+#'     \item{\code{"ksc"}}{The Kim, Shephard and Chib (1998) Table 4 mixture,
+#'       available only for Gaussian errors with \code{K = 7}. Retained as
+#'       the industry standard (directly comparable to \pkg{stochvol} and
+#'       other implementations). Note KSC built this table for their MCMC
+#'       sampler, with those assumptions -- including the rounded 1.2704
+#'       centring offset -- baked in; for the filtering done here,
+#'       \code{"optimal"} is the better default.}
+#'     \item{\code{"em"}}{The legacy sampled path: an EM fit to 10,000 random
+#'       draws from the exact density, reproducing the behaviour (and exact
+#'       numeric output, given the same \code{seed}) of package versions up
+#'       to 0.2.0.9002. Supports any \code{K >= 1}. For Gaussian errors with
+#'       \code{K = 7} this path returns the KSC table (as it always has), so
+#'       \code{"em"} and \code{"ksc"} coincide there.}
+#'   }
 #' @param K Integer. Number of mixture components for GMKF. Default 7.
+#'   Under \code{mixture = "optimal"} only 7, 10, 12 or 16 are available
+#'   (anything else is an error); \code{mixture = "em"} accepts any
+#'   \code{K >= 1}.
 #' @param M Integer. Number of particles for BPF. Default 1000.
-#' @param seed Integer. Random seed for BPF. Default 42.
+#' @param seed Integer. Random seed for BPF and for the sampled EM mixture
+#'   (\code{mixture = "em"}). Default 42. Has no effect under
+#'   \code{mixture = "optimal"} or \code{"ksc"}, whose mixtures are
+#'   deterministic.
 #' @param del Numeric. Small constant for log transformation. Default \code{1e-10}.
 #'
 #' @return An object of class \code{"svp_filter"}, a list containing:
@@ -294,6 +324,11 @@ fit_ksc_mixture <- function(distribution = c("gaussian", "student_t", "ged"),
 #'   \item{loglik}{Approximate log-likelihood.}
 #'   \item{method}{Filter method used.}
 #'   \item{model}{The input model object.}
+#'   \item{mixture}{(\code{method = "mixture"} only) The measurement mixture
+#'     actually used: a list with \code{weights}, \code{means}, \code{vars},
+#'     \code{nu}, \code{distribution}.}
+#'   \item{mixture_source}{(\code{method = "mixture"} only) Which mixture
+#'     source produced it: \code{"optimal"}, \code{"ksc"} or \code{"em"}.}
 #' }
 #'
 #' @examples
@@ -307,12 +342,14 @@ fit_ksc_mixture <- function(distribution = c("gaussian", "student_t", "ged"),
 #' @export
 filter_svp <- function(object, method = c("corrected", "mixture", "particle"),
                        proxy = c("bayes_optimal", "u"),
+                       mixture = c("optimal", "ksc", "em"),
                        K = 7, M = 1000, seed = 42, del = 1e-10) {
   if (!inherits(object, c("svp", "svp_t", "svp_ged"))) {
     stop("object must be of class 'svp', 'svp_t', or 'svp_ged'.")
   }
   method <- match.arg(method)
   proxy <- match.arg(proxy)
+  mixture <- match.arg(mixture)
   if (!is.numeric(K) || length(K) != 1L || K < 1L)
     stop("'K' must be a positive integer (>= 1).")
   if (!is.numeric(M) || length(M) != 1L || M < 1L)
@@ -361,17 +398,28 @@ filter_svp <- function(object, method = c("corrected", "mixture", "particle"),
     )
 
   } else if (method == "mixture") {
-    # GMKF: Gaussian Mixture Kalman Filter
-    mixture <- fit_ksc_mixture(params$dist_name, params$nu, K, seed = seed)
+    # GMKF: Gaussian Mixture Kalman Filter. Three mixture sources:
+    #   "optimal" - precomputed tables (deterministic; `seed` unused)
+    #   "ksc"     - the published KSC (1998) Table 4 (Gaussian, K = 7 only)
+    #   "em"      - the legacy sampled EM fit (any K; seeded via `seed`);
+    #               for Gaussian K = 7 it returns the KSC table, as always
+    .validate_mixture_choice(mixture, K, params$dist_name)
+    mix_params <- switch(mixture,
+      optimal = .gmkf_table_mixture(params$dist_name, params$nu, K),
+      ksc     = fit_ksc_mixture("gaussian", K = 7),
+      em      = fit_ksc_mixture(params$dist_name, params$nu, K, seed = seed)
+    )
 
     # For GMKF, y_star is raw log(y^2) (NOT centered by mu).
     # The intercept depends on whether mixture means are raw or centered:
-    #   - KSC Gaussian table: means ≈ -1.27 (raw log-chi2 density)
+    #   - KSC Gaussian table ("ksc"; also "em" at Gaussian K = 7): means
+    #     ≈ -1.27 (raw log-chi2 density)
     #     → intercept = log(sigma_y^2) only (m_k already encodes E[log(z^2)])
-    #   - EM-fitted (Student-t, GED): means ≈ 0 (centered)
+    #   - "optimal" tables (all families) and EM fits (Student-t, GED,
+    #     Gaussian K != 7): means ≈ 0 (centered)
     #     → intercept = log(sigma_y^2) + mu_bar (full mu_intercept)
     y_star_raw <- log(y_vec^2 + del)
-    mix_mean <- sum(mixture$weights * mixture$means)
+    mix_mean <- sum(mix_params$weights * mix_params$means)
     # If mixture mean is far from 0, means are raw → use log(sigy^2) only
     # If near 0, means are centered → use full mu_intercept
     if (abs(mix_mean) > 0.5) {
@@ -388,16 +436,16 @@ filter_svp <- function(object, method = c("corrected", "mixture", "particle"),
       sigma_v = params$sigma_v,
       delta_p = params$delta_p,
       var_zt = params$var_zt,
-      mix_weights = mixture$weights,
-      mix_means = mixture$means,
-      mix_vars = mixture$vars,
+      mix_weights = mix_params$weights,
+      mix_means = mix_params$means,
+      mix_vars = mix_params$vars,
       mu_intercept = mu_intercept_gmkf,
       P0 = P0,
       dist_code = dist_code,
       nu = nu_val,
       proxy_type = proxy_type
     )
-    result$mixture <- mixture
+    result$mixture <- mix_params
 
   } else if (method == "particle") {
     # BPF: Bootstrap Particle Filter (C++)
@@ -468,7 +516,10 @@ filter_svp <- function(object, method = c("corrected", "mixture", "particle"),
     method      = method,
     model       = object
   )
-  if (!is.null(result$mixture)) out$mixture <- result$mixture
+  if (!is.null(result$mixture)) {
+    out$mixture <- result$mixture
+    out$mixture_source <- mixture
+  }
   if (!is.null(result$ESS)) out$ESS <- as.numeric(result$ESS)
   class(out) <- "svp_filter"
   out

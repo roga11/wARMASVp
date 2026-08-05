@@ -1,5 +1,61 @@
 # wARMASVp (development version)
 
+## New features
+
+* **Precomputed optimal mixture tables for the Gaussian-mixture Kalman filter
+  (GMKF), now the default.** `filter_svp()`, `forecast_svp()`, `svp_IC()` and
+  `svp_AR_order()` gain a `mixture` argument selecting the source of the GMKF
+  measurement mixture:
+
+  - `mixture = "optimal"` (**new default**): tables fitted offline by
+    minimising Kullback-Leibler divergence against the exact density of the
+    measurement noise, for every error family (Gaussian, Student-t, GED) and
+    `K` in {7, 10, 12, 16}, evaluated at the fitted `nu` by spline
+    interpolation. Deterministic (no seed anywhere in the path), roughly 30x
+    faster per `method = "mixture"` filter call, and measured closer to the
+    exact density than the sampled EM fit at every `nu` tested — with
+    heavy-tail filtering now exactly as cheap as Gaussian.
+  - `mixture = "ksc"`: the Kim, Shephard and Chib (1998) Table 4 mixture
+    (Gaussian errors, `K = 7` only), retained as the industry standard for
+    comparability with other software. KSC built that table for their MCMC
+    sampler, with those assumptions baked in; for the filtering done in this
+    package, `"optimal"` is the better default.
+  - `mixture = "em"`: the previous behaviour — an EM fit to 10,000 random
+    draws — retained for back-compatibility. Given the same `seed`, it
+    reproduces the numeric output of version 0.2.0.9002 exactly. Supports any
+    `K >= 1`. (For Gaussian errors at `K = 7` this path has always returned
+    the KSC table, so `"em"` and `"ksc"` coincide there.)
+
+  The shipped tables live in `inst/extdata/` and can be inspected with the
+  new exported accessor `gmkf_table()`; the exact scripts that built them
+  ship in `inst/gmkf-tables/` with a README describing how to rebuild and
+  verify them (each table carries a provenance attribute with the md5 of the
+  script and helpers that produced it). The build scripts alone use
+  `matrixStats` and `clue` (added to `Suggests`).
+
+* **Behaviour changes under default settings.** Because `"optimal"` is the
+  default, results from `filter_svp()`, `forecast_svp()`, `svp_IC()` and
+  `svp_AR_order()` with `method`/`filter_method = "mixture"` change
+  (deterministically): for Student-t/GED the table sits at the sampled EM's
+  seed-median (removing seed noise that could move `BIC_Kalman` differences
+  across `p` by several nats at large `T`); for Gaussian the change from the
+  KSC table is a genuine fit improvement of about 1e-3 nats per observation.
+  To reproduce old results exactly, set `mixture = "em"` (all families) or
+  `mixture = "ksc"` (Gaussian, `K = 7`).
+
+* **Compatibility notes.** `filter_svp(method = "mixture")` with `K` outside
+  {7, 10, 12, 16} now requires `mixture = "em"` (the default errors, naming
+  the supported sizes — no silent fallback; the same validation runs inside
+  `svp_IC()`/`svp_AR_order()` so an unsupported combination errors loudly
+  instead of returning `NA` criteria). The `seed` argument has no effect on
+  the mixture under `"optimal"`/`"ksc"`. Filter output gains a
+  `mixture_source` element recording the source used; the existing (and now
+  documented) `mixture` element — the mixture actually used — loses its
+  `KL_div` field, which was hardcoded `NA` and read by nothing. The new
+  `mixture` argument sits after `proxy`, so code calling these functions with
+  purely positional arguments past `proxy` must be updated (named arguments
+  are unaffected).
+
 ## Bug fixes
 
 * The warning issued when the GED shape parameter hits its upper bound was

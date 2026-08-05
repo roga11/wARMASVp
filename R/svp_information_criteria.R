@@ -258,13 +258,23 @@
 #'   \code{"u"} is a simpler alternative using \eqn{\hat u_{t-1}} directly;
 #'   provided for compatibility but not recommended for IC computation
 #'   under Student-t leverage.
+#' @param mixture Character. Source of the GMKF measurement mixture when
+#'   \code{filter_method = "mixture"}: \code{"optimal"} (default,
+#'   precomputed tables), \code{"ksc"} (published KSC table; Gaussian,
+#'   \code{K = 7} only) or \code{"em"} (legacy sampled EM fit). With the
+#'   default, the Kalman criteria are fully deterministic — the sampled EM's
+#'   seed sensitivity (which could move \code{BIC_Kalman} differences across
+#'   \eqn{p} by several nats at large \eqn{T}) is gone. See
+#'   \code{\link{filter_svp}}.
 #' @param K Integer. Number of mixture components for
-#'   \code{filter_method = "mixture"}. Default 7 (KSC).
+#'   \code{filter_method = "mixture"}. Default 7. Under
+#'   \code{mixture = "optimal"} only 7, 10, 12 or 16 are available.
 #' @param M Integer. Number of particles for
 #'   \code{filter_method = "particle"}. Default 1000. Ignored for other
 #'   filter methods.
-#' @param seed Integer. Random seed for the bootstrap particle filter.
-#'   Default 42. Ignored for non-particle filters.
+#' @param seed Integer. Random seed for the bootstrap particle filter and
+#'   the \code{mixture = "em"} fit. Default 42. Has no effect under the
+#'   default \code{mixture = "optimal"}.
 #' @param del Numeric. Small constant added inside \eqn{\log} to avoid
 #'   \eqn{\log 0}. Default \code{1e-10}.
 #'
@@ -337,6 +347,7 @@ svp_IC <- function(fit,
                                 "BIC_HR", "AIC_HR"),
                    filter_method = c("mixture", "corrected", "particle"),
                    proxy = c("bayes_optimal", "u"),
+                   mixture = c("optimal", "ksc", "em"),
                    K = 7L, M = 1000L, seed = 42L,
                    del = 1e-10) {
   if (!inherits(fit, c("svp", "svp_t", "svp_ged")))
@@ -349,6 +360,7 @@ svp_IC <- function(fit,
   criteria <- match.arg(criteria, choices = all_crit, several.ok = TRUE)
   filter_method <- match.arg(filter_method)
   proxy <- match.arg(proxy)
+  mixture <- match.arg(mixture)
 
   errorType <- fit$errorType
   if (is.null(errorType))
@@ -394,9 +406,18 @@ svp_IC <- function(fit,
 
   # Kalman QML criteria
   if (any(c("AIC_Kalman", "BIC_Kalman", "AICc_Kalman") %in% criteria)) {
+    # Validate the (mixture, K) combination BEFORE the tryCatch below, so an
+    # unsupported choice errors loudly instead of surfacing as silent NA ICs.
+    if (filter_method == "mixture") {
+      dist_name <- switch(errorType,
+                          "Gaussian" = "gaussian",
+                          "Student-t" = "student_t",
+                          "GED" = "ged")
+      .validate_mixture_choice(mixture, K, dist_name)
+    }
     filt <- tryCatch(
       filter_svp(fit, method = filter_method, proxy = proxy,
-                 K = K, M = M, seed = seed, del = del),
+                 mixture = mixture, K = K, M = M, seed = seed, del = del),
       error = function(e) NULL
     )
     if (!is.null(filt) && is.finite(filt$loglik)) {
@@ -434,6 +455,10 @@ svp_IC <- function(fit,
 #'   criteria. Default \code{"mixture"}.
 #' @param proxy Character. Leverage proxy. Default \code{"bayes_optimal"}
 #'   for IC consistency under Student-t leverage. See \code{\link{svp_IC}}.
+#' @param mixture Character. Source of the GMKF measurement mixture:
+#'   \code{"optimal"} (default, precomputed tables — the whole sweep is then
+#'   deterministic), \code{"ksc"} or \code{"em"}. See \code{\link{svp_IC}}
+#'   and \code{\link{filter_svp}}.
 #' @param K,M,seed Filter arguments passed to \code{\link{filter_svp}}.
 #' @param criteria Character vector of criteria to compute. Default
 #'   returns the four recommended criteria: \code{c("BIC_Kalman",
@@ -470,6 +495,7 @@ svp_AR_order <- function(y, pmax = 6L,
                          sigvMethod = "factored", winsorize_eps = 0L,
                          filter_method = "mixture",
                          proxy = c("bayes_optimal", "u"),
+                         mixture = c("optimal", "ksc", "em"),
                          K = 7L, M = 1000L, seed = 42L,
                          criteria = c("BIC_Kalman", "AIC_Kalman",
                                       "BIC_HR", "AIC_HR")) {
@@ -483,6 +509,7 @@ svp_AR_order <- function(y, pmax = 6L,
   criteria <- match.arg(criteria, choices = all_crit, several.ok = TRUE)
   filter_method <- match.arg(filter_method, c("mixture", "corrected", "particle"))
   proxy <- match.arg(proxy)
+  mixture <- match.arg(mixture)
 
   # Pre-allocate IC_mat in the order requested by the user (criteria arg).
   # Note: row names follow the user-specified ordering.
@@ -502,7 +529,7 @@ svp_AR_order <- function(y, pmax = 6L,
     if (!is.null(fit)) {
       IC_mat[, p] <- svp_IC(fit, criteria = criteria,
                              filter_method = filter_method,
-                             proxy = proxy,
+                             proxy = proxy, mixture = mixture,
                              K = K, M = M, seed = seed, del = del)
     }
   }

@@ -8,6 +8,7 @@ filter_svp(
   object,
   method = c("corrected", "mixture", "particle"),
   proxy = c("bayes_optimal", "u"),
+  mixture = c("optimal", "ksc", "em"),
   K = 7,
   M = 1000,
   seed = 42,
@@ -42,11 +43,43 @@ variance inflation above. Has no effect for Gaussian or GED leverage
 (the proxy is closed-form in both cases) and no effect when
 \code{leverage = FALSE}.}
 
-\item{K}{Integer. Number of mixture components for GMKF. Default 7.}
+\item{mixture}{Character. Source of the GMKF measurement mixture (only
+used when \code{method = "mixture"}):
+\describe{
+  \item{\code{"optimal"} (default)}{Precomputed tables fitted by
+    minimising Kullback-Leibler divergence against the exact density of
+    the measurement noise (see \code{\link{gmkf_table}}), evaluated at
+    the fitted \eqn{\nu} by spline interpolation. Deterministic (the
+    \code{seed} argument has no effect), roughly 30 times faster per
+    filter call than the sampled EM, and measured closer to the exact
+    density at every \eqn{\nu} tested. Available for
+    \code{K} in \{7, 10, 12, 16\}.}
+  \item{\code{"ksc"}}{The Kim, Shephard and Chib (1998) Table 4 mixture,
+    available only for Gaussian errors with \code{K = 7}. Retained as
+    the industry standard (directly comparable to \pkg{stochvol} and
+    other implementations). Note KSC built this table for their MCMC
+    sampler, with those assumptions -- including the rounded 1.2704
+    centring offset -- baked in; for the filtering done here,
+    \code{"optimal"} is the better default.}
+  \item{\code{"em"}}{The legacy sampled path: an EM fit to 10,000 random
+    draws from the exact density, reproducing the behaviour (and exact
+    numeric output, given the same \code{seed}) of package versions up
+    to 0.2.0.9002. Supports any \code{K >= 1}. For Gaussian errors with
+    \code{K = 7} this path returns the KSC table (as it always has), so
+    \code{"em"} and \code{"ksc"} coincide there.}
+}}
+
+\item{K}{Integer. Number of mixture components for GMKF. Default 7.
+Under \code{mixture = "optimal"} only 7, 10, 12 or 16 are available
+(anything else is an error); \code{mixture = "em"} accepts any
+\code{K >= 1}.}
 
 \item{M}{Integer. Number of particles for BPF. Default 1000.}
 
-\item{seed}{Integer. Random seed for BPF. Default 42.}
+\item{seed}{Integer. Random seed for BPF and for the sampled EM mixture
+(\code{mixture = "em"}). Default 42. Has no effect under
+\code{mixture = "optimal"} or \code{"ksc"}, whose mixtures are
+deterministic.}
 
 \item{del}{Numeric. Small constant for log transformation. Default \code{1e-10}.}
 }
@@ -64,6 +97,11 @@ An object of class \code{"svp_filter"}, a list containing:
   \item{loglik}{Approximate log-likelihood.}
   \item{method}{Filter method used.}
   \item{model}{The input model object.}
+  \item{mixture}{(\code{method = "mixture"} only) The measurement mixture
+    actually used: a list with \code{weights}, \code{means}, \code{vars},
+    \code{nu}, \code{distribution}.}
+  \item{mixture_source}{(\code{method = "mixture"} only) Which mixture
+    source produced it: \code{"optimal"}, \code{"ksc"} or \code{"em"}.}
 }
 }
 \description{

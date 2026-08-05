@@ -1,7 +1,8 @@
 Package: wARMASVp
 Type: Package
 Title: Winsorized ARMA Estimation for Higher-Order Stochastic Volatility Models
-Version: 0.2.0.9002
+Version: 0.2.0.9003
+Depends: R (>= 3.5.0)
 Authors@R: c(
     person("Gabriel", "Rodriguez-Rondon",
            email = "gabriel.rodriguezrondon@mail.mcgill.ca",
@@ -18,7 +19,10 @@ Description: Estimation, simulation, hypothesis testing, AR-order selection,
     Carlo (LMC) and Maximized Monte Carlo (MMC) procedures for leverage
     effects, heavy tails, and autoregressive order. AR-order selection is
     also available via information criteria (BIC/AIC) using the Kalman-filter
-    quasi-likelihood and the Hannan-Rissanen ARMA residual variance.
+    quasi-likelihood and the Hannan-Rissanen ARMA residual variance. The
+    Gaussian-mixture Kalman filter uses precomputed optimal mixture tables
+    (deterministic and fast), with the sampled EM fit and the Kim, Shephard
+    and Chib (1998) table retained as options.
     Forecasting is based on Kalman filtering and smoothing. See Ahsan and
     Dufour (2021) <doi:10.1016/j.jeconom.2021.03.008>, Ahsan, Dufour, and
     Rodriguez-Rondon (2025) <doi:10.1111/jtsa.12851>, and Ahsan, Dufour, and
@@ -36,7 +40,9 @@ Suggests:
     GenSA,
     testthat (>= 3.0.0),
     knitr,
-    rmarkdown
+    rmarkdown,
+    matrixStats,
+    clue
 LinkingTo:
     Rcpp,
     RcppArmadillo
