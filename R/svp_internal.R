@@ -286,7 +286,8 @@ correction_factor_ged_approx <- function(nu, n_nodes = 200L) {
 
 # --- Gaussian SV(p) estimation (with optional leverage) ---
 .svp_gaussian <- function(y, p, J, leverage, rho_type, del, trunc_lev, wDecay,
-                          sigvMethod = "factored", winsorize_eps = 0) {
+                          sigvMethod = "factored", winsorize_eps = 0,
+                          sigeps = "theoretical") {
   y <- as.numeric(y)
   if (length(y) < 2 * p + J) {
     stop("Time series too short for the given p and J.")
@@ -302,11 +303,24 @@ correction_factor_ged_approx <- function(nu, n_nodes = 200L) {
   ys_g <- ly2 - mean(ly2)
   N_g <- length(ly2)
   var_ly2 <- stats::var(as.numeric(ly2))
-  sig_eps2 <- (pi^2) / 2
   phi_g <- as.numeric(para$phi)
-  # Distribution-free moment estimate of sigma_eps (diagnostic only here: the
-  # Gaussian model carries sigma_eps^2 = pi^2/2 into sigma_v and the filters)
+  # Distribution-free moment estimate of sigma_eps^2; diagnostic in the
+  # theoretical mode, the model's sigma_eps^2 in the estimated mode
   se2_raw <- .sigeps2_moment(as.matrix(ys_g), var_ly2, phi_g, N_g, J, winsorize_eps)
+  sigeps_fallback <- "none"
+  if (sigeps == "estimated") {
+    sig_eps2 <- se2_raw
+    if (!(is.finite(sig_eps2) && sig_eps2 > 0 && sig_eps2 < var_ly2)) {
+      sig_eps2 <- .sigeps2_moment(as.matrix(ys_g), var_ly2, phi_g, N_g, J, TRUE)
+      sigeps_fallback <- "pooled"
+      if (!(is.finite(sig_eps2) && sig_eps2 > 0 && sig_eps2 < var_ly2))
+        stop("sigeps = 'estimated': the moment estimate of sigma_eps^2 is not in ",
+             "(0, var(log(y^2 + del))) with either the single-lag or the pooled ",
+             "estimator; the series does not support the estimated mode.")
+    }
+  } else {
+    sig_eps2 <- (pi^2) / 2
+  }
   if (sigvMethod == "direct") {
     gam_vec_g <- numeric(p)
     for (k in seq_len(p)) {
@@ -320,6 +334,10 @@ correction_factor_ged_approx <- function(nu, n_nodes = 200L) {
     para$sigv <- sqrt(abs(sv2))
   }
   # else "hybrid": keep C++ result as-is
+  if (sigeps == "estimated") {
+    # sigma_y identified by E[log z^2] = -sigma_eps^2/2 (E[exp(eps)] = 1)
+    para$sigy <- sqrt(exp(para$mu + sig_eps2 / 2))
+  }
   para$theta <- c(para$phi, para$sigy, para$sigv)
   # Metadata
   para$rho <- NA_real_
@@ -334,10 +352,12 @@ correction_factor_ged_approx <- function(nu, n_nodes = 200L) {
   para$rho_type <- NA_character_
   para$sigvMethod <- sigvMethod
   para$winsorize_eps <- winsorize_eps
-  para$sigeps <- .sigeps_raw(se2_raw)
+  para$sigeps <- .sigeps_raw(se2_raw, warn = (sigeps == "estimated"))
   para$sigeps_nu <- sqrt(sig_eps2)
-  para$mubar <- digamma(0.5) + log(2)
+  para$mubar <- if (sigeps == "estimated") -sig_eps2 / 2 else digamma(0.5) + log(2)
   para$nu_boundary <- NA
+  para$sigeps_method <- sigeps
+  para$sigeps_fallback <- if (sigeps == "estimated") sigeps_fallback else NA_character_
   class(para) <- "svp"
   # Step 3: leverage post-processing (if requested)
   if (leverage) {
@@ -403,7 +423,7 @@ correction_factor_ged_approx <- function(nu, n_nodes = 200L) {
               sigeps = .sigeps_raw(se2),            # raw moment estimate
               sigeps_nu = sqrt(var_log_sq_t),       # sigma_eps(nu-hat), carried by the model
               mubar = mu_log_sq_t,                  # E[log z^2] at nu-hat
-              nu_boundary = nu_boundary,
+              nu_boundary = nu_boundary, sigeps_method = "nu",
               y = as.numeric(y), J = J, p = as.integer(p), del = del,
               wDecay = wDecay, logNu = logNu,
               sigvMethod = sigvMethod, winsorize_eps = winsorize_eps,
@@ -493,7 +513,7 @@ correction_factor_ged_approx <- function(nu, n_nodes = 200L) {
               sigeps = .sigeps_raw(se2),            # raw moment estimate
               sigeps_nu = sqrt(var_log_sq_ged),     # sigma_eps(nu-hat), carried by the model
               mubar = mu_log_sq_ged,                # E[log z^2] at nu-hat
-              nu_boundary = nu_boundary,
+              nu_boundary = nu_boundary, sigeps_method = "nu",
               y = as.numeric(y), J = J, p = as.integer(p), del = del,
               wDecay = wDecay,
               sigvMethod = sigvMethod, winsorize_eps = winsorize_eps,

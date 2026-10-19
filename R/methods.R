@@ -8,7 +8,8 @@
 print.svp <- function(x, ...) {
   p <- x$p
   mdl_type <- if (isTRUE(x$leverage) && !is.na(x$rho)) "SVL" else "SV"
-  cat(sprintf("%s(%d) model (W-ARMA-SV estimation)\n", mdl_type, p))
+  cat(sprintf("%s(%d) model (W-ARMA-SV estimation%s)\n", mdl_type, p,
+              if (isTRUE(x$sigeps_method == "estimated")) ", sigma_eps estimated" else ""))
   cat(sprintf("  phi: %s\n", paste(round(x$phi, 4), collapse = ", ")))
   cat(sprintf("  sigy: %.4f, sigv: %.4f\n", x$sigy, x$sigv))
   cat(sprintf("  sigeps: %.4f (moment), %.4f (model); mubar: %.4f\n",

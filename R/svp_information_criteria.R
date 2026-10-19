@@ -408,6 +408,8 @@ svp_IC <- function(fit,
   if (any(c("AIC_Kalman", "BIC_Kalman", "AICc_Kalman") %in% criteria)) {
     # Validate the (mixture, K) combination BEFORE the tryCatch below, so an
     # unsupported choice errors loudly instead of surfacing as silent NA ICs.
+    if (isTRUE(fit$sigeps_method == "estimated") && filter_method != "corrected")
+      stop("fits with sigeps = 'estimated' support filter_method = 'corrected' only.")
     if (filter_method == "mixture") {
       dist_name <- switch(errorType,
                           "Gaussian" = "gaussian",

@@ -201,10 +201,13 @@ fit_ksc_mixture <- function(distribution = c("gaussian", "student_t", "ged"),
   sigma_v <- model$sigv
 
   # Measurement noise variance: distribution-specific sigma_eps^2
+  sigeps_est <- isTRUE(model$sigeps_method == "estimated")
   if (inherits(model, "svp_t") && !is.null(model$v) && is.finite(model$v)) {
     sig_eps2 <- psigamma(0.5, 1) + psigamma(model$v / 2, 1)
   } else if (inherits(model, "svp_ged") && !is.null(model$v) && is.finite(model$v)) {
     sig_eps2 <- (2 / model$v)^2 * psigamma(1 / model$v, 1)
+  } else if (sigeps_est) {
+    sig_eps2 <- model$sigeps_nu^2
   } else {
     sig_eps2 <- (pi^2) / 2
   }
@@ -224,6 +227,8 @@ fit_ksc_mixture <- function(distribution = c("gaussian", "student_t", "ged"),
   } else if (inherits(model, "svp_ged") && !is.null(model$v) && is.finite(model$v)) {
     mu_bar <- (2 / model$v) * digamma(1 / model$v) +
       lgamma(1 / model$v) - lgamma(3 / model$v)
+  } else if (sigeps_est) {
+    mu_bar <- model$mubar
   } else {
     mu_bar <- digamma(0.5) + log(2)
   }
@@ -350,6 +355,9 @@ filter_svp <- function(object, method = c("corrected", "mixture", "particle"),
   method <- match.arg(method)
   proxy <- match.arg(proxy)
   mixture <- match.arg(mixture)
+  if (isTRUE(object$sigeps_method == "estimated") && method != "corrected")
+    stop("fits with sigeps = 'estimated' support method = 'corrected' only ",
+         "(the mixture and particle filters use the log-chi-square measurement density).")
   if (!is.numeric(K) || length(K) != 1L || K < 1L)
     stop("'K' must be a positive integer (>= 1).")
   if (!is.numeric(M) || length(M) != 1L || M < 1L)

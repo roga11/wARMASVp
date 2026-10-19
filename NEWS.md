@@ -12,6 +12,17 @@
   `winsorize_eps` is now honoured for Gaussian fits (it affects only `sigeps`).
   No estimate changes.
 
+* **`svp(..., sigeps = "estimated")` for Gaussian errors.** Replaces the
+  log-chi-square constant `pi^2/2` by the distribution-free moment estimate of
+  `sigma_eps^2`, recomputes `sigv` from it, feeds it to the corrected Kalman
+  filter, and identifies `sigy` by `E[log z^2] = -sigma_eps^2/2`. Intended for
+  measurement-error proxies such as realized volatility, where `var(log y^2)`
+  is far below `pi^2/2` and the theoretical constant makes `sigv` come from
+  the `abs()` branch and the filter over-weight the noise. Returns
+  `sigeps_method` and `sigeps_fallback`. Not available with leverage,
+  `sigvMethod = "hybrid"`, the mixture or particle filters, or `svpSE()`.
+  Default `"theoretical"`: all existing results unchanged.
+
 ## Bug fixes
 
 * The Gaussian `sigy` step and the Gaussian moment conditions of the leverage

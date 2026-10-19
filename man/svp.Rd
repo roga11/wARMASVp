@@ -16,7 +16,8 @@ svp(
   wDecay = FALSE,
   logNu = FALSE,
   sigvMethod = "factored",
-  winsorize_eps = 0
+  winsorize_eps = 0,
+  sigeps = c("theoretical", "estimated")
 )
 }
 \arguments{
@@ -62,6 +63,20 @@ in the moment estimate of \eqn{\sigma_\varepsilon^2} (\code{0} = single-lag
 estimator; \code{TRUE} = pool \code{J} lags). The estimate drives
 \eqn{\hat\nu} for Student-t and GED and is reported as \code{sigeps} for
 every error type. Default \code{0}.}
+
+\item{sigeps}{Character, Gaussian errors only. \code{"theoretical"}
+(default): the measurement noise \eqn{\varepsilon_t = \log z_t^2} has the
+log-chi-square variance \eqn{\pi^2/2}, as implied by \eqn{z_t \sim N(0,1)}.
+\code{"estimated"}: \eqn{\sigma_\varepsilon^2} is the distribution-free
+moment estimate instead, \eqn{\sigma_v} is computed from it, the Kalman
+filter uses it, and \eqn{\sigma_y} is identified by
+\eqn{E[\log z_t^2] = -\sigma_\varepsilon^2/2} (so that
+\eqn{E[y_t^2 | w_t] = \sigma_y^2 \exp(w_t)} under Gaussian
+\eqn{\varepsilon_t}). Intended for measurement-error volatility proxies
+such as realized volatility, where \eqn{\sigma_\varepsilon^2} is far below
+\eqn{\pi^2/2}; on squared returns the theoretical value is appropriate.
+Not available with \code{leverage = TRUE}, \code{sigvMethod = "hybrid"},
+the mixture or particle filters, or \code{\link{svpSE}}.}
 }
 \value{
 Depending on \code{errorType}:
@@ -89,6 +104,13 @@ The \code{"svp"} class contains:
   \item{nu_boundary}{Student-t and GED only: \code{TRUE} if \eqn{\hat\nu}
     sits at a bound of its search interval, in which case \code{sigeps_nu}
     differs from \code{sigeps}. \code{NA} for Gaussian errors.}
+  \item{sigeps_method}{How \code{sigeps_nu} was obtained:
+    \code{"theoretical"}, \code{"estimated"} (Gaussian) or \code{"nu"}
+    (Student-t, GED).}
+  \item{sigeps_fallback}{Estimated mode only: \code{"none"}, or
+    \code{"pooled"} if the single-lag estimate was outside
+    \eqn{(0, \mathrm{var}(\log y_t^2))} and the pooled \code{J}-lag estimate
+    was used instead.}
   \item{rho}{Leverage parameter (if estimated, otherwise \code{NA}).}
   \item{y}{The original data.}
   \item{p, J}{Model order and winsorizing parameter.}

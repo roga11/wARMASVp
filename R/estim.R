@@ -50,6 +50,19 @@
 #'   estimator; \code{TRUE} = pool \code{J} lags). The estimate drives
 #'   \eqn{\hat\nu} for Student-t and GED and is reported as \code{sigeps} for
 #'   every error type. Default \code{0}.
+#' @param sigeps Character, Gaussian errors only. \code{"theoretical"}
+#'   (default): the measurement noise \eqn{\varepsilon_t = \log z_t^2} has the
+#'   log-chi-square variance \eqn{\pi^2/2}, as implied by \eqn{z_t \sim N(0,1)}.
+#'   \code{"estimated"}: \eqn{\sigma_\varepsilon^2} is the distribution-free
+#'   moment estimate instead, \eqn{\sigma_v} is computed from it, the Kalman
+#'   filter uses it, and \eqn{\sigma_y} is identified by
+#'   \eqn{E[\log z_t^2] = -\sigma_\varepsilon^2/2} (so that
+#'   \eqn{E[y_t^2 | w_t] = \sigma_y^2 \exp(w_t)} under Gaussian
+#'   \eqn{\varepsilon_t}). Intended for measurement-error volatility proxies
+#'   such as realized volatility, where \eqn{\sigma_\varepsilon^2} is far below
+#'   \eqn{\pi^2/2}; on squared returns the theoretical value is appropriate.
+#'   Not available with \code{leverage = TRUE}, \code{sigvMethod = "hybrid"},
+#'   the mixture or particle filters, or \code{\link{svpSE}}.
 #'
 #' @return Depending on \code{errorType}:
 #' \itemize{
@@ -76,6 +89,13 @@
 #'   \item{nu_boundary}{Student-t and GED only: \code{TRUE} if \eqn{\hat\nu}
 #'     sits at a bound of its search interval, in which case \code{sigeps_nu}
 #'     differs from \code{sigeps}. \code{NA} for Gaussian errors.}
+#'   \item{sigeps_method}{How \code{sigeps_nu} was obtained:
+#'     \code{"theoretical"}, \code{"estimated"} (Gaussian) or \code{"nu"}
+#'     (Student-t, GED).}
+#'   \item{sigeps_fallback}{Estimated mode only: \code{"none"}, or
+#'     \code{"pooled"} if the single-lag estimate was outside
+#'     \eqn{(0, \mathrm{var}(\log y_t^2))} and the pooled \code{J}-lag estimate
+#'     was used instead.}
 #'   \item{rho}{Leverage parameter (if estimated, otherwise \code{NA}).}
 #'   \item{y}{The original data.}
 #'   \item{p, J}{Model order and winsorizing parameter.}
@@ -116,7 +136,8 @@
 svp <- function(y, p = 1, J = 10, leverage = FALSE, errorType = "Gaussian",
                 rho_type = "pearson", del = 1e-10, trunc_lev = TRUE,
                 wDecay = FALSE, logNu = FALSE,
-                sigvMethod = "factored", winsorize_eps = 0) {
+                sigvMethod = "factored", winsorize_eps = 0,
+                sigeps = c("theoretical", "estimated")) {
   cl <- match.call()
   y <- as.numeric(y)
   if (length(y) < 1L) stop("'y' must be a non-empty numeric vector.")
@@ -132,10 +153,21 @@ svp <- function(y, p = 1, J = 10, leverage = FALSE, errorType = "Gaussian",
   if (!is.numeric(del) || del <= 0) stop("'del' must be a positive number.")
   errorType <- match.arg(errorType, c("Gaussian", "Student-t", "GED"))
   sigvMethod <- match.arg(sigvMethod, c("hybrid", "direct", "factored"))
+  sigeps <- match.arg(sigeps)
+  if (sigeps == "estimated") {
+    if (errorType != "Gaussian")
+      stop("sigeps = 'estimated' applies to errorType = 'Gaussian' only; ",
+           "Student-t and GED estimate sigma_eps through nu.")
+    if (leverage)
+      stop("leverage = TRUE is not supported with sigeps = 'estimated'.")
+    if (sigvMethod == "hybrid")
+      stop("sigvMethod = 'hybrid' is not supported with sigeps = 'estimated'; ",
+           "use 'factored' or 'direct'.")
+  }
   # Dispatch: estimate base model (without leverage)
   if (errorType == "Gaussian") {
     out <- .svp_gaussian(y, p, J, leverage, rho_type, del, trunc_lev, wDecay,
-                         sigvMethod, winsorize_eps)
+                         sigvMethod, winsorize_eps, sigeps)
   } else if (errorType == "Student-t") {
     out <- .svp_t(y, p, J, del, wDecay, logNu, sigvMethod, winsorize_eps)
     if (leverage) {
@@ -201,6 +233,9 @@ svpSE <- function(object, n_sim = 199, alpha = 0.05, burnin = 500,
   if (!is.numeric(burnin) || burnin < 0)
     stop("'burnin' must be a non-negative integer.")
 
+  if (isTRUE(object$sigeps_method == "estimated"))
+    stop("svpSE() does not support fits with sigeps = 'estimated' ",
+         "(the bootstrap simulates Gaussian z_t, which implies sigma_eps^2 = pi^2/2).")
   if (inherits(object, "svp_t")) {
     .svpSE_t(object, n_sim, alpha, burnin, logNu)
   } else if (inherits(object, "svp_ged")) {
