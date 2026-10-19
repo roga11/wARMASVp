@@ -57,9 +57,11 @@ dominates RMSE in most settings, see ADRR 2025);
 \code{"hybrid"} — AD2021 closed-form for \eqn{p = 1}, falls back to
 \code{"direct"} for \eqn{p \ge 2} (Student-t and GED only).}
 
-\item{winsorize_eps}{Integer. Number of extreme autocovariance lags to
-winsorize (\code{0} = none). Used in Student-t and GED
-\eqn{\sigma_\varepsilon^2} estimation. Default \code{0}.}
+\item{winsorize_eps}{Integer or logical. Number of autocovariance lags pooled
+in the moment estimate of \eqn{\sigma_\varepsilon^2} (\code{0} = single-lag
+estimator; \code{TRUE} = pool \code{J} lags). The estimate drives
+\eqn{\hat\nu} for Student-t and GED and is reported as \code{sigeps} for
+every error type. Default \code{0}.}
 }
 \value{
 Depending on \code{errorType}:
@@ -75,6 +77,18 @@ The \code{"svp"} class contains:
   \item{phi}{Numeric vector of AR coefficients.}
   \item{sigv}{Standard deviation of volatility innovations.}
   \item{sigy}{Unconditional standard deviation.}
+  \item{sigeps}{Distribution-free moment estimate of
+    \eqn{\sigma_\varepsilon}, the standard deviation of
+    \eqn{\varepsilon_t = \log z_t^2} (\code{NA} if the variance estimate is
+    not positive).}
+  \item{sigeps_nu}{The \eqn{\sigma_\varepsilon} the fitted model carries into
+    \code{sigv}, the filters and the forecasts: \eqn{\pi/\sqrt{2}} for
+    Gaussian errors, \eqn{\sigma_\varepsilon(\hat\nu)} for Student-t and GED.}
+  \item{mubar}{\eqn{E[\log z_t^2]} under the fitted model, so that
+    \code{mu = log(sigy^2) + mubar}.}
+  \item{nu_boundary}{Student-t and GED only: \code{TRUE} if \eqn{\hat\nu}
+    sits at a bound of its search interval, in which case \code{sigeps_nu}
+    differs from \code{sigeps}. \code{NA} for Gaussian errors.}
   \item{rho}{Leverage parameter (if estimated, otherwise \code{NA}).}
   \item{y}{The original data.}
   \item{p, J}{Model order and winsorizing parameter.}

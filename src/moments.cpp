@@ -3,6 +3,9 @@
 // Authors: Nazmul Ahsan, Jean-Marie Dufour, Gabriel Rodriguez Rondon
 // ============================================================================ //
 #include <RcppArmadillo.h>
+
+// -E[log z^2] for z ~ N(0,1): -(digamma(1/2) + log(2))
+static const double NEG_LOG_CHI2_MEAN = 1.2703628454614782;
 // [[Rcpp::depends(RcppArmadillo)]]
 using namespace Rcpp;
 
@@ -168,7 +171,7 @@ double LRT_moment_lev_svp_cpp(arma::vec y, Rcpp::List mdl_out,
   double EH = compute_EH(y, rho_type);
 
   // Moment vector
-  double m1 = mu + 1.2704 - std::log(sigy * sigy);
+  double m1 = mu + NEG_LOG_CHI2_MEAN - std::log(sigy * sigy);
   double m2 = gam0 + gamk_all(1) - (M_PI * M_PI / 2.0) -
     (1.0 / (1.0 - phi(0))) * (gamtmp + sigv * sigv);
   arma::vec mk = build_mk(phi, gamk_all, p);
@@ -496,7 +499,7 @@ double LRT_moment_lev_svp_Amat_cpp(arma::vec y, Rcpp::List mdl_out,
   }
 
   // Aggregated moments
-  double m1 = mu + 1.2704 - std::log(sigy * sigy);
+  double m1 = mu + NEG_LOG_CHI2_MEAN - std::log(sigy * sigy);
   double m2 = gam0 + gamk_all(1) - (M_PI * M_PI / 2.0) -
     (1.0 / (1.0 - phi(0))) * (gamtmp + sigv * sigv);
   arma::vec mk = build_mk(phi, gamk_all, p);
@@ -504,7 +507,7 @@ double LRT_moment_lev_svp_Amat_cpp(arma::vec y, Rcpp::List mdl_out,
     (sigv * sigy * sigy) * std::exp(-0.25 * gammatilde);
 
   // Per-obs scores
-  g_t.col(0) = ly2 + 1.2704 - std::log(sigy * sigy);
+  g_t.col(0) = ly2 + NEG_LOG_CHI2_MEAN - std::log(sigy * sigy);
   g_t.col(1) = gam0_t + gamk_t.col(0) - (M_PI * M_PI / 2.0) -
     (1.0 / (1.0 - phi(0))) * (gamtmp_t + sigv * sigv);
 
@@ -557,13 +560,13 @@ double LRT_moment_ar_Amat_cpp(arma::vec y, Rcpp::List mdl_out,
   arma::vec gam0_t = ys % ys;
   arma::vec gamtmp_t = compute_gamtmp_t(phi, gamk_t, p);
 
-  double m1 = mu + 1.2704 - std::log(sigy * sigy);
+  double m1 = mu + NEG_LOG_CHI2_MEAN - std::log(sigy * sigy);
   double m2 = gam0 + gamk_all(1) - (M_PI * M_PI / 2.0) -
     (1.0 / (1.0 - phi(0))) * (gamtmp + sigv * sigv);
   arma::vec mk = build_mk(phi, gamk_all, p);
 
   arma::mat g_t(Tsize, n_mom, arma::fill::zeros);
-  g_t.col(0) = ly2 + 1.2704 - std::log(sigy * sigy);
+  g_t.col(0) = ly2 + NEG_LOG_CHI2_MEAN - std::log(sigy * sigy);
   g_t.col(1) = gam0_t + gamk_t.col(0) - (M_PI * M_PI / 2.0) -
     (1.0 / (1.0 - phi(0))) * (gamtmp_t + sigv * sigv);
 

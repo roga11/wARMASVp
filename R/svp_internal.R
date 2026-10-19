@@ -242,9 +242,51 @@ correction_factor_ged_approx <- function(nu, n_nodes = 200L) {
 }
 
 
+# --- Distribution-free moment estimate of sigma_eps^2 (shared by all families) ---
+# ys: centred log(y^2 + del) as an N x 1 matrix; var_ly2 = var(log(y^2 + del));
+# phi: AR coefficients; N = length(y); J = winsorizing parameter.
+# winsorize_eps: 0 / FALSE = single-lag estimator, sigma_eps^2 = gamma(0) -
+# gamma(1)/rho_w(1) (SVHT eq. 18); TRUE = pool J lags; integer > 0 = pool that
+# many lags by OLS of gamma(k) on rho_w(k) (SVHT eq. 69).
+# Returns the raw variance estimate. It can be <= 0 in finite samples.
+.sigeps2_moment <- function(ys, var_ly2, phi, N, J, winsorize_eps = 0) {
+  J_w <- 0L
+  if (is.logical(winsorize_eps)) {
+    if (winsorize_eps) J_w <- J
+  } else if (is.numeric(winsorize_eps) && winsorize_eps > 0) {
+    J_w <- as.integer(winsorize_eps)
+  }
+  if (J_w > 0L) {
+    rho_w_all <- as.numeric(stats::ARMAacf(ar = phi, lag.max = J_w)[-1])
+    gam_all <- numeric(J_w)
+    for (k in seq_len(J_w)) {
+      gam_all[k] <- (1 / (N - 1)) * as.numeric(
+        t(ys[(k + 1):N, , drop = FALSE]) %*% ys[1:(N - k), , drop = FALSE])
+    }
+    gamma_w0_ols <- sum(gam_all * rho_w_all) / sum(rho_w_all^2)
+    se2 <- var_ly2 - gamma_w0_ols
+  } else {
+    rho_w1 <- as.numeric(stats::ARMAacf(ar = phi, lag.max = 1)[2])
+    gam1 <- (1 / (N - 1)) * as.numeric(
+      t(ys[2:N, , drop = FALSE]) %*% ys[1:(N - 1), , drop = FALSE])
+    se2 <- var_ly2 - gam1 / rho_w1
+  }
+  as.numeric(se2)
+}
+
+# sigma_eps (not squared) from the raw variance estimate; NA when the estimate
+# is not positive (silent unless warn = TRUE).
+.sigeps_raw <- function(se2, warn = FALSE) {
+  if (is.finite(se2) && se2 > 0) return(sqrt(se2))
+  if (warn)
+    warning("Moment estimate of sigma_eps^2 is not positive (", signif(se2, 4),
+            "); 'sigeps' set to NA.")
+  NA_real_
+}
+
 # --- Gaussian SV(p) estimation (with optional leverage) ---
 .svp_gaussian <- function(y, p, J, leverage, rho_type, del, trunc_lev, wDecay,
-                          sigvMethod = "factored") {
+                          sigvMethod = "factored", winsorize_eps = 0) {
   y <- as.numeric(y)
   if (length(y) < 2 * p + J) {
     stop("Time series too short for the given p and J.")
@@ -262,6 +304,9 @@ correction_factor_ged_approx <- function(nu, n_nodes = 200L) {
   var_ly2 <- stats::var(as.numeric(ly2))
   sig_eps2 <- (pi^2) / 2
   phi_g <- as.numeric(para$phi)
+  # Distribution-free moment estimate of sigma_eps (diagnostic only here: the
+  # Gaussian model carries sigma_eps^2 = pi^2/2 into sigma_v and the filters)
+  se2_raw <- .sigeps2_moment(as.matrix(ys_g), var_ly2, phi_g, N_g, J, winsorize_eps)
   if (sigvMethod == "direct") {
     gam_vec_g <- numeric(p)
     for (k in seq_len(p)) {
@@ -288,6 +333,11 @@ correction_factor_ged_approx <- function(nu, n_nodes = 200L) {
   para$trunc_lev <- trunc_lev
   para$rho_type <- NA_character_
   para$sigvMethod <- sigvMethod
+  para$winsorize_eps <- winsorize_eps
+  para$sigeps <- .sigeps_raw(se2_raw)
+  para$sigeps_nu <- sqrt(sig_eps2)
+  para$mubar <- digamma(0.5) + log(2)
+  para$nu_boundary <- NA
   class(para) <- "svp"
   # Step 3: leverage post-processing (if requested)
   if (leverage) {
@@ -308,36 +358,14 @@ correction_factor_ged_approx <- function(nu, n_nodes = 200L) {
   para_base <- svpCpp_nolev(as.numeric(y), p, J, del, wDecay)
   phi_reg <- as.numeric(para_base$phi)
   var_ly2 <- stats::var(as.numeric(ly2))
-  # Estimate sigma_eps^2
-  # winsorize_eps: 0 or FALSE = off; TRUE = use J; integer > 0 = use that as J_w
-  J_w <- 0L
-  if (is.logical(winsorize_eps)) {
-    if (winsorize_eps) J_w <- J
-  } else if (is.numeric(winsorize_eps) && winsorize_eps > 0) {
-    J_w <- as.integer(winsorize_eps)
-  }
-  if (J_w > 0L) {
-    # OLS winsorized estimator (SVHT Eq. 69): average gamma_w(0) across J_w lags
-    rho_w_all <- as.numeric(stats::ARMAacf(ar = phi_reg, lag.max = J_w)[-1])
-    gam_all <- numeric(J_w)
-    for (k in seq_len(J_w)) {
-      gam_all[k] <- (1 / (N - 1)) * as.numeric(
-        t(ys[(k + 1):N, , drop = FALSE]) %*% ys[1:(N - k), , drop = FALSE])
-    }
-    gamma_w0_ols <- sum(gam_all * rho_w_all) / sum(rho_w_all^2)
-    se2 <- var_ly2 - gamma_w0_ols
-  } else {
-    # Single-lag estimator (SVHT Eq. 18): sigma_eps^2 = gamma(0) - gamma(1)/rho_w(1)
-    rho_w1 <- as.numeric(stats::ARMAacf(ar = phi_reg, lag.max = 1)[2])
-    gam1 <- (1 / (N - 1)) * as.numeric(
-      t(ys[2:N, , drop = FALSE]) %*% ys[1:(N - 1), , drop = FALSE])
-    se2 <- var_ly2 - gam1 / rho_w1
-  }
+  # Estimate sigma_eps^2 (distribution-free moment estimate; see .sigeps2_moment)
+  se2 <- .sigeps2_moment(ys, var_ly2, phi_reg, N, J, winsorize_eps)
   se2b <- as.numeric(se2) - psigamma(0.5, 1)
   # Estimate nu via root-finding on trigamma: psigamma(nu/2, 1) = se2b (C++)
   nu_lower <- 2.01
   nu_upper <- 500
   nuh <- find_nu_t_cpp(se2b, nu_lower, nu_upper, logNu)
+  nu_boundary <- (nuh >= nu_upper) || (nuh <= nu_lower)
   if (nuh >= nu_upper) {
     warning("Estimated nu at upper boundary (", nu_upper,
             "); tails indistinguishable from Gaussian.")
@@ -368,14 +396,14 @@ correction_factor_ged_approx <- function(nu, n_nodes = 200L) {
   }
   # Estimate sigy
   mu_log_sq_t <- psigamma(0.5, 0) - psigamma(nuh / 2, 0) + log(nuh)
-  if (p == 1L) {
-    sigy <- sqrt(exp(mean(log(y^2)) - mu_log_sq_t))
-  } else {
-    sigy <- sqrt(exp(mean(log(y^2 + del)) - mu_log_sq_t))
-  }
+  sigy <- sqrt(exp(mu - mu_log_sq_t))
   theta <- c(phi_reg, sigy, sv_reg, nuh)
   out <- list(mu = mu, phi = phi_reg, sigv = as.numeric(sv_reg),
               sigy = as.numeric(sigy), v = nuh, theta = theta,
+              sigeps = .sigeps_raw(se2),            # raw moment estimate
+              sigeps_nu = sqrt(var_log_sq_t),       # sigma_eps(nu-hat), carried by the model
+              mubar = mu_log_sq_t,                  # E[log z^2] at nu-hat
+              nu_boundary = nu_boundary,
               y = as.numeric(y), J = J, p = as.integer(p), del = del,
               wDecay = wDecay, logNu = logNu,
               sigvMethod = sigvMethod, winsorize_eps = winsorize_eps,
@@ -399,31 +427,8 @@ correction_factor_ged_approx <- function(nu, n_nodes = 200L) {
   para_base <- svpCpp_nolev(as.numeric(y), p, J, del, wDecay)
   phi_reg <- as.numeric(para_base$phi)
   var_ly2 <- stats::var(as.numeric(ly2))
-  # Estimate sigma_eps^2
-  # winsorize_eps: 0 or FALSE = off; TRUE = use J; integer > 0 = use that as J_w
-  J_w <- 0L
-  if (is.logical(winsorize_eps)) {
-    if (winsorize_eps) J_w <- J
-  } else if (is.numeric(winsorize_eps) && winsorize_eps > 0) {
-    J_w <- as.integer(winsorize_eps)
-  }
-  if (J_w > 0L) {
-    # OLS winsorized estimator (SVHT Eq. 69)
-    rho_w_all <- as.numeric(stats::ARMAacf(ar = phi_reg, lag.max = J_w)[-1])
-    gam_all <- numeric(J_w)
-    for (k in seq_len(J_w)) {
-      gam_all[k] <- (1 / (N - 1)) * as.numeric(
-        t(ys[(k + 1):N, , drop = FALSE]) %*% ys[1:(N - k), , drop = FALSE])
-    }
-    gamma_w0_ols <- sum(gam_all * rho_w_all) / sum(rho_w_all^2)
-    se2 <- var_ly2 - gamma_w0_ols
-  } else {
-    # Single-lag estimator (SVHT Eq. 18)
-    rho_w1 <- as.numeric(stats::ARMAacf(ar = phi_reg, lag.max = 1)[2])
-    gam1 <- (1 / (N - 1)) * as.numeric(
-      t(ys[2:N, , drop = FALSE]) %*% ys[1:(N - 1), , drop = FALSE])
-    se2 <- as.numeric(var_ly2 - gam1 / rho_w1)
-  }
+  # Estimate sigma_eps^2 (distribution-free moment estimate; see .sigeps2_moment)
+  se2 <- .sigeps2_moment(ys, var_ly2, phi_reg, N, J, winsorize_eps)
   # Estimate nu: solve (2/nu)^2 * psigamma(1/nu, 1) = se2 (C++)
   # GED nu root-finding bracket. The historical data-scale-DEPENDENT bracket
   # (x0 = mean|ly2| / sd|ly2|, retained below for reference) made nu-hat
@@ -444,6 +449,7 @@ correction_factor_ged_approx <- function(nu, n_nodes = 200L) {
   lower <- 0.1
   upper <- 20
   ged_nuh <- find_nu_ged_cpp(as.numeric(se2), lower, upper)
+  nu_boundary <- (ged_nuh >= upper) || (ged_nuh <= lower)
   if (ged_nuh >= 20) {
     warning("Estimated GED nu at upper boundary (20). The shape is not ",
             "identified near this bound: nu in [20, Inf) spans a range of the ",
@@ -480,14 +486,14 @@ correction_factor_ged_approx <- function(nu, n_nodes = 200L) {
   # Estimate sigy
   mu_log_sq_ged <- (2 / ged_nuh) * psigamma(1 / ged_nuh, 0) +
     log(gamma(1 / ged_nuh)) - log(gamma(3 / ged_nuh))
-  if (p == 1L) {
-    sigy <- sqrt(exp(mean(log(y^2)) - mu_log_sq_ged))
-  } else {
-    sigy <- sqrt(exp(mean(log(y^2 + del)) - mu_log_sq_ged))
-  }
+  sigy <- sqrt(exp(mu - mu_log_sq_ged))
   theta <- c(phi_reg, sigy, sv_reg, ged_nuh)
   out <- list(mu = mu, phi = phi_reg, sigv = as.numeric(sv_reg),
               sigy = as.numeric(sigy), v = ged_nuh, theta = theta,
+              sigeps = .sigeps_raw(se2),            # raw moment estimate
+              sigeps_nu = sqrt(var_log_sq_ged),     # sigma_eps(nu-hat), carried by the model
+              mubar = mu_log_sq_ged,                # E[log z^2] at nu-hat
+              nu_boundary = nu_boundary,
               y = as.numeric(y), J = J, p = as.integer(p), del = del,
               wDecay = wDecay,
               sigvMethod = sigvMethod, winsorize_eps = winsorize_eps,

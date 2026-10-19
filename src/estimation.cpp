@@ -19,7 +19,8 @@ List svpCpp_nolev(arma::vec u, int p, int J, double del, bool wDecay = false) {
   arma::mat y = log(u2) - mu;
 
   // ----- compute sigma_y
-  double s_yh = sqrt(exp(mu + 1.2704));
+  // E[log z^2] for z ~ N(0,1) is digamma(1/2) + log(2) = -1.2703628454614782
+  double s_yh = sqrt(exp(mu + 1.2703628454614782));
 
   // ----- compute phi
   arma::mat xMM1(J * p, p, arma::fill::zeros);

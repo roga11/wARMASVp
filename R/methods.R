@@ -11,6 +11,8 @@ print.svp <- function(x, ...) {
   cat(sprintf("%s(%d) model (W-ARMA-SV estimation)\n", mdl_type, p))
   cat(sprintf("  phi: %s\n", paste(round(x$phi, 4), collapse = ", ")))
   cat(sprintf("  sigy: %.4f, sigv: %.4f\n", x$sigy, x$sigv))
+  cat(sprintf("  sigeps: %.4f (moment), %.4f (model); mubar: %.4f\n",
+              x$sigeps, x$sigeps_nu, x$mubar))
   if (!is.na(x$rho)) {
     cat(sprintf("  rho (leverage): %.4f\n", x$rho))
   }
@@ -73,6 +75,8 @@ print.svp_t <- function(x, ...) {
   cat(sprintf("%s(%d) model with Student-t errors (W-ARMA-SV estimation)\n", mdl_type, p))
   cat(sprintf("  phi: %s\n", paste(round(x$phi, 4), collapse = ", ")))
   cat(sprintf("  sigy: %.4f, sigv: %.4f\n", x$sigy, x$sigv))
+  cat(sprintf("  sigeps: %.4f (moment), %.4f (model); mubar: %.4f\n",
+              x$sigeps, x$sigeps_nu, x$mubar))
   cat(sprintf("  nu (d.f.): %.4f\n", x$v))
   if (!is.na(x$rho)) {
     cat(sprintf("  rho (leverage): %.4f\n", x$rho))
@@ -132,6 +136,8 @@ print.svp_ged <- function(x, ...) {
   cat(sprintf("%s(%d) model with GED errors (W-ARMA-SV estimation)\n", mdl_type, p))
   cat(sprintf("  phi: %s\n", paste(round(x$phi, 4), collapse = ", ")))
   cat(sprintf("  sigy: %.4f, sigv: %.4f\n", x$sigy, x$sigv))
+  cat(sprintf("  sigeps: %.4f (moment), %.4f (model); mubar: %.4f\n",
+              x$sigeps, x$sigeps_nu, x$mubar))
   cat(sprintf("  nu (shape): %.4f\n", x$v))
   if (!is.na(x$rho)) {
     cat(sprintf("  rho (leverage): %.4f\n", x$rho))

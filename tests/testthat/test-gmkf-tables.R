@@ -65,38 +65,41 @@ fitB <- .gmkf_fit(302, "Student-t", nu = 3)                # Student-t, interior
 fitC <- .gmkf_fit(103, "GED", nu = 1.5)                    # GED
 fitD <- .gmkf_fit(104, "Student-t", nu = 3, leverage = TRUE)
 
-# ---- 4. mixture = "em" reproduces 0.2.0.9002 exactly ---------------------- #
+# ---- 4. mixture = "em" reproduces the frozen EM-path output exactly -------- #
 
-test_that("mixture = 'em' matches frozen 0.2.0.9002 logliks", {
-  # Literals frozen from the installed 0.2.0.9002 on 2026-08-05 (scratch
-  # script freeze_baselines_0202_9002.R), same seeds/fits as above.
+test_that("mixture = 'em' matches frozen 0.2.0.9004 logliks", {
+  # Literals frozen from 0.2.0.9002 on 2026-08-05 and re-frozen under
+  # 0.2.0.9004 on 2026-10-19 after the exact E[log z^2] constant replaced the
+  # rounded -1.2704 in the Gaussian sigy step and sigy at p = 1 gained the
+  # del offset for Student-t/GED (shifts of 3e-5 to 4e-5 in the logliks of
+  # fitA and fitB, 1e-8 in fitD's forecast). Same seeds/fits as above.
   expect_equal(filter_svp(fitA, method = "mixture", mixture = "em",
                           K = 7, seed = 42)$loglik,
-               -670.756399171503, tolerance = 1e-10)
+               -670.756428541143, tolerance = 1e-10)
   expect_equal(filter_svp(fitA, method = "mixture", mixture = "em",
                           K = 5, seed = 42)$loglik,
-               -667.752180421772, tolerance = 1e-10)   # gaussian EM at K != 7
+               -667.75220866356, tolerance = 1e-10)    # gaussian EM at K != 7
   expect_equal(filter_svp(fitB, method = "mixture", mixture = "em",
                           K = 7, seed = 42)$loglik,
-               -722.224040723902, tolerance = 1e-10)
+               -722.224080736509, tolerance = 1e-10)
   expect_equal(filter_svp(fitB, method = "mixture", mixture = "em",
                           K = 3, seed = 42)$loglik,
-               -721.941900006826, tolerance = 1e-10)   # arbitrary-K EM
+               -721.941937532276, tolerance = 1e-10)   # arbitrary-K EM
   expect_equal(filter_svp(fitC, method = "mixture", mixture = "em",
                           K = 7, seed = 42)$loglik,
-               -669.786206686606, tolerance = 1e-10)
+               -669.786206672167, tolerance = 1e-10)
   expect_equal(filter_svp(fitD, method = "mixture", mixture = "em",
                           K = 7, seed = 42)$loglik,
-               -683.571674389611, tolerance = 1e-10)   # Student-t leverage
+               -683.571674372417, tolerance = 1e-10)   # Student-t leverage
 })
 
-test_that("mixture = 'em' IC and forecast match frozen 0.2.0.9002 values", {
+test_that("mixture = 'em' IC and forecast match frozen 0.2.0.9004 values", {
   expect_equal(unname(svp_IC(fitC, criteria = c("BIC_Kalman", "AIC_Kalman"),
                              mixture = "em")),
-               c(1364.430845766901, 1347.572413373212), tolerance = 1e-10)
+               c(1364.43084573802, 1347.57241334433), tolerance = 1e-10)
   expect_equal(forecast_svp(fitD, H = 2, filter_method = "mixture",
                             mixture = "em")$log_var_forecast,
-               c(-1.644374704648, -1.445872235208), tolerance = 1e-10)
+               c(-1.64437471762357, -1.4458722466171), tolerance = 1e-10)
 })
 
 # ---- 5. "ksc" coincides with "em" for Gaussian K = 7; errors otherwise ---- #

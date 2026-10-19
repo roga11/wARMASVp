@@ -2,6 +2,29 @@
 
 ## New features
 
+* **`svp()` objects now report the measurement-noise scale.** Every fit carries
+  `sigeps` (the distribution-free moment estimate of sigma_eps, the standard
+  deviation of log z_t^2; `NA` when the variance estimate is not positive),
+  `sigeps_nu` (the value the fitted model actually uses: pi/sqrt(2) for
+  Gaussian errors, sigma_eps(nu-hat) for Student-t and GED), `mubar`
+  (E[log z_t^2] under the fitted model, so that `mu = log(sigy^2) + mubar`) and,
+  for Student-t and GED, `nu_boundary`. `print()` shows them.
+  `winsorize_eps` is now honoured for Gaussian fits (it affects only `sigeps`).
+  No estimate changes.
+
+## Bug fixes
+
+* The Gaussian `sigy` step and the Gaussian moment conditions of the leverage
+  and AR-order tests now use the exact `E[log z^2] = digamma(1/2) + log(2)`
+  (-1.2703628454614782) instead of the rounded -1.2704 that the Kalman filter
+  never used. Gaussian `sigy` moves by a factor of about 1 - 1.9e-5; the filter
+  intercept now equals `mu` exactly and `mu == log(sigy^2) + mubar` holds for
+  every fit.
+
+* Student-t and GED `sigy` at `p = 1` used `mean(log(y^2))` without the `del`
+  offset, unlike every other branch; a series containing an exact zero gave
+  `sigy = 0`. All branches now use `mean(log(y^2 + del))`.
+
 * **Precomputed optimal mixture tables for the Gaussian-mixture Kalman filter
   (GMKF), now the default.** `filter_svp()`, `forecast_svp()`, `svp_IC()` and
   `svp_AR_order()` gain a `mixture` argument selecting the source of the GMKF
@@ -22,7 +45,9 @@
     package, `"optimal"` is the better default.
   - `mixture = "em"`: the previous behaviour — an EM fit to 10,000 random
     draws — retained for back-compatibility. Given the same `seed`, it
-    reproduces the numeric output of version 0.2.0.9002 exactly. Supports any
+    reproduces the mixture of version 0.2.0.9002 exactly; the filter output
+    differs from 0.2.0.9002 only through the `sigy` fixes listed under Bug
+    fixes below (of order 1e-5 in the log-likelihood). Supports any
     `K >= 1`. (For Gaussian errors at `K = 7` this path has always returned
     the KSC table, so `"em"` and `"ksc"` coincide there.)
 
@@ -55,8 +80,6 @@
   `mixture` argument sits after `proxy`, so code calling these functions with
   purely positional arguments past `proxy` must be updated (named arguments
   are unaffected).
-
-## Bug fixes
 
 * The warning issued when the GED shape parameter hits its upper bound was
   **factually backwards**. It stated that the tails were "indistinguishable
