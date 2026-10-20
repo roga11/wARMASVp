@@ -453,6 +453,9 @@ svp_IC <- function(fit,
 #'   \code{"GED"}. Default \code{"Gaussian"}.
 #' @param rho_type,del,trunc_lev,wDecay,logNu,sigvMethod,winsorize_eps Other
 #'   arguments passed to \code{\link{svp}}.
+#' @param sigeps Character, passed to \code{\link{svp}}: \code{"theoretical"}
+#'   (default) or \code{"estimated"} (Gaussian errors only; requires
+#'   \code{filter_method = "corrected"} for the \code{*_Kalman} criteria).
 #' @param filter_method Character. Filter method for \code{*_Kalman}
 #'   criteria. Default \code{"mixture"}.
 #' @param proxy Character. Leverage proxy. Default \code{"bayes_optimal"}
@@ -495,6 +498,7 @@ svp_AR_order <- function(y, pmax = 6L,
                          rho_type = "pearson", del = 1e-10, trunc_lev = TRUE,
                          wDecay = FALSE, logNu = FALSE,
                          sigvMethod = "factored", winsorize_eps = 0L,
+                         sigeps = c("theoretical", "estimated"),
                          filter_method = "mixture",
                          proxy = c("bayes_optimal", "u"),
                          mixture = c("optimal", "ksc", "em"),
@@ -512,6 +516,21 @@ svp_AR_order <- function(y, pmax = 6L,
   filter_method <- match.arg(filter_method, c("mixture", "corrected", "particle"))
   proxy <- match.arg(proxy)
   mixture <- match.arg(mixture)
+  sigeps <- match.arg(sigeps)
+  if (sigeps == "estimated") {
+    # Same rules as svp(); checked here so they error instead of being
+    # swallowed by the per-p tryCatch below.
+    if (errorType != "Gaussian")
+      stop("sigeps = 'estimated' applies to errorType = 'Gaussian' only.")
+    if (leverage)
+      stop("leverage = TRUE is not supported with sigeps = 'estimated'.")
+    if (sigvMethod == "hybrid")
+      stop("sigvMethod = 'hybrid' is not supported with sigeps = 'estimated'.")
+    if (filter_method != "corrected" &&
+        any(c("AIC_Kalman", "BIC_Kalman", "AICc_Kalman") %in% criteria))
+      stop("sigeps = 'estimated' requires filter_method = 'corrected' for the ",
+           "*_Kalman criteria.")
+  }
 
   # Pre-allocate IC_mat in the order requested by the user (criteria arg).
   # Note: row names follow the user-specified ordering.
@@ -524,7 +543,8 @@ svp_AR_order <- function(y, pmax = 6L,
       svp(y, p = p, J = J, leverage = leverage, errorType = errorType,
           rho_type = rho_type, del = del, trunc_lev = trunc_lev,
           wDecay = wDecay, logNu = logNu,
-          sigvMethod = sigvMethod, winsorize_eps = winsorize_eps),
+          sigvMethod = sigvMethod, winsorize_eps = winsorize_eps,
+          sigeps = sigeps),
       error = function(e) NULL
     )
     fits[[p]] <- fit

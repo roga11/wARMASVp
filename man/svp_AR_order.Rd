@@ -17,6 +17,7 @@ svp_AR_order(
   logNu = FALSE,
   sigvMethod = "factored",
   winsorize_eps = 0L,
+  sigeps = c("theoretical", "estimated"),
   filter_method = "mixture",
   proxy = c("bayes_optimal", "u"),
   mixture = c("optimal", "ksc", "em"),
@@ -42,6 +43,10 @@ Default 10.}
 
 \item{rho_type, del, trunc_lev, wDecay, logNu, sigvMethod, winsorize_eps}{Other
 arguments passed to \code{\link{svp}}.}
+
+\item{sigeps}{Character, passed to \code{\link{svp}}: \code{"theoretical"}
+(default) or \code{"estimated"} (Gaussian errors only; requires
+\code{filter_method = "corrected"} for the \code{*_Kalman} criteria).}
 
 \item{filter_method}{Character. Filter method for \code{*_Kalman}
 criteria. Default \code{"mixture"}.}

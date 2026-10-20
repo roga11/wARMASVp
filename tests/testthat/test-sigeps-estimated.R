@@ -78,3 +78,20 @@ test_that("fallback: pooled estimate is used when the single-lag one fails, else
     .sigeps2_moment = function(...) -1, .package = "wARMASVp")
   expect_error(svp(y, sigeps = "estimated"), "does not support the estimated mode")
 })
+
+test_that("svp_AR_order forwards sigeps and validates the combination up front", {
+  y <- .sim_rv(2000)
+  res <- svp_AR_order(y, pmax = 2, sigeps = "estimated", filter_method = "corrected")
+  expect_true(all(vapply(res$fits, function(f) f$sigeps_method == "estimated", logical(1))))
+  expect_true(all(is.finite(res$IC)))
+  res0 <- svp_AR_order(y, pmax = 2, filter_method = "corrected")
+  expect_true(all(vapply(res0$fits, function(f) f$sigeps_method == "theoretical", logical(1))))
+  expect_error(svp_AR_order(y, pmax = 2, sigeps = "estimated"), "corrected")
+  expect_error(svp_AR_order(y, pmax = 2, sigeps = "estimated", errorType = "GED",
+                            filter_method = "corrected"), "Gaussian")
+  expect_error(svp_AR_order(y, pmax = 2, sigeps = "estimated", leverage = TRUE,
+                            filter_method = "corrected"), "leverage")
+  # HR/YW criteria need no filter, so they are allowed with the default filter_method
+  r2 <- svp_AR_order(y, pmax = 2, sigeps = "estimated", criteria = c("BIC_HR", "AIC_HR"))
+  expect_true(all(is.finite(r2$IC)))
+})

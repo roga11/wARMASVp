@@ -21,7 +21,8 @@
   the `abs()` branch and the filter over-weight the noise. Returns
   `sigeps_method` and `sigeps_fallback`. Not available with leverage,
   `sigvMethod = "hybrid"`, the mixture or particle filters, or `svpSE()`.
-  Default `"theoretical"`: all existing results unchanged.
+  Default `"theoretical"`: all existing results unchanged. `svp_AR_order()`
+  gains the same `sigeps` argument.
 
 ## Bug fixes
 
