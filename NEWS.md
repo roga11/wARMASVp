@@ -26,6 +26,53 @@
 
 ## Bug fixes
 
+* **Leverage filtering no longer diverges: the CKF/GMKF prediction covariance
+  under leverage is now that of Ahsan, Dufour and Rodriguez-Rondon (2026),
+  eqs. (48a)-(48b).** The leverage shift `sigma_v * delta_p * z_hat_{t-1}` used
+  to be treated as a known input, with state-noise variance
+  `sigma_v^2 (1 - delta_p^2)` and nothing else, although `z_hat_{t-1}` depends
+  on the filtered state through `exp(-w_hat_{t-1}/2)`. As `|delta_p|`
+  approached 1 the Kalman gain went to zero and the filter ran open loop on an
+  explosive recursion: on daily index returns with `rho_hat` at the -0.999
+  bound the filtered log-volatility reached 1e200 or `NaN` and the RTS
+  smoother failed, and simulated Gaussian-leverage cells diverged in 6-13% of
+  replications. The prediction covariance is now
+  `A_t P_{t-1|t-1} A_t' + sigma_v^2 [(1 - delta_p^2) + delta_p^2 Var(z_{t-1} | u_{t-1})] r r'`
+  with transition Jacobian
+  `A_t = F - (1/2) sigma_v delta_p g'(u_hat_{t-1}) u_hat_{t-1} r h'`, where
+  `g(u) = E[z | u]` is the Bayes-optimal proxy already used for the mean
+  (Gaussian `g(u) = u`; GED the Gaussian-copula map; Student-t the posterior
+  mean under the scale mixture, the only family with `Var(z | u) > 0`). The
+  RTS smoother gain uses `A_{t+1}` in place of `F`, and the `h = 1` forecast
+  covariance of `forecast_svp()` is the same one-step prediction (`h >= 2`
+  keeps the marginal `sigma_v^2`). On simulated designs the one-step
+  prediction variance is now calibrated (realised/claimed 0.98-1.01 in every
+  family and `rho`; it was over-confident by up to 47%), filtered-state RMSE
+  is within 0.01 of the particle filter, and none of the index-return windows
+  that diverged before does so now. **No change without leverage**: every
+  `delta_p = 0` path (filters, smoother, forecasts, information criteria) is
+  bit-identical to 0.2.0.9005. All leverage output of `filter_svp()`,
+  `forecast_svp()`, `svp_IC()` and `svp_AR_order()` changes; the particle
+  filter is unaffected.
+
+* **The GED leverage proxy is no longer clamped.** The copula map
+  `Phi^{-1}(F_GED(u; nu))` was evaluated through a CDF clamped to
+  `[1e-15, 1 - 1e-15]`, which capped the proxy at 7.94 and set its derivative
+  to zero beyond `|u|` of about 12 at `nu = 1.5`. It is now computed from the
+  log upper-tail probability and is exact for every finite `u`. For GED fits
+  with `nu_hat` far above 2, in particular at the `nu = 20` boundary where the
+  fitted distribution is nearly uniform, the map is extremely steep outside
+  `|u|` of about 1.75 and the first-order covariance can become very large
+  after an outlying residual; the filter stays finite (see `?filter_svp`).
+
+* **`proxy` argument removed** from `filter_svp()`, `forecast_svp()`,
+  `svp_IC()` and `svp_AR_order()`. The Bayes-optimal proxy `E[z | u]` is the
+  one the methodology prescribes and the only one consistent with the
+  covariance above; the `"u"` alternative coincided with it for Gaussian and
+  GED errors, was the misspecified mean for Student-t, and diverged on most
+  Student-t leverage fits tried. Calls passing `proxy =` now fail with
+  "unused argument".
+
 * The Gaussian `sigy` step and the Gaussian moment conditions of the leverage
   and AR-order tests now use the exact `E[log z^2] = digamma(1/2) + log(2)`
   (-1.2703628454614782) instead of the rounded -1.2704 that the Kalman filter
@@ -59,9 +106,10 @@
     draws — retained for back-compatibility. Given the same `seed`, it
     reproduces the mixture of version 0.2.0.9002 exactly; the filter output
     differs from 0.2.0.9002 only through the `sigy` fixes listed under Bug
-    fixes below (of order 1e-5 in the log-likelihood). Supports any
-    `K >= 1`. (For Gaussian errors at `K = 7` this path has always returned
-    the KSC table, so `"em"` and `"ksc"` coincide there.)
+    fixes below (of order 1e-5 in the log-likelihood) and, for leverage
+    fits, through the leverage prediction covariance fix listed there.
+    Supports any `K >= 1`. (For Gaussian errors at `K = 7` this path has
+    always returned the KSC table, so `"em"` and `"ksc"` coincide there.)
 
   The shipped tables live in `inst/extdata/` and can be inspected with the
   new exported accessor `gmkf_table()`; the exact scripts that built them
@@ -89,9 +137,10 @@
   `mixture_source` element recording the source used; the existing (and now
   documented) `mixture` element — the mixture actually used — loses its
   `KL_div` field, which was hardcoded `NA` and read by nothing. The new
-  `mixture` argument sits after `proxy`, so code calling these functions with
-  purely positional arguments past `proxy` must be updated (named arguments
-  are unaffected).
+  `mixture` argument now directly follows `method`/`filter_method` (the
+  `proxy` argument that preceded it in 0.2.0 has been removed, see Bug
+  fixes), so code calling these functions with purely positional arguments
+  must be updated (named arguments are unaffected).
 
 * The warning issued when the GED shape parameter hits its upper bound was
   **factually backwards**. It stated that the tails were "indistinguishable

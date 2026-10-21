@@ -169,7 +169,7 @@
 #'         \code{filter_method = "mixture"} uses the Gaussian mixture
 #'         Kalman filter (Kim, Shephard and Chib 1998). \code{BIC_Kalman}
 #'         is the primary recommended criterion: Schwarz-consistent under
-#'         the Bayes-optimal leverage proxy (see \code{proxy} argument)
+#'         the Bayes-optimal leverage proxy of \code{\link{filter_svp}}
 #'         and strong finite-sample performance across the simulation
 #'         grid (Ahsan, Dufour and Rodriguez-Rondon 2026).
 #'         \code{AIC_Kalman} is Shibata-efficient
@@ -250,14 +250,6 @@
 #'   \code{\link{filter_svp}} for \code{*_Kalman} criteria. One of
 #'   \code{"mixture"} (default, recommended), \code{"corrected"}, or
 #'   \code{"particle"}.
-#' @param proxy Character. Leverage proxy passed to \code{\link{filter_svp}}.
-#'   \code{"bayes_optimal"} (default) is the prescribed proxy in Ahsan,
-#'   Dufour and Rodriguez-Rondon (2026); it removes the \eqn{O(T)}
-#'   log-likelihood bias of the raw \eqn{\hat u}-proxy under Student-t
-#'   leverage and restores Schwarz consistency of \code{BIC_Kalman}.
-#'   \code{"u"} is a simpler alternative using \eqn{\hat u_{t-1}} directly;
-#'   provided for compatibility but not recommended for IC computation
-#'   under Student-t leverage.
 #' @param mixture Character. Source of the GMKF measurement mixture when
 #'   \code{filter_method = "mixture"}: \code{"optimal"} (default,
 #'   precomputed tables), \code{"ksc"} (published KSC table; Gaussian,
@@ -346,7 +338,6 @@ svp_IC <- function(fit,
                    criteria = c("BIC_Kalman", "AIC_Kalman",
                                 "BIC_HR", "AIC_HR"),
                    filter_method = c("mixture", "corrected", "particle"),
-                   proxy = c("bayes_optimal", "u"),
                    mixture = c("optimal", "ksc", "em"),
                    K = 7L, M = 1000L, seed = 42L,
                    del = 1e-10) {
@@ -359,7 +350,6 @@ svp_IC <- function(fit,
                 "BIC_YW", "AIC_YW")
   criteria <- match.arg(criteria, choices = all_crit, several.ok = TRUE)
   filter_method <- match.arg(filter_method)
-  proxy <- match.arg(proxy)
   mixture <- match.arg(mixture)
 
   errorType <- fit$errorType
@@ -418,7 +408,7 @@ svp_IC <- function(fit,
       .validate_mixture_choice(mixture, K, dist_name)
     }
     filt <- tryCatch(
-      filter_svp(fit, method = filter_method, proxy = proxy,
+      filter_svp(fit, method = filter_method,
                  mixture = mixture, K = K, M = M, seed = seed, del = del),
       error = function(e) NULL
     )
@@ -458,8 +448,6 @@ svp_IC <- function(fit,
 #'   \code{filter_method = "corrected"} for the \code{*_Kalman} criteria).
 #' @param filter_method Character. Filter method for \code{*_Kalman}
 #'   criteria. Default \code{"mixture"}.
-#' @param proxy Character. Leverage proxy. Default \code{"bayes_optimal"}
-#'   for IC consistency under Student-t leverage. See \code{\link{svp_IC}}.
 #' @param mixture Character. Source of the GMKF measurement mixture:
 #'   \code{"optimal"} (default, precomputed tables — the whole sweep is then
 #'   deterministic), \code{"ksc"} or \code{"em"}. See \code{\link{svp_IC}}
@@ -500,7 +488,6 @@ svp_AR_order <- function(y, pmax = 6L,
                          sigvMethod = "factored", winsorize_eps = 0L,
                          sigeps = c("theoretical", "estimated"),
                          filter_method = "mixture",
-                         proxy = c("bayes_optimal", "u"),
                          mixture = c("optimal", "ksc", "em"),
                          K = 7L, M = 1000L, seed = 42L,
                          criteria = c("BIC_Kalman", "AIC_Kalman",
@@ -514,7 +501,6 @@ svp_AR_order <- function(y, pmax = 6L,
                 "BIC_YW", "AIC_YW")
   criteria <- match.arg(criteria, choices = all_crit, several.ok = TRUE)
   filter_method <- match.arg(filter_method, c("mixture", "corrected", "particle"))
-  proxy <- match.arg(proxy)
   mixture <- match.arg(mixture)
   sigeps <- match.arg(sigeps)
   if (sigeps == "estimated") {
@@ -551,7 +537,7 @@ svp_AR_order <- function(y, pmax = 6L,
     if (!is.null(fit)) {
       IC_mat[, p] <- svp_IC(fit, criteria = criteria,
                              filter_method = filter_method,
-                             proxy = proxy, mixture = mixture,
+                             mixture = mixture,
                              K = K, M = M, seed = seed, del = del)
     }
   }

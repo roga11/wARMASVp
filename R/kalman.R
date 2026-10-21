@@ -212,15 +212,6 @@ fit_ksc_mixture <- function(distribution = c("gaussian", "student_t", "ged"),
     sig_eps2 <- (pi^2) / 2
   }
 
-  # Var(z_t) for the leverage prediction covariance.  Per Ahsan, Dufour and
-  # Rodriguez-Rondon (2026), the *conditional* state-innovation covariance
-  # at one-step-ahead is sigma_v^2 * (1 - delta^2): the leverage shift
-  # sigma_v * delta_p * z_{t-1} is treated as a known input because the
-  # proxy z-hat_{t-1} is deterministic given F_{t-1} (both proxy choices
-  # yield this).  Hence var_zt = 0 uniformly across error types, leverage
-  # configurations, and proxy options.
-  var_zt <- 0.0
-
   # Measurement intercept mu_bar
   if (inherits(model, "svp_t") && !is.null(model$v) && is.finite(model$v)) {
     mu_bar <- digamma(0.5) - digamma(model$v / 2) + log(model$v)
@@ -240,7 +231,7 @@ fit_ksc_mixture <- function(distribution = c("gaussian", "student_t", "ged"),
                else "gaussian"
 
   list(phi = phi, p = p, delta_p = delta_p, sigma_y = sigma_y,
-       sigma_v = sigma_v, sig_eps2 = sig_eps2, var_zt = var_zt,
+       sigma_v = sigma_v, sig_eps2 = sig_eps2,
        mu_intercept = mu_intercept, dist_name = dist_name,
        nu = if (!is.null(model$v)) model$v else NULL,
        mu = model$mu)
@@ -262,24 +253,6 @@ fit_ksc_mixture <- function(distribution = c("gaussian", "student_t", "ged"),
 #'   standard Kalman with distribution-specific \eqn{\sigma_\varepsilon^2(\nu)},
 #'   \code{"mixture"} for the Gaussian Mixture Kalman Filter (GMKF), or
 #'   \code{"particle"} for the Bootstrap Particle Filter (BPF).
-#' @param proxy Character. Leverage proxy for the state-space prediction
-#'   mean \eqn{\hat{z}_{t-1}} that enters the leverage shift
-#'   \eqn{\sigma_\nu \delta_p \hat{z}_{t-1}} (the prediction covariance is
-#'   independently \eqn{\sigma_\nu^2(1-\delta_p^2)} per Ahsan, Dufour and
-#'   Rodriguez-Rondon (2026), i.e.\ \code{var_zt = 0L}).
-#'   \code{"bayes_optimal"} (default) uses the posterior mean
-#'   \eqn{E[\zeta_{t-1} \mid u_{t-1}]} for Student-t leverage; this is the
-#'   prescribed proxy in Ahsan, Dufour and Rodriguez-Rondon (2026), and
-#'   corrects the marginal variance inflation that arises from using
-#'   \eqn{\hat{u}_{t-1}} directly (\eqn{\mathrm{Var}(\hat{u}) =
-#'   \nu/(\nu - 2) > 1}). It is also what the IC functions
-#'   \code{\link{svp_IC}} / \code{\link{svp_AR_order}} use internally.
-#'   \code{"u"} is a simpler alternative that uses the raw filtered
-#'   residual \eqn{\hat{u}_{t-1}} as the proxy (\eqn{\hat{z}_{t-1} =
-#'   \hat{u}_{t-1}}); under Student-t leverage it does not correct the
-#'   variance inflation above. Has no effect for Gaussian or GED leverage
-#'   (the proxy is closed-form in both cases) and no effect when
-#'   \code{leverage = FALSE}.
 #' @param mixture Character. Source of the GMKF measurement mixture (only
 #'   used when \code{method = "mixture"}):
 #'   \describe{
@@ -316,6 +289,36 @@ fit_ksc_mixture <- function(distribution = c("gaussian", "student_t", "ged"),
 #'   deterministic.
 #' @param del Numeric. Small constant for log transformation. Default \code{1e-10}.
 #'
+#' @details
+#' Under leverage (\eqn{\delta_p \neq 0}) the CKF and GMKF prediction step
+#' follows Ahsan, Dufour and Rodriguez-Rondon (2026), Section 3.3.2, eqs.
+#' (48a)-(48b). The state mean is shifted by \eqn{\sigma_v \delta_p \hat{z}_{t-1}}
+#' with \eqn{\hat{z}_{t-1} = g(\hat{u}_{t-1})}, where \eqn{g(u) = E[z_{t-1} \mid
+#' u_{t-1} = u]} is the Bayes-optimal proxy evaluated at the filtered
+#' standardized residual \eqn{\hat{u}_{t-1} = (y_{t-1}/\sigma_y)
+#' \exp(-\hat{w}_{t-1|t-1}/2)}, and the prediction covariance is
+#' \deqn{P_{t|t-1} = A_t P_{t-1|t-1} A_t' + \sigma_v^2 [(1-\delta_p^2) +
+#'   \delta_p^2 V_{t-1}]\, r r', \qquad A_t = F - \tfrac{1}{2} \sigma_v \delta_p\,
+#'   g'(\hat{u}_{t-1})\, \hat{u}_{t-1}\, r h',}
+#' with \eqn{V_{t-1} = \mathrm{Var}(z_{t-1} \mid u_{t-1} = \hat{u}_{t-1})}.
+#' \eqn{A_t} propagates the dependence of the leverage shift on the filtered
+#' state to first order in the state-estimation error, and \eqn{V_{t-1}} is
+#' the mixing-variable variance. By error type: Gaussian \eqn{g(u) = u},
+#' \eqn{V = 0}; GED \eqn{g(u) = \Phi^{-1}(F_{GED}(u;\nu))} (eq. 49), \eqn{V = 0};
+#' Student-t, with \eqn{c(\nu) = \Gamma((\nu+2)/2)/\Gamma((\nu+1)/2)},
+#' \eqn{g(u) = u \sqrt{2/(\nu+u^2)}\, c(\nu)} and
+#' \eqn{V(u) = u^2 [(\nu+1) - 2 c(\nu)^2]/(\nu+u^2)}. The GMKF applies the same
+#' step to its collapsed state, and the RTS smoother gain uses \eqn{A_{t+1}}
+#' in place of \eqn{F}. Without leverage both filters are the standard linear
+#' Kalman recursions.
+#'
+#' For GED fits with \eqn{\hat\nu} well above 2, in particular at the
+#' estimation boundary \eqn{\hat\nu = 20} (see \code{nu_boundary} on the fit),
+#' the copula map \eqn{g} is extremely steep outside \eqn{|u| \approx 1.75}, so
+#' after an outlying residual \eqn{A_t} is far from stable and the prediction
+#' variance can become very large. The filter remains finite, but the
+#' first-order covariance is not reliable for such fits.
+#'
 #' @return An object of class \code{"svp_filter"}, a list containing:
 #' \describe{
 #'   \item{w_filtered}{Filtered log-volatility (T-vector).}
@@ -346,14 +349,12 @@ fit_ksc_mixture <- function(distribution = c("gaussian", "student_t", "ged"),
 #'
 #' @export
 filter_svp <- function(object, method = c("corrected", "mixture", "particle"),
-                       proxy = c("bayes_optimal", "u"),
                        mixture = c("optimal", "ksc", "em"),
                        K = 7, M = 1000, seed = 42, del = 1e-10) {
   if (!inherits(object, c("svp", "svp_t", "svp_ged"))) {
     stop("object must be of class 'svp', 'svp_t', or 'svp_ged'.")
   }
   method <- match.arg(method)
-  proxy <- match.arg(proxy)
   mixture <- match.arg(mixture)
   if (isTRUE(object$sigeps_method == "estimated") && method != "corrected")
     stop("fits with sigeps = 'estimated' support method = 'corrected' only ",
@@ -366,7 +367,6 @@ filter_svp <- function(object, method = c("corrected", "mixture", "particle"),
     stop("'del' must be a positive number.")
   y_vec <- as.numeric(object$y)
   params <- .get_filter_params(object)
-  proxy_type <- if (proxy == "u") 0L else 1L
   dist_code  <- switch(params$dist_name, "gaussian" = 0L,
                                           "student_t" = 1L,
                                           "ged" = 2L)
@@ -398,11 +398,9 @@ filter_svp <- function(object, method = c("corrected", "mixture", "particle"),
       sigma_v = params$sigma_v,
       delta_p = params$delta_p,
       sig_eps2 = params$sig_eps2,
-      var_zt = params$var_zt,
       P0 = P0,
       dist_code = dist_code,
-      nu = nu_val,
-      proxy_type = proxy_type
+      nu = nu_val
     )
 
   } else if (method == "mixture") {
@@ -443,15 +441,13 @@ filter_svp <- function(object, method = c("corrected", "mixture", "particle"),
       sigma_y = params$sigma_y,
       sigma_v = params$sigma_v,
       delta_p = params$delta_p,
-      var_zt = params$var_zt,
       mix_weights = mix_params$weights,
       mix_means = mix_params$means,
       mix_vars = mix_params$vars,
       mu_intercept = mu_intercept_gmkf,
       P0 = P0,
       dist_code = dist_code,
-      nu = nu_val,
-      proxy_type = proxy_type
+      nu = nu_val
     )
     result$mixture <- mix_params
 

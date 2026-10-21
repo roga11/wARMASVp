@@ -7,7 +7,6 @@
 filter_svp(
   object,
   method = c("corrected", "mixture", "particle"),
-  proxy = c("bayes_optimal", "u"),
   mixture = c("optimal", "ksc", "em"),
   K = 7,
   M = 1000,
@@ -23,25 +22,6 @@ from \code{\link{svp}}.}
 standard Kalman with distribution-specific \eqn{\sigma_\varepsilon^2(\nu)},
 \code{"mixture"} for the Gaussian Mixture Kalman Filter (GMKF), or
 \code{"particle"} for the Bootstrap Particle Filter (BPF).}
-
-\item{proxy}{Character. Leverage proxy for the state-space prediction
-mean \eqn{\hat{z}_{t-1}} that enters the leverage shift
-\eqn{\sigma_\nu \delta_p \hat{z}_{t-1}} (the prediction covariance is
-independently \eqn{\sigma_\nu^2(1-\delta_p^2)} per Ahsan, Dufour and
-Rodriguez-Rondon (2026), i.e.\ \code{var_zt = 0L}).
-\code{"bayes_optimal"} (default) uses the posterior mean
-\eqn{E[\zeta_{t-1} \mid u_{t-1}]} for Student-t leverage; this is the
-prescribed proxy in Ahsan, Dufour and Rodriguez-Rondon (2026), and
-corrects the marginal variance inflation that arises from using
-\eqn{\hat{u}_{t-1}} directly (\eqn{\mathrm{Var}(\hat{u}) =
-\nu/(\nu - 2) > 1}). It is also what the IC functions
-\code{\link{svp_IC}} / \code{\link{svp_AR_order}} use internally.
-\code{"u"} is a simpler alternative that uses the raw filtered
-residual \eqn{\hat{u}_{t-1}} as the proxy (\eqn{\hat{z}_{t-1} =
-\hat{u}_{t-1}}); under Student-t leverage it does not correct the
-variance inflation above. Has no effect for Gaussian or GED leverage
-(the proxy is closed-form in both cases) and no effect when
-\code{leverage = FALSE}.}
 
 \item{mixture}{Character. Source of the GMKF measurement mixture (only
 used when \code{method = "mixture"}):
@@ -107,6 +87,36 @@ An object of class \code{"svp_filter"}, a list containing:
 \description{
 Applies Kalman filtering (corrected or Gaussian mixture) and RTS smoothing
 to extract the latent log-volatility process from an estimated SV(p) model.
+}
+\details{
+Under leverage (\eqn{\delta_p \neq 0}) the CKF and GMKF prediction step
+follows Ahsan, Dufour and Rodriguez-Rondon (2026), Section 3.3.2, eqs.
+(48a)-(48b). The state mean is shifted by \eqn{\sigma_v \delta_p \hat{z}_{t-1}}
+with \eqn{\hat{z}_{t-1} = g(\hat{u}_{t-1})}, where \eqn{g(u) = E[z_{t-1} \mid
+u_{t-1} = u]} is the Bayes-optimal proxy evaluated at the filtered
+standardized residual \eqn{\hat{u}_{t-1} = (y_{t-1}/\sigma_y)
+\exp(-\hat{w}_{t-1|t-1}/2)}, and the prediction covariance is
+\deqn{P_{t|t-1} = A_t P_{t-1|t-1} A_t' + \sigma_v^2 [(1-\delta_p^2) +
+  \delta_p^2 V_{t-1}]\, r r', \qquad A_t = F - \tfrac{1}{2} \sigma_v \delta_p\,
+  g'(\hat{u}_{t-1})\, \hat{u}_{t-1}\, r h',}
+with \eqn{V_{t-1} = \mathrm{Var}(z_{t-1} \mid u_{t-1} = \hat{u}_{t-1})}.
+\eqn{A_t} propagates the dependence of the leverage shift on the filtered
+state to first order in the state-estimation error, and \eqn{V_{t-1}} is
+the mixing-variable variance. By error type: Gaussian \eqn{g(u) = u},
+\eqn{V = 0}; GED \eqn{g(u) = \Phi^{-1}(F_{GED}(u;\nu))} (eq. 49), \eqn{V = 0};
+Student-t, with \eqn{c(\nu) = \Gamma((\nu+2)/2)/\Gamma((\nu+1)/2)},
+\eqn{g(u) = u \sqrt{2/(\nu+u^2)}\, c(\nu)} and
+\eqn{V(u) = u^2 [(\nu+1) - 2 c(\nu)^2]/(\nu+u^2)}. The GMKF applies the same
+step to its collapsed state, and the RTS smoother gain uses \eqn{A_{t+1}}
+in place of \eqn{F}. Without leverage both filters are the standard linear
+Kalman recursions.
+
+For GED fits with \eqn{\hat\nu} well above 2, in particular at the
+estimation boundary \eqn{\hat\nu = 20} (see \code{nu_boundary} on the fit),
+the copula map \eqn{g} is extremely steep outside \eqn{|u| \approx 1.75}, so
+after an outlying residual \eqn{A_t} is far from stable and the prediction
+variance can become very large. The filter remains finite, but the
+first-order covariance is not reliable for such fits.
 }
 \examples{
 \donttest{

@@ -5,41 +5,41 @@
 // [[Rcpp::depends(RcppArmadillo)]]
 using namespace Rcpp;
 
-// Forward declaration: GED CDF, defined in utils_cpp.cpp
-double pged_std_cpp(double u, double nu);
+// Forward declaration: GED copula proxy g(u) = Phi^{-1}(F_GED(u; nu)) and its
+// derivative, defined in utils_cpp.cpp
+void ged_copula_cpp(double u, double nu, double& g, double& dg);
 
 // --------------------------------------------------------------------------- //
-// Compute the leverage-shift proxy zeta_hat from the observed u, by error type.
-// dist_code:    0 = Gaussian, 1 = Student-t, 2 = GED
-// proxy_type:   0 = "u" (paper-faithful per SVHT Remark 3.5)
-//               1 = "bayes_optimal" (Bayes posterior mean for Student-t)
-// For Gaussian, u = zeta exactly (no choice).
-// For GED, u = qged_std(Phi(zeta)) so zeta = Phi^{-1}(F_GED(u;nu)) (exact;
-//   the proxy_type flag has no effect).
-// For Student-t, u = zeta * lambda^{-1/2}.  The "u" proxy uses zeta_hat = u
-//   (paper choice).  The "bayes_optimal" proxy uses
-//     E[zeta | u] = u * sqrt((nu+1)/(nu+u^2)) * Gamma((nu+2)/2)/Gamma((nu+1)/2)
-//                * sqrt(2/(nu+1))
-//             = u * sqrt(2/(nu+u^2)) * Gamma((nu+2)/2)/Gamma((nu+1)/2).
+// Leverage proxy and the two quantities the prediction covariance needs,
+// SVHT Section 3.3.2 (eqs. 48a, 48b, 49).  Given the standardized residual
+// u_hat_{t-1} = (y_{t-1}/sigma_y) exp(-w_hat_{t-1|t-1}/2):
+//   g  = g(u)  := E[z_{t-1} | u_{t-1} = u]   (Bayes-optimal proxy z_hat; enters the
+//                                             state shift sigma_v delta_p z_hat r)
+//   dg = g'(u)                               (enters the Jacobian A_t, eq. 48b)
+//   V  = Var(z_{t-1} | u_{t-1} = u)          (enters the state-noise variance, eq. 48a)
+// dist_code: 0 = Gaussian, 1 = Student-t, 2 = GED.
+//   Gaussian : z = u exactly, so g = u, g' = 1, V = 0.
+//   GED      : u = F_GED^{-1}(Phi(z)), so g = Phi^{-1}(F_GED(u; nu)) (eq. 49),
+//              g' = f_GED(u)/phi(g(u)), V = 0 (ged_copula_cpp, tail-stable).
+//   Student-t: u = z / sqrt(lambda), nu lambda ~ chi^2_nu, so
+//              lambda | u ~ Gamma((nu+1)/2, rate (nu+u^2)/2) and with
+//              c(nu) = Gamma((nu+2)/2) / Gamma((nu+1)/2):
+//                g  = u sqrt(2/(nu+u^2)) c(nu),
+//                g' = sqrt(2) nu c(nu) (nu+u^2)^{-3/2},
+//                V  = u^2 [ (nu+1)/(nu+u^2) - 2 c(nu)^2/(nu+u^2) ].
 // --------------------------------------------------------------------------- //
-static inline double leverage_zeta_proxy(double u, int dist_code, double nu,
-                                          int proxy_type) {
+static inline void leverage_proxy(double u, int dist_code, double nu,
+                                  double& g, double& dg, double& V) {
   if (dist_code == 0) {
-    return u;                       // Gaussian: zeta = u exactly
+    g = u; dg = 1.0; V = 0.0;
   } else if (dist_code == 2) {
-    double p = pged_std_cpp(u, nu); // GED: invert the copula
-    return R::qnorm(p, 0.0, 1.0, 1, 0);
+    ged_copula_cpp(u, nu, g, dg); V = 0.0;
   } else {
-    // Student-t
-    if (proxy_type == 0) {
-      return u;                     // paper-faithful (Remark 3.5)
-    } else {
-      // Bayes-optimal: posterior mean of zeta given u
-      double factor = std::sqrt(2.0 / (nu + u * u))
-                    * std::exp(R::lgammafn((nu + 2.0) / 2.0)
-                             - R::lgammafn((nu + 1.0) / 2.0));
-      return u * factor;
-    }
+    const double c   = std::exp(R::lgammafn((nu + 2.0) / 2.0) - R::lgammafn((nu + 1.0) / 2.0));
+    const double s   = nu + u * u;
+    g  = u * std::sqrt(2.0 / s) * c;
+    dg = std::sqrt(2.0) * nu * c / (s * std::sqrt(s));
+    V  = u * u * ((nu + 1.0) / s - 2.0 * c * c / s);
   }
 }
 
@@ -61,7 +61,12 @@ arma::mat solve_lyapunov_discrete_cpp(const arma::mat& F_mat, const arma::mat& Q
 // Corrected Kalman Filter (CKF) — forward pass + RTS smoother
 //
 // This is the standard Kalman filter using distribution-specific σ_ε²(ν)
-// as measurement noise variance, with leverage support.
+// as measurement noise variance, with leverage support.  Under leverage the
+// prediction step is SVHT eqs. (48a)-(48b): mean shift sigma_v delta_p g(u_hat)
+// and covariance A_t P A_t' + sigma_v^2 [(1 - delta_p^2) + delta_p^2 V] r r',
+// A_t = F - (1/2) sigma_v delta_p g'(u_hat) u_hat r h' (first order in the
+// state-estimation error; see leverage_proxy above).  delta_p = 0 recovers
+// the standard linear filter exactly.
 // --------------------------------------------------------------------------- //
 // [[Rcpp::export]]
 List kalman_filter_cpp(const arma::vec& y_star,
@@ -71,11 +76,9 @@ List kalman_filter_cpp(const arma::vec& y_star,
                        double sigma_v,
                        double delta_p,
                        double sig_eps2,
-                       double var_zt,
                        const arma::mat& P0,
                        int dist_code = 0,
-                       double nu = 0.0,
-                       int proxy_type = 0) {
+                       double nu = 0.0) {
   int p = phi.n_elem;
   int T = y_star.n_elem;
 
@@ -92,18 +95,18 @@ List kalman_filter_cpp(const arma::vec& y_star,
   arma::vec h_vec(p, arma::fill::zeros);
   h_vec(0) = 1.0;
 
-  // State noise covariance (no leverage component, handled in prediction)
-  double sigma_v_eff2 = (delta_p == 0.0) ? sigma_v * sigma_v
-                                          : sigma_v * sigma_v * (1.0 - delta_p * delta_p);
-  double sigma_v_lev2 = sigma_v * sigma_v * delta_p * delta_p * var_zt;
-  arma::mat Q_eff = sigma_v_eff2 * (h_vec * h_vec.t());
-  arma::mat Q_lev = sigma_v_lev2 * (h_vec * h_vec.t());
+  // State noise covariance r r' (r = h = e_1); under leverage its scale is
+  // time-varying, sigma_v^2 [(1 - delta_p^2) + delta_p^2 V_{t-1}] (eq. 48a)
+  arma::mat rr = h_vec * h_vec.t();
+  arma::mat Q0 = sigma_v * sigma_v * rr;
 
-  // Storage
+  // Storage (A_arr: transition Jacobian A_t of eq. 48b, = F without leverage;
+  // the RTS smoother gain uses A_{t+1} in place of F)
   arma::mat xi_pred(p, T, arma::fill::zeros);
   arma::mat xi_filt(p, T, arma::fill::zeros);
   arma::cube P_pred_arr(p, p, T, arma::fill::zeros);
   arma::cube P_filt_arr(p, p, T, arma::fill::zeros);
+  arma::cube A_arr(p, p, T);
   arma::vec w_filt(T);
   arma::vec w_pred(T);
   arma::vec P_filt_11(T);
@@ -120,20 +123,23 @@ List kalman_filter_cpp(const arma::vec& y_star,
     // Prediction
     arma::vec xi_p;
     arma::mat P_p;
+    A_arr.slice(t) = F_mat;
     if (t == 0) {
       xi_p = F_mat * xi_hat;
-      P_p = F_mat * P_hat * F_mat.t() + sigma_v * sigma_v * (h_vec * h_vec.t());
+      P_p = F_mat * P_hat * F_mat.t() + Q0;
+    } else if (delta_p != 0.0) {
+      // Leverage prediction, SVHT eqs. (48a)-(48b), with u_hat = zt(t-1)
+      double g, dg, V;
+      leverage_proxy(zt(t - 1), dist_code, nu, g, dg, V);
+      xi_p = F_mat * xi_filt.col(t - 1) + sigma_v * delta_p * g * h_vec;
+      arma::mat A_t = F_mat;
+      A_t(0, 0) -= 0.5 * sigma_v * delta_p * dg * zt(t - 1);
+      A_arr.slice(t) = A_t;
+      double q_t = sigma_v * sigma_v * ((1.0 - delta_p * delta_p) + delta_p * delta_p * V);
+      P_p = A_t * P_filt_arr.slice(t - 1) * A_t.t() + q_t * rr;
     } else {
       xi_p = F_mat * xi_filt.col(t - 1);
-      if (delta_p != 0.0) {
-        // Apply distribution-aware leverage proxy: zeta_hat = u for Gaussian
-        // (exact), Phi^{-1}(F_GED(u;nu)) for GED (exact), and either u
-        // (paper-faithful) or E[zeta|u] (Bayes-optimal) for Student-t.
-        double zeta_hat = leverage_zeta_proxy(zt(t - 1), dist_code, nu,
-                                               proxy_type);
-        xi_p += sigma_v * delta_p * zeta_hat * h_vec;
-      }
-      P_p = F_mat * P_filt_arr.slice(t - 1) * F_mat.t() + Q_eff + Q_lev;
+      P_p = F_mat * P_filt_arr.slice(t - 1) * F_mat.t() + Q0;
     }
     xi_pred.col(t) = xi_p;
     P_pred_arr.slice(t) = P_p;
@@ -167,7 +173,7 @@ List kalman_filter_cpp(const arma::vec& y_star,
   P_smooth_arr.slice(T - 1) = P_filt_arr.slice(T - 1);
 
   for (int t = T - 2; t >= 0; t--) {
-    arma::mat A = P_filt_arr.slice(t) * F_mat.t() * arma::pinv(P_pred_arr.slice(t + 1));
+    arma::mat A = P_filt_arr.slice(t) * A_arr.slice(t + 1).t() * arma::pinv(P_pred_arr.slice(t + 1));
     xi_smooth.col(t) = xi_filt.col(t) + A * (xi_smooth.col(t + 1) - xi_pred.col(t + 1));
     P_smooth_arr.slice(t) = P_filt_arr.slice(t) +
       A * (P_smooth_arr.slice(t + 1) - P_pred_arr.slice(t + 1)) * A.t();
@@ -201,6 +207,8 @@ List kalman_filter_cpp(const arma::vec& y_star,
 //
 // Runs K parallel Kalman updates per time step (one per mixture component),
 // then collapses via moment matching. Includes RTS smoothing on collapsed states.
+// The prediction step applied to the collapsed state is the same as the CKF's
+// (SVHT GMKF step 2, "as in (48)").
 // --------------------------------------------------------------------------- //
 // [[Rcpp::export]]
 List gmkf_filter_cpp(const arma::vec& y_star,
@@ -209,15 +217,13 @@ List gmkf_filter_cpp(const arma::vec& y_star,
                      double sigma_y,
                      double sigma_v,
                      double delta_p,
-                     double var_zt,
                      const arma::vec& mix_weights,
                      const arma::vec& mix_means,
                      const arma::vec& mix_vars,
                      double mu_intercept,
                      const arma::mat& P0,
                      int dist_code = 0,
-                     double nu = 0.0,
-                     int proxy_type = 0) {
+                     double nu = 0.0) {
   int p = phi.n_elem;
   int T = y_star.n_elem;
   int K = mix_weights.n_elem;
@@ -235,18 +241,16 @@ List gmkf_filter_cpp(const arma::vec& y_star,
   arma::vec h_vec(p, arma::fill::zeros);
   h_vec(0) = 1.0;
 
-  // State noise covariance
-  double sigma_v_eff2 = (delta_p == 0.0) ? sigma_v * sigma_v
-                                          : sigma_v * sigma_v * (1.0 - delta_p * delta_p);
-  double sigma_v_lev2 = sigma_v * sigma_v * delta_p * delta_p * var_zt;
-  arma::mat Q_eff = sigma_v_eff2 * (h_vec * h_vec.t());
-  arma::mat Q_lev = sigma_v_lev2 * (h_vec * h_vec.t());
+  // State noise covariance r r' (see kalman_filter_cpp)
+  arma::mat rr = h_vec * h_vec.t();
+  arma::mat Q0 = sigma_v * sigma_v * rr;
 
-  // Storage
+  // Storage (A_arr: transition Jacobian, see kalman_filter_cpp)
   arma::mat xi_pred(p, T, arma::fill::zeros);
   arma::mat xi_filt(p, T, arma::fill::zeros);
   arma::cube P_pred_arr(p, p, T, arma::fill::zeros);
   arma::cube P_filt_arr(p, p, T, arma::fill::zeros);
+  arma::cube A_arr(p, p, T);
   arma::vec w_filt(T), w_pred(T), P_filt_11(T), P_pred_11(T), zt(T);
   double loglik = 0.0;
 
@@ -258,17 +262,23 @@ List gmkf_filter_cpp(const arma::vec& y_star,
     // --- Prediction ---
     arma::vec xi_p;
     arma::mat P_p;
+    A_arr.slice(t) = F_mat;
     if (t == 0) {
       xi_p = F_mat * xi_hat;
-      P_p = F_mat * P_hat * F_mat.t() + sigma_v * sigma_v * (h_vec * h_vec.t());
+      P_p = F_mat * P_hat * F_mat.t() + Q0;
+    } else if (delta_p != 0.0) {
+      // Leverage prediction, SVHT eqs. (48a)-(48b), as in kalman_filter_cpp
+      double g, dg, V;
+      leverage_proxy(zt(t - 1), dist_code, nu, g, dg, V);
+      xi_p = F_mat * xi_filt.col(t - 1) + sigma_v * delta_p * g * h_vec;
+      arma::mat A_t = F_mat;
+      A_t(0, 0) -= 0.5 * sigma_v * delta_p * dg * zt(t - 1);
+      A_arr.slice(t) = A_t;
+      double q_t = sigma_v * sigma_v * ((1.0 - delta_p * delta_p) + delta_p * delta_p * V);
+      P_p = A_t * P_filt_arr.slice(t - 1) * A_t.t() + q_t * rr;
     } else {
       xi_p = F_mat * xi_filt.col(t - 1);
-      if (delta_p != 0.0) {
-        double zeta_hat = leverage_zeta_proxy(zt(t - 1), dist_code, nu,
-                                               proxy_type);
-        xi_p += sigma_v * delta_p * zeta_hat * h_vec;
-      }
-      P_p = F_mat * P_filt_arr.slice(t - 1) * F_mat.t() + Q_eff + Q_lev;
+      P_p = F_mat * P_filt_arr.slice(t - 1) * F_mat.t() + Q0;
     }
     xi_pred.col(t) = xi_p;
     P_pred_arr.slice(t) = P_p;
@@ -325,7 +335,7 @@ List gmkf_filter_cpp(const arma::vec& y_star,
   P_smooth_arr.slice(T - 1) = P_filt_arr.slice(T - 1);
 
   for (int t = T - 2; t >= 0; t--) {
-    arma::mat A = P_filt_arr.slice(t) * F_mat.t() * arma::pinv(P_pred_arr.slice(t + 1));
+    arma::mat A = P_filt_arr.slice(t) * A_arr.slice(t + 1).t() * arma::pinv(P_pred_arr.slice(t + 1));
     xi_smooth.col(t) = xi_filt.col(t) + A * (xi_smooth.col(t + 1) - xi_pred.col(t + 1));
     P_smooth_arr.slice(t) = P_filt_arr.slice(t) +
       A * (P_smooth_arr.slice(t + 1) - P_pred_arr.slice(t + 1)) * A.t();

@@ -13,14 +13,6 @@
 #'   controls which is used by \code{print} and \code{plot} methods.
 #' @param filter_method Character. Filter method: \code{"corrected"} (default),
 #'   \code{"mixture"} (GMKF), or \code{"particle"} (BPF).
-#' @param proxy Character. Leverage proxy for the filter and the h=1 forecast
-#'   shift. \code{"bayes_optimal"} (default) uses the posterior mean
-#'   \eqn{E[\zeta_{t-1} \mid u_{t-1}]} for Student-t leverage; this is the
-#'   prescribed proxy in Ahsan, Dufour and Rodriguez-Rondon (2026) and
-#'   corrects the \eqn{\mathrm{Var}(\hat u) = \nu/(\nu-2) > 1} marginal
-#'   inflation of the raw residual. \code{"u"} is a simpler alternative
-#'   that uses \eqn{\hat{u}_{t-1}} directly. Has no effect for Gaussian or
-#'   GED leverage. See \code{\link{filter_svp}} for details.
 #' @param mixture Character. Source of the GMKF measurement mixture when
 #'   \code{filter_method = "mixture"}: \code{"optimal"} (default, precomputed
 #'   tables — deterministic), \code{"ksc"} (published KSC table; Gaussian,
@@ -32,6 +24,24 @@
 #' @param seed Integer. Random seed for BPF and the \code{mixture = "em"}
 #'   fit. Default 42.
 #' @param del Numeric. Small constant for log transformation. Default \code{1e-10}.
+#'
+#' @details
+#' The forecasts follow Ahsan, Dufour and Rodriguez-Rondon (2026), Section
+#' 3.3.6. Writing \eqn{\hat{\xi}_{T|T}} and \eqn{P_{T|T}} for the filtered state
+#' and covariance at \eqn{T} (from \code{\link{filter_svp}}),
+#' \deqn{\hat{\xi}_{T+h|T} = F^h \hat{\xi}_{T|T} + F^{h-1} r\, \sigma_v \delta_p
+#'   \hat{z}_T, \qquad P_{T+h|T} = F P_{T+h-1|T} F' + \sigma_v^2 r r' \ (h \ge 2),}
+#' where \eqn{\hat{z}_T = g(\hat{u}_T)} is the Bayes-optimal leverage proxy of
+#' the last filtered residual and \eqn{P_{T+1|T}} is the one-step prediction
+#' covariance of eqs. (48a)-(48b), \eqn{A_{T+1} P_{T|T} A_{T+1}' + \sigma_v^2
+#' [(1-\delta_p^2) + \delta_p^2 V_T] r r'} with \eqn{A_{T+1}} built from
+#' \eqn{\hat{u}_T} (see \code{\link{filter_svp}} for \eqn{g}, \eqn{A_t} and
+#' \eqn{V_t}). Beyond one step no further leverage shock is observed, so the
+#' full marginal state-innovation variance \eqn{\sigma_v^2} applies. Without
+#' leverage the recursion is the standard \eqn{P_{T+h|T} = F P_{T+h-1|T} F' +
+#' \sigma_v^2 r r'} at every horizon. For the particle filter
+#' \eqn{P_{T|T}} is the diagonal approximation returned by
+#' \code{\link{filter_svp}}.
 #'
 #' @return An object of class \code{"svp_forecast"}, a list containing:
 #' \describe{
@@ -64,7 +74,6 @@
 forecast_svp <- function(object, H = 1,
                          output = c("log-variance", "variance", "volatility"),
                          filter_method = "corrected",
-                         proxy = c("bayes_optimal", "u"),
                          mixture = c("optimal", "ksc", "em"),
                          K = 7, M = 1000, seed = 42, del = 1e-10) {
   if (!inherits(object, c("svp", "svp_t", "svp_ged"))) {
@@ -82,7 +91,6 @@ forecast_svp <- function(object, H = 1,
     stop("'del' must be a positive number.")
   output <- match.arg(output)
   filter_method <- match.arg(filter_method, c("corrected", "mixture", "particle"))
-  proxy <- match.arg(proxy)
   mixture <- match.arg(mixture)
 
   mdl <- object
@@ -93,47 +101,41 @@ forecast_svp <- function(object, H = 1,
   sigma_y <- mdl$sigy
   sigma_v <- mdl$sigv
 
-  # Filter (forward proxy choice — relevant only for Student-t leverage)
-  filt <- filter_svp(mdl, method = filter_method, proxy = proxy,
+  # Filter
+  filt <- filter_svp(mdl, method = filter_method,
                      mixture = mixture, K = K, M = M, seed = seed, del = del)
   Tsize <- length(filt$w_filtered)
 
-  # Extract final state and residual
+  # Final filtered state and standardized residual u_hat_T
   xi_T <- filt$xi_filtered[, Tsize]
-  zT_raw <- filt$zt[Tsize]
-  # Apply leverage proxy transform consistent with the filter's choice:
-  #   Gaussian: zeta = u (exact)
-  #   GED:      zeta = Phi^{-1}(F_GED(u; nu)) (exact via copula)
-  #   Student-t with proxy="bayes_optimal": zeta = E[zeta|u]  (prescribed
-  #       by Ahsan, Dufour and Rodriguez-Rondon 2026; default)
-  #   Student-t with proxy="u": zeta = u  (simpler alternative; does not
-  #       correct the Var(u-hat) = nu/(nu-2) > 1 marginal inflation)
-  zT <- .leverage_zeta_proxy_R(zT_raw, mdl, proxy)
+  uT <- filt$zt[Tsize]
+  # Leverage proxy g(u_hat_T) = E[z_T | u_T] with its derivative and the
+  # mixing-variable variance Var(z_T | u_T) (R mirror of the C++ helper)
+  lp <- .leverage_proxy_R(uT, mdl)
+  zT <- lp$g
 
   # Build companion matrix
   Fmat <- companionMat(t(phi), p_len, 1)
   h_vec <- c(1, rep(0, p_len - 1))
   r_vec <- h_vec
+  rr <- r_vec %*% t(r_vec)
 
-  # State noise covariance — horizon-dependent under leverage.
-  #
-  # h = 1: predicting w_{T+1} from F_T.  The proxy z-hat_T is computed
-  #        deterministically from F_T (either proxy choice), so the
-  #        leverage shift sigma_v * delta_p * z-hat_T is treated as a known
-  #        input and the conditional Var[z_T | F_T] = 0.  Per Ahsan, Dufour
-  #        and Rodriguez-Rondon (2026):
-  #            Q_1 = sigma_v^2 * (1 - delta_p^2).
-  #
-  # h >= 2: predicting w_{T+h} from F_T.  z_{T+h-1} is unobserved future
-  #        noise with marginal Var = 1.  No further leverage shocks are
-  #        observed, so:
-  #            Q_h = sigma_v^2  (the marginal state-innovation variance).
-  #
-  # When delta_p = 0 both reduce to sigma_v^2 (no-leverage case).
-  Q_h1_scalar   <- if (delta_p == 0) sigma_v^2 else sigma_v^2 * (1 - delta_p^2)
-  Q_hge2_scalar <- sigma_v^2
-  Q_h1   <- Q_h1_scalar   * (r_vec %*% t(r_vec))
-  Q_hge2 <- Q_hge2_scalar * (r_vec %*% t(r_vec))
+  # Prediction covariance, Ahsan, Dufour and Rodriguez-Rondon (2026) Section 3.3.6.
+  # h = 1: the one-step prediction of eqs. (48a)-(48b) from (xi_T, P_T, u_hat_T):
+  #          P_{T+1|T} = A_1 P_T A_1' + sigma_v^2 [(1 - delta^2) + delta^2 V_T] r r',
+  #          A_1 = F - (1/2) sigma_v delta g'(u_hat_T) u_hat_T r h'.
+  # h >= 2: no further leverage shock is observed, so the marginal
+  #          state-innovation variance applies: P_h = F P_{h-1} F' + sigma_v^2 r r'.
+  # delta = 0 gives A_1 = F and sigma_v^2 at every horizon (no-leverage case).
+  if (delta_p != 0) {
+    A_1 <- Fmat
+    A_1[1, 1] <- A_1[1, 1] - 0.5 * sigma_v * delta_p * lp$dg * uT
+    q_1 <- sigma_v^2 * ((1 - delta_p^2) + delta_p^2 * lp$V)
+  } else {
+    A_1 <- Fmat
+    q_1 <- sigma_v^2
+  }
+  Q_hge2 <- sigma_v^2 * rr
 
   # E[u^2] for variance forecast
   Eu2 <- 1.0
@@ -158,15 +160,14 @@ forecast_svp <- function(object, H = 1,
   P_h <- P_T
 
   for (h in 1:H) {
-    # State prediction (no leverage feedback beyond h=1)
+    # State prediction (leverage shift enters at h = 1 only)
     if (h == 1) {
       xi_h <- as.numeric(Fmat %*% xi_T) + tilde_delta_p * eta_T
+      P_h <- A_1 %*% P_h %*% t(A_1) + q_1 * rr
     } else {
       xi_h <- as.numeric(Fmat %*% xi_h)
+      P_h <- Fmat %*% P_h %*% t(Fmat) + Q_hge2
     }
-    # Horizon-dependent Q: conditional at h=1 (z_T observed), marginal at h>=2
-    Q_use <- if (h == 1L) Q_h1 else Q_hge2
-    P_h <- Fmat %*% P_h %*% t(Fmat) + Q_use
 
     w_h <- sum(h_vec * xi_h)
     P_h_11 <- as.numeric(t(h_vec) %*% P_h %*% h_vec)
@@ -209,26 +210,33 @@ forecast_svp <- function(object, H = 1,
 }
 
 
-# Internal: R-side mirror of the C++ leverage_zeta_proxy helper used in
-# kalman_filter.cpp.  Computes the proxy zeta_hat from observed u given the
-# fit's error type and the proxy choice.  Used by forecast_svp() to apply
-# the proxy transform to zT before it enters the leverage shift at h=1.
+# Internal: R-side mirror of the C++ helpers leverage_proxy (kalman_filter.cpp)
+# and ged_copula_cpp (utils_cpp.cpp).  For the standardized residual u returns
+#   g  = E[z | u]        the Bayes-optimal leverage proxy (SVHT Section 3.3.2),
+#   dg = g'(u)           for the Jacobian A_t of eq. (48b),
+#   V  = Var(z | u)      for the state-noise variance of eq. (48a).
+# Gaussian: g = u, dg = 1, V = 0.  GED: g = Phi^{-1}(F_GED(u; nu)) (eq. 49),
+# computed tail-stably from the log upper-tail probability exactly as in C++
+# (R's pgamma/qnorm are the same routines), dg = f_GED(u)/phi(g), V = 0.
+# Student-t: c = Gamma((nu+2)/2)/Gamma((nu+1)/2), g = u sqrt(2/(nu+u^2)) c,
+# dg = sqrt(2) nu c (nu+u^2)^{-3/2}, V = u^2 [(nu+1) - 2 c^2]/(nu+u^2).
 #' @keywords internal
-.leverage_zeta_proxy_R <- function(u, fit, proxy) {
-  if (inherits(fit, "svp")) return(u)        # Gaussian: zeta = u exactly
+.leverage_proxy_R <- function(u, fit) {
+  if (inherits(fit, "svp")) return(list(g = u, dg = 1, V = 0))
   nu <- as.numeric(fit$v)
   if (inherits(fit, "svp_ged")) {
-    # GED: zeta = Phi^{-1}(F_GED(u; nu)) deterministic
     a <- exp(0.5 * (lgamma(1 / nu) - lgamma(3 / nu)))
-    p <- if (u >= 0) 0.5 + 0.5 * pgamma((u / a)^nu, shape = 1 / nu)
-         else        0.5 - 0.5 * pgamma((-u / a)^nu, shape = 1 / nu)
-    p <- min(max(p, 1e-15), 1 - 1e-15)
-    return(qnorm(p))
+    x <- (abs(u) / a)^nu
+    log_q <- log(0.5) + pgamma(x, shape = 1 / nu, lower.tail = FALSE, log.p = TRUE)
+    g_abs <- qnorm(log_q, lower.tail = FALSE, log.p = TRUE)
+    g <- if (u < 0) -g_abs else g_abs
+    log_f <- log(nu) - log(2 * a) - lgamma(1 / nu) - x
+    return(list(g = g, dg = exp(log_f - dnorm(g, log = TRUE)), V = 0))
   }
   # Student-t (svp_t)
-  if (proxy == "u") return(u)
-  # Bayes-optimal: E[zeta | u] = u * sqrt(2/(nu+u^2)) * Gamma((nu+2)/2)/Gamma((nu+1)/2)
-  factor <- sqrt(2 / (nu + u^2)) *
-            exp(lgamma((nu + 2) / 2) - lgamma((nu + 1) / 2))
-  u * factor
+  cc <- exp(lgamma((nu + 2) / 2) - lgamma((nu + 1) / 2))
+  s <- nu + u^2
+  list(g  = u * sqrt(2 / s) * cc,
+       dg = sqrt(2) * nu * cc / (s * sqrt(s)),
+       V  = u^2 * ((nu + 1) / s - 2 * cc^2 / s))
 }

@@ -8,7 +8,6 @@ svp_IC(
   fit,
   criteria = c("BIC_Kalman", "AIC_Kalman", "BIC_HR", "AIC_HR"),
   filter_method = c("mixture", "corrected", "particle"),
-  proxy = c("bayes_optimal", "u"),
   mixture = c("optimal", "ksc", "em"),
   K = 7L,
   M = 1000L,
@@ -32,15 +31,6 @@ opt-in criterion.}
 \code{\link{filter_svp}} for \code{*_Kalman} criteria. One of
 \code{"mixture"} (default, recommended), \code{"corrected"}, or
 \code{"particle"}.}
-
-\item{proxy}{Character. Leverage proxy passed to \code{\link{filter_svp}}.
-\code{"bayes_optimal"} (default) is the prescribed proxy in Ahsan,
-Dufour and Rodriguez-Rondon (2026); it removes the \eqn{O(T)}
-log-likelihood bias of the raw \eqn{\hat u}-proxy under Student-t
-leverage and restores Schwarz consistency of \code{BIC_Kalman}.
-\code{"u"} is a simpler alternative using \eqn{\hat u_{t-1}} directly;
-provided for compatibility but not recommended for IC computation
-under Student-t leverage.}
 
 \item{mixture}{Character. Source of the GMKF measurement mixture when
 \code{filter_method = "mixture"}: \code{"optimal"} (default,
@@ -90,7 +80,7 @@ argument.
         \code{filter_method = "mixture"} uses the Gaussian mixture
         Kalman filter (Kim, Shephard and Chib 1998). \code{BIC_Kalman}
         is the primary recommended criterion: Schwarz-consistent under
-        the Bayes-optimal leverage proxy (see \code{proxy} argument)
+        the Bayes-optimal leverage proxy of \code{\link{filter_svp}}
         and strong finite-sample performance across the simulation
         grid (Ahsan, Dufour and Rodriguez-Rondon 2026).
         \code{AIC_Kalman} is Shibata-efficient

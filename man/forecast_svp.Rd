@@ -9,7 +9,6 @@ forecast_svp(
   H = 1,
   output = c("log-variance", "variance", "volatility"),
   filter_method = "corrected",
-  proxy = c("bayes_optimal", "u"),
   mixture = c("optimal", "ksc", "em"),
   K = 7,
   M = 1000,
@@ -31,15 +30,6 @@ controls which is used by \code{print} and \code{plot} methods.}
 
 \item{filter_method}{Character. Filter method: \code{"corrected"} (default),
 \code{"mixture"} (GMKF), or \code{"particle"} (BPF).}
-
-\item{proxy}{Character. Leverage proxy for the filter and the h=1 forecast
-shift. \code{"bayes_optimal"} (default) uses the posterior mean
-\eqn{E[\zeta_{t-1} \mid u_{t-1}]} for Student-t leverage; this is the
-prescribed proxy in Ahsan, Dufour and Rodriguez-Rondon (2026) and
-corrects the \eqn{\mathrm{Var}(\hat u) = \nu/(\nu-2) > 1} marginal
-inflation of the raw residual. \code{"u"} is a simpler alternative
-that uses \eqn{\hat{u}_{t-1}} directly. Has no effect for Gaussian or
-GED leverage. See \code{\link{filter_svp}} for details.}
 
 \item{mixture}{Character. Source of the GMKF measurement mixture when
 \code{filter_method = "mixture"}: \code{"optimal"} (default, precomputed
@@ -79,6 +69,24 @@ An object of class \code{"svp_forecast"}, a list containing:
 \description{
 Applies Kalman filtering/smoothing to an estimated SV(p) model and produces
 multi-step ahead volatility forecasts with uncertainty quantification.
+}
+\details{
+The forecasts follow Ahsan, Dufour and Rodriguez-Rondon (2026), Section
+3.3.6. Writing \eqn{\hat{\xi}_{T|T}} and \eqn{P_{T|T}} for the filtered state
+and covariance at \eqn{T} (from \code{\link{filter_svp}}),
+\deqn{\hat{\xi}_{T+h|T} = F^h \hat{\xi}_{T|T} + F^{h-1} r\, \sigma_v \delta_p
+  \hat{z}_T, \qquad P_{T+h|T} = F P_{T+h-1|T} F' + \sigma_v^2 r r' \ (h \ge 2),}
+where \eqn{\hat{z}_T = g(\hat{u}_T)} is the Bayes-optimal leverage proxy of
+the last filtered residual and \eqn{P_{T+1|T}} is the one-step prediction
+covariance of eqs. (48a)-(48b), \eqn{A_{T+1} P_{T|T} A_{T+1}' + \sigma_v^2
+[(1-\delta_p^2) + \delta_p^2 V_T] r r'} with \eqn{A_{T+1}} built from
+\eqn{\hat{u}_T} (see \code{\link{filter_svp}} for \eqn{g}, \eqn{A_t} and
+\eqn{V_t}). Beyond one step no further leverage shock is observed, so the
+full marginal state-innovation variance \eqn{\sigma_v^2} applies. Without
+leverage the recursion is the standard \eqn{P_{T+h|T} = F P_{T+h-1|T} F' +
+\sigma_v^2 r r'} at every horizon. For the particle filter
+\eqn{P_{T|T}} is the diagonal approximation returned by
+\code{\link{filter_svp}}.
 }
 \examples{
 \donttest{

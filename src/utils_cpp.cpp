@@ -75,6 +75,28 @@ double pged_std_cpp(double u, double nu) {
   return p;
 }
 
+// GED copula proxy for the leverage shift and its derivative, SVHT Section 3.3.2:
+//   g(u)  = Phi^{-1}( F_GED(u; nu) )            (SVHT eq. 49),
+//   g'(u) = f_GED(u; nu) / phi( g(u) ),
+// with f_GED(u) = nu / (2 a Gamma(1/nu)) exp(-(|u|/a)^nu) the standardized GED(nu)
+// density (Var = 1), a = sqrt(Gamma(1/nu) / Gamma(3/nu)), phi the N(0,1) density.
+// Tail-stable: F_GED(u) rounds to 1 in double precision once |u| is large, so the
+// inversion uses the UPPER-tail probability of |u| on the log scale,
+//   log q = log(1/2) + log Q_Gamma((|u|/a)^nu; 1/nu),   g(|u|) = Phi^{-1}(1 - q),
+// via R's qnorm(log_p, lower_tail = FALSE) and pgamma(lower_tail = FALSE, log_p),
+// and g' in logs. No probability clamp (unlike pged_std_cpp): g is odd, strictly
+// increasing and finite for every finite u, g(u) ~ sqrt(2) (|u|/a)^{nu/2}.
+// g' enters the Jacobian A_t of the prediction covariance (SVHT eq. 48b).
+void ged_copula_cpp(double u, double nu, double& g, double& dg) {
+  const double a     = std::exp(0.5 * (R::lgammafn(1.0 / nu) - R::lgammafn(3.0 / nu)));
+  const double x     = std::pow(std::fabs(u) / a, nu);                      // Gamma(1/nu, 1) variate
+  const double log_q = std::log(0.5) + R::pgamma(x, 1.0 / nu, 1.0, 0, 1);  // log upper-tail prob of |u|
+  const double g_abs = R::qnorm(log_q, 0.0, 1.0, 0, 1);                     // upper-tail N(0,1) quantile
+  g  = (u < 0.0) ? -g_abs : g_abs;
+  const double log_f = std::log(nu) - std::log(2.0 * a) - R::lgammafn(1.0 / nu) - x;
+  dg = std::exp(log_f - R::dnorm(g, 0.0, 1.0, 1));
+}
+
 // [[Rcpp::export]]
 arma::vec rged_cpp(int n, double mean = 0.0, double sd = 1.0, double nu = 2.0) {
   // Generalized Error Distribution random deviates

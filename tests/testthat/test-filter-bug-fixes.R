@@ -1,60 +1,141 @@
-# Tests for the 2026-05-09 filter parameterization fixes:
-#   Fix 1: var_zt = 1 in CKF/GMKF/forecast (was nu/(nu-2) for Student-t leverage)
-#   Fix 3: BPF posterior lambda for Student-t leverage (was prior)
-#   Fix 4: GED copula proxy in CKF/GMKF leverage shift
-# Plus the proxy = c("u", "bayes_optimal") API.
+# Tests for the leverage prediction covariance of the CKF / GMKF and of the
+# h = 1 forecast (Ahsan, Dufour and Rodriguez-Rondon 2026, eqs. 48a-48b and
+# Section 3.3.6), introduced in 0.2.0.9006, which also removed the `proxy`
+# argument (the Bayes-optimal proxy is the only one). Earlier filter fixes
+# kept here: BPF posterior lambda for Student-t leverage (2026-05-09, Fix 3).
 
-test_that("filter_svp accepts proxy argument; default is 'u'", {
-  set.seed(1)
-  y <- sim_svp(800, phi = 0.95, sigy = 1, sigv = 0.3,
-               errorType = "Student-t", nu = 5,
-               leverage = TRUE, rho = -0.4)$y
-  fit <- suppressWarnings(svp(y, p = 1, errorType = "Student-t",
-                               leverage = TRUE))
-  expect_silent(filter_svp(fit, method = "mixture"))
-  expect_silent(filter_svp(fit, method = "mixture", proxy = "u"))
-  expect_silent(filter_svp(fit, method = "mixture", proxy = "bayes_optimal"))
+# R reference for the CKF under leverage at p = 1: SVHT (48a)-(48b) with the
+# per-family g, g', V written out. Independent of the package filter code.
+.ckf_ref <- function(fit, y, del = 1e-10) {
+  pr <- wARMASVp:::.get_filter_params(fit)
+  nu <- pr$nu; sv <- pr$sigma_v; d <- pr$delta_p; phi <- as.numeric(pr$phi)
+  gdv <- switch(pr$dist_name,
+    gaussian  = function(u) c(u, 1, 0),
+    student_t = function(u) {
+      cc <- exp(lgamma((nu + 2) / 2) - lgamma((nu + 1) / 2)); s <- nu + u^2
+      c(u * sqrt(2 / s) * cc, sqrt(2) * nu * cc / s^1.5,
+        u^2 * ((nu + 1) / s - 2 * cc^2 / s)) },
+    ged       = function(u) {
+      a <- exp(0.5 * (lgamma(1 / nu) - lgamma(3 / nu))); x <- (abs(u) / a)^nu
+      g <- sign(u) * qnorm(log(0.5) + pgamma(x, 1 / nu, lower.tail = FALSE,
+                                             log.p = TRUE),
+                           lower.tail = FALSE, log.p = TRUE)
+      c(g, exp(log(nu) - log(2 * a) - lgamma(1 / nu) - x - dnorm(g, log = TRUE)), 0) })
+  ys <- log(y^2 + del) - pr$mu; Tn <- length(y)
+  P <- sv^2 / (1 - phi^2); xi <- 0; u <- 0
+  w <- numeric(Tn); Pp <- numeric(Tn)
+  for (t in 1:Tn) {
+    if (t == 1) {
+      xp <- phi * xi; P_p <- phi^2 * P + sv^2
+    } else {
+      k <- gdv(u); A <- phi - 0.5 * sv * d * k[2] * u
+      xp <- phi * xi + sv * d * k[1]
+      P_p <- A^2 * P + sv^2 * ((1 - d^2) + d^2 * k[3])
+    }
+    Pp[t] <- P_p; f <- P_p + pr$sig_eps2; K <- P_p / f
+    xi <- xp + K * (ys[t] - xp); P <- P_p - K * P_p; w[t] <- xi
+    u <- (y[t] / pr$sigma_y) * exp(-0.5 * w[t])
+  }
+  list(w = w, Pp = Pp)
+}
+
+.lev_fit <- function(seed, errorType = "Gaussian", nu = NULL, rho = -0.6,
+                     n = 800, sigv = 0.3) {
+  set.seed(seed)
+  y <- sim_svp(n, phi = 0.95, sigy = 1, sigv = sigv, errorType = errorType,
+               nu = nu, leverage = TRUE, rho = rho)$y
+  list(y = y, fit = suppressWarnings(svp(y, p = 1, errorType = errorType,
+                                         leverage = TRUE)))
+}
+
+test_that("the proxy argument is gone from the four filter-consuming functions", {
+  d <- .lev_fit(1, "Student-t", nu = 5)
+  expect_silent(filter_svp(d$fit, method = "mixture"))
+  expect_error(filter_svp(d$fit, proxy = "u"), "unused argument")
+  expect_error(forecast_svp(d$fit, H = 2, proxy = "bayes_optimal"), "unused argument")
+  expect_error(svp_IC(d$fit, proxy = "bayes_optimal"), "unused argument")
+  expect_error(svp_AR_order(d$y, pmax = 2, proxy = "u"), "unused argument")
 })
 
-test_that("proxy choice differs only for Student-t with leverage", {
-  set.seed(2)
-  # Gaussian no-leverage: proxy is irrelevant (zeta = u exactly)
-  y_g <- sim_svp(500, phi = 0.95, sigy = 1, sigv = 0.4)$y
-  fit_g <- svp(y_g, p = 1)
-  f_g_u <- filter_svp(fit_g, method = "corrected", proxy = "u")
-  f_g_b <- filter_svp(fit_g, method = "corrected", proxy = "bayes_optimal")
-  expect_equal(f_g_u$loglik, f_g_b$loglik, tolerance = 1e-10)
+test_that("delta_p = 0 recovers the linear filter exactly (CKF, GMKF, smoother)", {
+  for (et in c("Gaussian", "Student-t")) {
+    d <- .lev_fit(11, et, nu = if (et == "Student-t") 5 else NULL)
+    fit0 <- d$fit; fit0$rho <- 0                      # same parameters, no shift
+    fitn <- suppressWarnings(svp(d$y, p = 1, errorType = et, leverage = FALSE))
+    for (m in c("corrected", "mixture")) {
+      a <- filter_svp(fit0, method = m); b <- filter_svp(fitn, method = m)
+      for (f in c("w_filtered", "w_smoothed", "P_predicted", "P_filt_T", "loglik"))
+        expect_identical(a[[f]], b[[f]], info = paste(et, m, f))
+    }
+  }
+})
 
-  # Gaussian with leverage: still proxy-irrelevant (zeta = u for Gaussian)
-  y_gl <- sim_svp(500, phi = 0.95, sigy = 1, sigv = 0.3,
-                   leverage = TRUE, rho = -0.3)$y
-  fit_gl <- svp(y_gl, p = 1, leverage = TRUE)
-  f_gl_u <- filter_svp(fit_gl, method = "corrected", proxy = "u")
-  f_gl_b <- filter_svp(fit_gl, method = "corrected", proxy = "bayes_optimal")
-  expect_equal(f_gl_u$loglik, f_gl_b$loglik, tolerance = 1e-10)
+test_that("CKF leverage prediction matches the R reference of SVHT (48a)-(48b)", {
+  cases <- list(list("Gaussian", NULL), list("Student-t", 5), list("GED", 1.5))
+  for (cs in cases) {
+    d <- .lev_fit(21, cs[[1]], nu = cs[[2]])
+    ref <- .ckf_ref(d$fit, d$y)
+    f <- filter_svp(d$fit, method = "corrected")
+    expect_equal(f$w_filtered, ref$w, tolerance = 1e-10, info = cs[[1]])
+    expect_equal(f$P_predicted, ref$Pp, tolerance = 1e-10, info = cs[[1]])
+    expect_true(abs(d$fit$rho) > 0.1)                 # the shift is active
+  }
+})
 
-  # Student-t with leverage: proxy DOES matter
-  y_t <- sim_svp(500, phi = 0.95, sigy = 1, sigv = 0.3,
-                  errorType = "Student-t", nu = 5,
-                  leverage = TRUE, rho = -0.4)$y
-  fit_t <- suppressWarnings(svp(y_t, p = 1, errorType = "Student-t",
-                                 leverage = TRUE))
-  f_t_u <- filter_svp(fit_t, method = "corrected", proxy = "u")
-  f_t_b <- filter_svp(fit_t, method = "corrected", proxy = "bayes_optimal")
-  # The two log-likelihoods should differ for Student-t leverage
-  expect_false(isTRUE(all.equal(f_t_u$loglik, f_t_b$loglik,
-                                 tolerance = 1e-6)))
+test_that("h = 1 forecast equals the filter's own one-step prediction (CKF, GMKF)", {
+  cases <- list(list("Gaussian", NULL), list("Student-t", 5), list("GED", 1.5))
+  for (cs in cases) {
+    d <- .lev_fit(31, cs[[1]], nu = cs[[2]])
+    Tn <- length(d$y); fit1 <- d$fit; fit1$y <- d$y[-Tn]
+    for (m in c("corrected", "mixture")) {
+      fc <- forecast_svp(fit1, H = 1, filter_method = m)
+      fl <- filter_svp(d$fit, method = m)
+      expect_equal(fc$log_var_forecast[1], fl$w_predicted[Tn], tolerance = 1e-12,
+                   info = paste(cs[[1]], m))
+      expect_equal(fc$P_forecast[1], fl$P_predicted[Tn], tolerance = 1e-12,
+                   info = paste(cs[[1]], m))
+    }
+  }
+})
 
-  # GED with leverage: proxy is irrelevant (the GED copula proxy is
-  # deterministic and doesn't depend on the proxy_type flag)
-  y_ged <- sim_svp(500, phi = 0.95, sigy = 1, sigv = 0.3,
-                    errorType = "GED", nu = 1.5,
-                    leverage = TRUE, rho = -0.4)$y
-  fit_ged <- suppressWarnings(svp(y_ged, p = 1, errorType = "GED",
-                                   leverage = TRUE))
-  f_ged_u <- filter_svp(fit_ged, method = "corrected", proxy = "u")
-  f_ged_b <- filter_svp(fit_ged, method = "corrected", proxy = "bayes_optimal")
-  expect_equal(f_ged_u$loglik, f_ged_b$loglik, tolerance = 1e-10)
+test_that("forecast covariance: (48a) at h = 1, marginal sigma_v^2 at h >= 2", {
+  skip_on_cran()
+  for (et in c("Gaussian", "Student-t")) {
+    d <- .lev_fit(2026, et, nu = if (et == "Student-t") 5 else NULL, n = 1500, sigv = 0.4)
+    fit <- d$fit; fc <- forecast_svp(fit, H = 5, filter_method = "corrected")
+    phi <- as.numeric(fit$phi); sv <- fit$sigv; delta <- fit$rho
+    uT <- fc$filter_output$zt[length(d$y)]
+    if (et == "Gaussian") { dg <- 1; V <- 0 } else {
+      nu <- fit$v; cc <- exp(lgamma((nu + 2) / 2) - lgamma((nu + 1) / 2)); s <- nu + uT^2
+      dg <- sqrt(2) * nu * cc / s^1.5; V <- uT^2 * ((nu + 1) / s - 2 * cc^2 / s)
+    }
+    A1 <- phi - 0.5 * sv * delta * dg * uT
+    q1 <- sv^2 * ((1 - delta^2) + delta^2 * V)
+    P <- fc$P_forecast; P_T <- fc$filter_output$P_filt_T[1, 1]
+    expect_equal(P[1] - A1^2 * P_T, q1, tolerance = 1e-8, info = et)
+    expect_equal(P[2] - phi^2 * P[1], sv^2, tolerance = 1e-8, info = et)
+    expect_equal(P[3] - phi^2 * P[2], sv^2, tolerance = 1e-8, info = et)
+  }
+})
+
+test_that("leverage filters stay finite where 0.2.0.9005 diverged (rho at the bound)", {
+  skip_on_cran()
+  # Seeds on which the pre-0.2.0.9006 covariance (sigma_v^2 (1 - delta^2) alone)
+  # sent the CKF and the GMKF to Inf: Gaussian SV(1), phi = 0.95, sigma_v = 0.5,
+  # rho = -0.9, T = 2000, rho_hat at the -0.999 bound.
+  for (sd in c(6L, 19L, 23L)) {
+    set.seed(sd)
+    y <- sim_svp(2000, phi = 0.95, sigy = 1, sigv = 0.5, leverage = TRUE, rho = -0.9)$y
+    fit <- suppressWarnings(svp(y, p = 1, leverage = TRUE))
+    for (m in c("corrected", "mixture")) {
+      f <- filter_svp(fit, method = m)
+      expect_true(all(is.finite(f$w_filtered)) && max(abs(f$w_filtered)) < 20,
+                  info = paste("seed", sd, m))
+      expect_true(all(is.finite(f$w_smoothed)), info = paste("seed", sd, m))
+      fc <- forecast_svp(fit, H = 22, filter_method = m)
+      expect_true(all(is.finite(fc$log_var_forecast)), info = paste("seed", sd, m))
+    }
+  }
 })
 
 test_that("BPF Student-t recovery uses the posterior (Bug 3 fix)", {
@@ -73,26 +154,8 @@ test_that("BPF Student-t recovery uses the posterior (Bug 3 fix)", {
   expect_true(all(is.finite(pf$w_filtered)))
 })
 
-test_that("svp_IC default proxy is 'bayes_optimal'", {
+test_that("CKF returns a finite log-likelihood for every family, with and without leverage", {
   skip_on_cran()
-  set.seed(4)
-  y <- sim_svp(800, phi = 0.95, sigy = 1, sigv = 0.3,
-                errorType = "Student-t", nu = 5,
-                leverage = TRUE, rho = -0.4)$y
-  fit <- suppressWarnings(svp(y, p = 1, errorType = "Student-t",
-                               leverage = TRUE))
-  # Default svp_IC should match svp_IC(proxy = "bayes_optimal") exactly
-  ic_default <- svp_IC(fit)
-  ic_b       <- svp_IC(fit, proxy = "bayes_optimal")
-  expect_equal(ic_default, ic_b, tolerance = 1e-8)
-  # (Whether proxy="u" gives a numerically different value depends on the
-  # estimated delta_p — small delta_p → small effect.  We verify the
-  # forwarding instead of assuming a numerical difference here.)
-})
-
-test_that("var_zt fix does not affect Gaussian or no-leverage cells", {
-  skip_on_cran()
-  # All three combos that should be invariant to the fix:
   combos <- list(
     list(et = "Gaussian",  lev = FALSE),
     list(et = "Gaussian",  lev = TRUE,  rho = -0.3),
@@ -114,47 +177,4 @@ test_that("var_zt fix does not affect Gaussian or no-leverage cells", {
                 info = paste("combo", i, combos[[i]]$et,
                               "leverage", combos[[i]]$lev))
   }
-})
-
-test_that("forecast_svp accepts proxy and forwards correctly", {
-  skip_on_cran()
-  set.seed(5)
-  y <- sim_svp(500, phi = 0.95, sigy = 1, sigv = 0.3,
-                errorType = "Student-t", nu = 5,
-                leverage = TRUE, rho = -0.4)$y
-  fit <- suppressWarnings(svp(y, p = 1, errorType = "Student-t",
-                               leverage = TRUE))
-  fc_u <- forecast_svp(fit, H = 5, filter_method = "mixture", proxy = "u")
-  fc_b <- forecast_svp(fit, H = 5, filter_method = "mixture",
-                        proxy = "bayes_optimal")
-  expect_true(all(is.finite(fc_u$vol_forecast)))
-  expect_true(all(is.finite(fc_b$vol_forecast)))
-  # Should differ (not identical) for Student-t leverage
-  expect_false(isTRUE(all.equal(fc_u$vol_forecast, fc_b$vol_forecast,
-                                 tolerance = 1e-6)))
-})
-
-
-test_that("forecast Q is conditional at h=1 and marginal at h>=2 (Bug 5 fix)", {
-  skip_on_cran()
-  set.seed(2026)
-  y <- sim_svp(1500, phi = 0.95, sigy = 1, sigv = 0.4,
-               leverage = TRUE, rho = -0.5)$y
-  fit <- suppressWarnings(svp(y, p = 1, leverage = TRUE))
-  fc <- forecast_svp(fit, H = 5, filter_method = "corrected")
-  # Build the expected Q values
-  phi <- as.numeric(fit$phi)
-  sigv2 <- fit$sigv^2
-  delta <- if (is.null(fit$rho) || is.na(fit$rho)) 0 else fit$rho
-  Q_h1   <- sigv2 * (1 - delta^2)   # conditional at h=1
-  Q_hge2 <- sigv2                    # marginal at h>=2
-  # The Q recursion increment equals Q_h at each step:
-  #   P_h - phi^2 * P_{h-1} = Q_h
-  P <- fc$P_forecast
-  # Use filter's P_filt_T as the seed for h=1
-  P_T_11 <- fc$filter_output$P_filt_T[1, 1]
-  expect_equal(P[1] - phi^2 * P_T_11, Q_h1, tolerance = 1e-6)
-  # h>=2 increments should equal Q_hge2
-  expect_equal(P[2] - phi^2 * P[1], Q_hge2, tolerance = 1e-6)
-  expect_equal(P[3] - phi^2 * P[2], Q_hge2, tolerance = 1e-6)
 })
