@@ -145,7 +145,7 @@ correction_factor_ged_approx <- function(nu, n_nodes = 200L) {
 #' @param p AR order
 #' @param rho_type "pearson", "kendall", or "both"
 #' @param del Small constant for log transform
-#' @param trunc_lev Logical: truncate rho to [-0.999, 0.999]
+#' @param trunc_lev Logical: truncate rho to [-0.99, 0.99]
 #' @param wDecay Logical: decaying weights (passed from original estimation)
 #' @param errorType "Gaussian", "Student-t", or "GED"
 #' @return Updated model object with leverage fields added
@@ -203,18 +203,18 @@ correction_factor_ged_approx <- function(nu, n_nodes = 200L) {
   if (rho_type == "pearson") {
     EH <- .compute_EH(y, "pearson")
     rho_val <- .compute_delta(EH)
-    if (trunc_lev && !is.na(rho_val)) rho_val <- max(-0.999, min(0.999, rho_val))
+    if (trunc_lev && !is.na(rho_val)) rho_val <- max(-0.99, min(0.99, rho_val))
   } else if (rho_type == "kendall") {
     EH <- .compute_EH(y, "kendall")
     rho_val <- .compute_delta(EH)
-    if (trunc_lev && !is.na(rho_val)) rho_val <- max(-0.999, min(0.999, rho_val))
+    if (trunc_lev && !is.na(rho_val)) rho_val <- max(-0.99, min(0.99, rho_val))
   } else if (rho_type == "both") {
     EH_pea <- .compute_EH(y, "pearson")
     EH_ken <- .compute_EH(y, "kendall")
     rho_val <- .compute_delta(EH_pea)
     rho_ken <- .compute_delta(EH_ken)
-    if (trunc_lev && !is.na(rho_val)) rho_val <- max(-0.999, min(0.999, rho_val))
-    if (trunc_lev && !is.na(rho_ken)) rho_ken <- max(-0.999, min(0.999, rho_ken))
+    if (trunc_lev && !is.na(rho_val)) rho_val <- max(-0.99, min(0.99, rho_val))
+    if (trunc_lev && !is.na(rho_ken)) rho_ken <- max(-0.99, min(0.99, rho_ken))
     out$rho_kendall <- rho_ken
     out$rho_pearson <- rho_val
   } else {

@@ -41,9 +41,12 @@ autocovariance blocks used. Default is 10.}
 \eqn{\log(y_t^2 + \delta)}. Default is \code{1e-10}.}
 
 \item{trunc_lev}{Logical. If \code{TRUE}, truncate the estimated leverage
-parameter to \code{[-0.999, 0.999]}. Default is \code{TRUE}. Setting to
-\code{FALSE} can reduce bias in some cases but may yield estimates
-outside the parameter space.}
+parameter to \code{[-0.99, 0.99]}. Default is \code{TRUE}. At
+\eqn{|\delta_p| = 1} the model is singular (the volatility innovation
+becomes a deterministic function of the return shock) and the filters of
+\code{\link{filter_svp}} lose all state noise, so the bound is kept
+strictly inside the parameter space. Setting to \code{FALSE} can reduce
+bias in some cases but may yield estimates outside the parameter space.}
 
 \item{wDecay}{Logical. Use linearly decaying weights in the WLS estimation.
 Default is \code{FALSE}.}

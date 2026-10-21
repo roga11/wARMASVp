@@ -21,7 +21,7 @@ Works for all error distributions: Gaussian, Student-t, GED.
 
 \item{del}{Small constant for log transform}
 
-\item{trunc_lev}{Logical: truncate rho to [-0.999, 0.999]}
+\item{trunc_lev}{Logical: truncate rho to [-0.99, 0.99]}
 
 \item{wDecay}{Logical: decaying weights (passed from original estimation)}
 

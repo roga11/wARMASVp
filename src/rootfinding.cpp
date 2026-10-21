@@ -172,19 +172,20 @@ double find_delta_ged_cpp(double target, double sigv, double nu,
     return E_g - target;
   };
 
-  // Check bounds (match R behavior)
+  // Check bounds (match R behavior: the leverage parameter is truncated to
+  // [-0.99, 0.99] for every error type)
   double f_lo, f_hi;
   bool lo_ok = true, hi_ok = true;
-  try { f_lo = f_root(-0.999); } catch (...) { lo_ok = false; }
-  try { f_hi = f_root(0.999); } catch (...) { hi_ok = false; }
+  try { f_lo = f_root(-0.99); } catch (...) { lo_ok = false; }
+  try { f_hi = f_root(0.99); } catch (...) { hi_ok = false; }
 
   if (!lo_ok || !hi_ok || f_lo * f_hi >= 0) {
     if (!lo_ok || !hi_ok) {
       return NA_REAL;
     }
     // Return boundary
-    return (std::fabs(f_lo) < std::fabs(f_hi)) ? -0.999 : 0.999;
+    return (std::fabs(f_lo) < std::fabs(f_hi)) ? -0.99 : 0.99;
   }
 
-  return brent_zero(f_root, -0.999, 0.999, tol, 1000);
+  return brent_zero(f_root, -0.99, 0.99, tol, 1000);
 }

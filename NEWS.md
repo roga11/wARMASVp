@@ -26,6 +26,19 @@
 
 ## Bug fixes
 
+* **Leverage truncation bound 0.999 -> 0.99.** `svp(..., trunc_lev = TRUE)` now
+  truncates the leverage parameter to `[-0.99, 0.99]` (all error types; for
+  GED this is the root-finding bracket). At `|delta_p| = 1` the model is
+  singular and the filters' state noise `sigma_v^2 (1 - delta_p^2)` vanishes;
+  at 0.999 it was 0.2% of `sigma_v^2`, so on fits whose raw estimate falls
+  outside `[-1, 1]` (every flagged index-return window examined, raw values
+  down to -1.8) the filters were still left with single-date excursions of
+  the filtered log-volatility to |w| of 20-27 and the particle filter
+  collapsed. At 0.99 none of those remain. Fits whose estimate was at the old
+  bound now report -0.99 (or 0.99) and their filtered paths and forecasts
+  move accordingly; all other fits are unchanged. The MMC optimizer boxes
+  for the AR coefficients are unrelated and untouched.
+
 * **Leverage filtering no longer diverges: the CKF/GMKF prediction covariance
   under leverage is now that of Ahsan, Dufour and Rodriguez-Rondon (2026),
   eqs. (48a)-(48b).** The leverage shift `sigma_v * delta_p * z_hat_{t-1}` used

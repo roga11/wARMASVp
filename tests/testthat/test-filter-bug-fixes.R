@@ -122,7 +122,8 @@ test_that("leverage filters stay finite where 0.2.0.9005 diverged (rho at the bo
   skip_on_cran()
   # Seeds on which the pre-0.2.0.9006 covariance (sigma_v^2 (1 - delta^2) alone)
   # sent the CKF and the GMKF to Inf: Gaussian SV(1), phi = 0.95, sigma_v = 0.5,
-  # rho = -0.9, T = 2000, rho_hat at the -0.999 bound.
+  # rho = -0.9, T = 2000, rho_hat at the truncation bound (-0.999 then, -0.99
+  # since 0.2.0.9007).
   for (sd in c(6L, 19L, 23L)) {
     set.seed(sd)
     y <- sim_svp(2000, phi = 0.95, sigy = 1, sigv = 0.5, leverage = TRUE, rho = -0.9)$y
