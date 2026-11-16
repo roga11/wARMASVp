@@ -6,7 +6,7 @@
 
 # R reference for the CKF under leverage at p = 1: SVHT (48a)-(48b) with the
 # per-family g, g', V written out. Independent of the package filter code.
-.ckf_ref <- function(fit, y, del = 1e-10) {
+.ckf_ref <- function(fit, y, del = fit$del) {
   pr <- wARMASVp:::.get_filter_params(fit)
   nu <- pr$nu; sv <- pr$sigma_v; d <- pr$delta_p; phi <- as.numeric(pr$phi)
   gdv <- switch(pr$dist_name,

@@ -150,7 +150,7 @@ static arma::mat build_mk_t(const arma::vec& phi, const arma::mat& gamk_t, int p
 // [[Rcpp::export]]
 double LRT_moment_lev_svp_cpp(arma::vec y, Rcpp::List mdl_out,
                                 arma::mat Amat, std::string rho_type,
-                                double del = 1e-10) {
+                                double del = 0) {
   arma::vec ly2 = arma::log(arma::square(y) + del);
   double mu = arma::mean(ly2);
   arma::vec ys = ly2 - mu;
@@ -191,7 +191,7 @@ double LRT_moment_lev_svp_cpp(arma::vec y, Rcpp::List mdl_out,
 // [[Rcpp::export]]
 double LRT_moment_lev_t_cpp(arma::vec y, Rcpp::List mdl_out,
                              arma::mat Amat, std::string rho_type,
-                             double del = 1e-10) {
+                             double del = 0) {
   arma::vec ly2 = arma::log(arma::square(y) + del);
   double mu = arma::mean(ly2);
   arma::vec ys = ly2 - mu;
@@ -303,7 +303,7 @@ double LRT_moment_lev_ged_cpp(arma::vec y, Rcpp::List mdl_out,
 // [[Rcpp::export]]
 double LRT_moment_t_cpp(arma::vec y, Rcpp::List mdl_out,
                          arma::mat Amat, bool WAmat = false,
-                         double del = 1e-10, bool Bartlett = true,
+                         double del = 0, bool Bartlett = true,
                          Rcpp::Nullable<Rcpp::Function> pinv_fn = R_NilValue) {
   int Tsize = y.n_elem;
   arma::vec ly2 = arma::log(arma::square(y) + del);
@@ -376,7 +376,7 @@ double LRT_moment_t_cpp(arma::vec y, Rcpp::List mdl_out,
 // [[Rcpp::export]]
 double LRT_moment_ged_cpp(arma::vec y, Rcpp::List mdl_out,
                            arma::mat Amat, bool WAmat = false,
-                           double del = 1e-10, bool Bartlett = true,
+                           double del = 0, bool Bartlett = true,
                            Rcpp::Nullable<Rcpp::Function> pinv_fn = R_NilValue) {
   int Tsize = y.n_elem;
   arma::vec ly2 = arma::log(arma::square(y) + del);
@@ -448,7 +448,7 @@ double LRT_moment_ged_cpp(arma::vec y, Rcpp::List mdl_out,
 // [[Rcpp::export]]
 double LRT_moment_lev_svp_Amat_cpp(arma::vec y, Rcpp::List mdl_out,
                                      std::string rho_type,
-                                     double del = 1e-10, bool Bartlett = true,
+                                     double del = 0, bool Bartlett = true,
                                      Rcpp::Nullable<Rcpp::Function> pinv_fn = R_NilValue) {
   int Tsize = y.n_elem;
   arma::vec ly2 = arma::log(arma::square(y) + del);
@@ -540,7 +540,7 @@ double LRT_moment_lev_svp_Amat_cpp(arma::vec y, Rcpp::List mdl_out,
 
 // [[Rcpp::export]]
 double LRT_moment_ar_Amat_cpp(arma::vec y, Rcpp::List mdl_out,
-                                double del = 1e-10, bool Bartlett = true,
+                                double del = 0, bool Bartlett = true,
                                 Rcpp::Nullable<Rcpp::Function> pinv_fn = R_NilValue) {
   int Tsize = y.n_elem;
   arma::vec ly2 = arma::log(arma::square(y) + del);
@@ -590,7 +590,7 @@ double LRT_moment_ar_Amat_cpp(arma::vec y, Rcpp::List mdl_out,
 // [[Rcpp::export]]
 double LRT_moment_lev_t_Amat_cpp(arma::vec y, Rcpp::List mdl_out,
                                    std::string rho_type,
-                                   double del = 1e-10, bool Bartlett = true,
+                                   double del = 0, bool Bartlett = true,
                                    Rcpp::Nullable<Rcpp::Function> pinv_fn = R_NilValue) {
   int Tsize = y.n_elem;
   arma::vec ly2 = arma::log(arma::square(y) + del);

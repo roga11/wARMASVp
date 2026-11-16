@@ -284,8 +284,16 @@ print.svp_test <- function(x, ...) {
   if (!is.null(x$S_T)) {
     cat(sprintf("  Signed root (S_T): %.4f\n", x$S_T))
   }
-  cat(sprintf("  p-value: %.4f\n", x$pval))
-  cat(sprintf("  MC replications: %d\n", length(x$sN)))
+  if (is.null(x$sN)) {
+    # MMC: p-value maximized over the nuisance parameters; no stored null draws
+    cat(sprintf("  Maximized p-value: %.4f\n", x$pval))
+    cat(sprintf("  MC replications: %d\n", x$N))
+    cat(sprintf("  Nuisance parameters at the maximum: %s\n",
+                paste(sprintf("%.4f", x$par), collapse = ", ")))
+  } else {
+    cat(sprintf("  p-value: %.4f\n", x$pval))
+    cat(sprintf("  MC replications: %d\n", length(x$sN)))
+  }
   cat("\n")
   invisible(x)
 }

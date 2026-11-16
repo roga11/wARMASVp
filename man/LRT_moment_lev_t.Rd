@@ -4,7 +4,7 @@
 \alias{LRT_moment_lev_t}
 \title{GMM moments for SVL(p)-Student-t with fixed A matrix (p+4 conditions)}
 \usage{
-LRT_moment_lev_t(y, mdl_out, Amat, rho_type, del = 1e-10)
+LRT_moment_lev_t(y, mdl_out, Amat, rho_type, del = 0)
 }
 \description{
 GMM moments for SVL(p)-Student-t with fixed A matrix (p+4 conditions)

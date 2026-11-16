@@ -287,7 +287,9 @@ fit_ksc_mixture <- function(distribution = c("gaussian", "student_t", "ged"),
 #'   (\code{mixture = "em"}). Default 42. Has no effect under
 #'   \code{mixture = "optimal"} or \code{"ksc"}, whose mixtures are
 #'   deterministic.
-#' @param del Numeric. Small constant for log transformation. Default \code{1e-10}.
+#' @param del Non-negative offset in \eqn{\log(y_t^2 + \delta)}. Default
+#'   \code{NULL} uses the value the model was estimated with
+#'   (\code{object$del}); see \code{\link{svp}}.
 #'
 #' @details
 #' Under leverage (\eqn{\delta_p \neq 0}) the CKF and GMKF prediction step
@@ -350,7 +352,7 @@ fit_ksc_mixture <- function(distribution = c("gaussian", "student_t", "ged"),
 #' @export
 filter_svp <- function(object, method = c("corrected", "mixture", "particle"),
                        mixture = c("optimal", "ksc", "em"),
-                       K = 7, M = 1000, seed = 42, del = 1e-10) {
+                       K = 7, M = 1000, seed = 42, del = NULL) {
   if (!inherits(object, c("svp", "svp_t", "svp_ged"))) {
     stop("object must be of class 'svp', 'svp_t', or 'svp_ged'.")
   }
@@ -363,9 +365,9 @@ filter_svp <- function(object, method = c("corrected", "mixture", "particle"),
     stop("'K' must be a positive integer (>= 1).")
   if (!is.numeric(M) || length(M) != 1L || M < 1L)
     stop("'M' must be a positive integer (>= 1).")
-  if (!is.numeric(del) || length(del) != 1L || del <= 0)
-    stop("'del' must be a positive number.")
   y_vec <- as.numeric(object$y)
+  if (is.null(del)) del <- object$del
+  .check_del(y_vec, del)
   params <- .get_filter_params(object)
   dist_code  <- switch(params$dist_name, "gaussian" = 0L,
                                           "student_t" = 1L,

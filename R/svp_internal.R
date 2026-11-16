@@ -2,6 +2,32 @@
 # Internal estimation helpers called by svp() in estim.R
 # =========================================================================== #
 
+# Validate the log-transform offset. del = 0 (the default) uses log(y^2)
+# itself, which needs every y_t to be non-zero.
+.check_del <- function(y, del) {
+  if (!is.numeric(del) || length(del) != 1L || !is.finite(del) || del < 0)
+    stop("'del' must be a non-negative number.", call. = FALSE)
+  if (del == 0) {
+    zero <- which(y^2 == 0)
+    if (length(zero) > 0L)
+      stop("'y' contains ", length(zero), " zero value(s) (first at index ",
+           zero[1L], "), so log(y^2) is not finite. Set 'del' to a small ",
+           "positive number to use log(y^2 + del); choose it small relative ",
+           "to y^2 (here mean(y^2) = ", signif(mean(y^2), 3), "), since the ",
+           "estimates depend on it.", call. = FALSE)
+  }
+  invisible(NULL)
+}
+
+# Validate the MMC half-widths: one finite, non-negative number per nuisance
+# parameter (0 holds that parameter at its estimate).
+.check_eps <- function(eps) {
+  if (!is.numeric(eps) || anyNA(eps) || any(!is.finite(eps)) || any(eps < 0))
+    stop("'eps' must be a numeric vector of finite, non-negative half-widths ",
+         "(0 holds a parameter at its estimate).", call. = FALSE)
+  invisible(NULL)
+}
+
 
 # =========================================================================== #
 # Correction factors and helper functions for leverage under heavy tails
@@ -719,7 +745,7 @@ correction_factor_ged_approx <- function(nu, n_nodes = 200L) {
 
 # MMC p-value for AR test
 .mmc_pval_ar <- function(theta, y, p_null, p_alt, j, N, s0, ini,
-                         del = 1e-10, wDecay = FALSE, Bartlett = FALSE,
+                         del = 0, wDecay = FALSE, Bartlett = FALSE,
                          sigvMethod = "factored",
                          errorType = "Gaussian",
                          nu_fixed = NA_real_,
@@ -747,7 +773,7 @@ correction_factor_ged_approx <- function(nu, n_nodes = 200L) {
 # MMC p-value for leverage test (identity Amat)
 # S0 is kept fixed per Dufour (2006, eq 4.22)
 .mmc_pval_lev <- function(theta, y, j, N, s0, mdl_alt, rho_null, ini,
-                          Amat, rho_type, del = 1e-10, Bartlett = FALSE,
+                          Amat, rho_type, del = 0, Bartlett = FALSE,
                           wDecay = FALSE, trunc_lev = TRUE,
                           logNu = FALSE, sigvMethod = "factored",
                           winsorize_eps = 0,
@@ -770,7 +796,7 @@ correction_factor_ged_approx <- function(nu, n_nodes = 200L) {
 # MMC p-value for leverage test (Bartlett kernel Amat)
 # S0 is kept fixed per Dufour (2006, eq 4.22)
 .mmc_pval_lev_Amat <- function(theta, y, j, N, s0, mdl_alt, rho_null, ini, innovations = NULL,
-                               Amat = NULL, rho_type, del = 1e-10, Bartlett = TRUE,
+                               Amat = NULL, rho_type, del = 0, Bartlett = TRUE,
                                wDecay = FALSE, trunc_lev = TRUE,
                                logNu = FALSE, sigvMethod = "factored",
                                winsorize_eps = 0) {
@@ -793,7 +819,7 @@ correction_factor_ged_approx <- function(nu, n_nodes = 200L) {
 # theta = (phi_1,...,phi_p, sigy, sigv, nu) — nuisance under H0: rho = rho_null
 # S0 is kept fixed per Dufour (2006, eq 4.22)
 .mmc_pval_lev_t <- function(theta, y, j, N, s0, mdl_alt, rho_null, ini, innovations = NULL,
-                             Amat, rho_type, del = 1e-10, Bartlett = FALSE,
+                             Amat, rho_type, del = 0, Bartlett = FALSE,
                              wDecay = FALSE, trunc_lev = TRUE,
                              logNu = FALSE, sigvMethod = "factored",
                              winsorize_eps = FALSE) {
@@ -831,7 +857,7 @@ correction_factor_ged_approx <- function(nu, n_nodes = 200L) {
 # theta = (phi_1,...,phi_p, sigy, sigv, nu) — nuisance under H0: rho = rho_null
 # S0 is kept fixed per Dufour (2006, eq 4.22)
 .mmc_pval_lev_ged <- function(theta, y, j, N, s0, mdl_alt, rho_null, ini, innovations = NULL,
-                               Amat, rho_type, del = 1e-10, Bartlett = FALSE,
+                               Amat, rho_type, del = 0, Bartlett = FALSE,
                                wDecay = FALSE, trunc_lev = TRUE,
                                sigvMethod = "factored",
                                winsorize_eps = FALSE) {
@@ -868,7 +894,7 @@ correction_factor_ged_approx <- function(nu, n_nodes = 200L) {
 # MMC p-value for Student-t (returns negative for minimization)
 # S0 is kept fixed per Dufour (2006, eq 4.22)
 .mmc_pval_t <- function(theta, y, j, N, s0, mdl_alt, nu_null, ini,
-                        Amat, WAmat = FALSE, del = 1e-10, Bartlett = TRUE,
+                        Amat, WAmat = FALSE, del = 0, Bartlett = TRUE,
                         logNu = TRUE, wDecay = FALSE,
                         sigvMethod = "factored", winsorize_eps = 0,
                         direction = "two-sided",
@@ -898,7 +924,7 @@ correction_factor_ged_approx <- function(nu, n_nodes = 200L) {
 # MMC p-value for GED (returns negative for minimization)
 # S0 is kept fixed per Dufour (2006, eq 4.22)
 .mmc_pval_ged <- function(theta, y, j, N, s0, mdl_alt, nu_null, ini,
-                          Amat, WAmat = FALSE, del = 1e-10, Bartlett = TRUE,
+                          Amat, WAmat = FALSE, del = 0, Bartlett = TRUE,
                           wDecay = FALSE, sigvMethod = "factored",
                           winsorize_eps = 0,
                           innovations = NULL,
@@ -965,28 +991,41 @@ correction_factor_ged_approx <- function(nu, n_nodes = 200L) {
 # Generic MMC optimizer dispatch
 .run_mmc_optimizer <- function(method, theta_0, fn, lower, upper,
                                threshold, maxit, ...) {
+  if (!method %in% c("GenSA", "pso"))
+    stop("method must be 'pso' or 'GenSA'.")
+  if (!requireNamespace(method, quietly = TRUE))
+    stop("Package '", method, "' required. Install it or use method='",
+         setdiff(c("pso", "GenSA"), method), "'.")
+  if (is.null(maxit)) maxit <- 100
+  # Coordinates with a zero half-width (sigma_y by default) are held at their
+  # estimate and left out of the search: GenSA rejects lower == upper, and
+  # they only add a dimension the p-value cannot move along.
+  free <- upper > lower
+  theta_full <- theta_0
+  fn_free <- function(th, ...) {
+    theta_full[free] <- th
+    fn(theta_full, ...)
+  }
+  if (!any(free)) {
+    out <- list(par = theta_full, value = fn(theta_full, ...))
+    return(out)
+  }
   if (method == "GenSA") {
-    if (!requireNamespace("GenSA", quietly = TRUE)) {
-      stop("Package 'GenSA' required. Install it or use method='pso'.")
-    }
-    if (is.null(maxit)) maxit <- 100
-    out <- GenSA::GenSA(theta_0, fn, lower = lower, upper = upper,
+    out <- GenSA::GenSA(theta_0[free], fn_free,
+                        lower = lower[free], upper = upper[free],
                         control = list(threshold.stop = -threshold,
                                        max.call = maxit, verbose = TRUE),
                         ...)
-  } else if (method == "pso") {
-    if (!requireNamespace("pso", quietly = TRUE)) {
-      stop("Package 'pso' required. Install it or use method='GenSA'.")
-    }
-    if (is.null(maxit)) maxit <- 100
-    out <- pso::psoptim(theta_0, fn, lower = lower, upper = upper,
+  } else {
+    out <- pso::psoptim(theta_0[free], fn_free,
+                        lower = lower[free], upper = upper[free],
                         control = list(abstol = -threshold,
                                        maxf = maxit, trace = 1,
                                        REPORT = 1, trace.stats = TRUE),
                         ...)
-  } else {
-    stop("method must be 'pso' or 'GenSA'.")
   }
+  theta_full[free] <- out$par
+  out$par <- theta_full
   return(out)
 }
 
@@ -1002,31 +1041,31 @@ correction_factor_ged_approx <- function(nu, n_nodes = 200L) {
 }
 
 #' @keywords internal
-LRT_moment_lev_svp <- function(y, mdl_out, Amat, rho_type, del = 1e-10) {
+LRT_moment_lev_svp <- function(y, mdl_out, Amat, rho_type, del = 0) {
   LRT_moment_lev_svp_cpp(as.numeric(y), mdl_out, Amat, rho_type, del)
 }
 
 #' @keywords internal
-LRT_moment_lev_svp_Amat <- function(y, mdl_out, rho_type, del = 1e-10,
+LRT_moment_lev_svp_Amat <- function(y, mdl_out, rho_type, del = 0,
                                      Bartlett = TRUE) {
   LRT_moment_lev_svp_Amat_cpp(as.numeric(y), mdl_out, rho_type, del,
                                 Bartlett, pinv_fn = .pinv)
 }
 
 #' @keywords internal
-LRT_moment_ar_Amat <- function(y, mdl_out, del = 1e-10, Bartlett = TRUE) {
+LRT_moment_ar_Amat <- function(y, mdl_out, del = 0, Bartlett = TRUE) {
   LRT_moment_ar_Amat_cpp(as.numeric(y), mdl_out, del, Bartlett, pinv_fn = .pinv)
 }
 
 #' @keywords internal
-LRT_moment_t <- function(y, mdl_out, Amat, WAmat = FALSE, del = 1e-10,
+LRT_moment_t <- function(y, mdl_out, Amat, WAmat = FALSE, del = 0,
                          Bartlett = TRUE) {
   LRT_moment_t_cpp(as.numeric(y), mdl_out, Amat, WAmat, del, Bartlett,
                     pinv_fn = .pinv)
 }
 
 #' @keywords internal
-LRT_moment_ged <- function(y, mdl_out, Amat, WAmat = FALSE, del = 1e-10,
+LRT_moment_ged <- function(y, mdl_out, Amat, WAmat = FALSE, del = 0,
                            Bartlett = TRUE) {
   LRT_moment_ged_cpp(as.numeric(y), mdl_out, Amat, WAmat, del, Bartlett,
                       pinv_fn = .pinv)
@@ -1039,13 +1078,13 @@ LRT_moment_ged <- function(y, mdl_out, Amat, WAmat = FALSE, del = 1e-10,
 
 #' GMM moments for SVL(p)-Student-t with fixed A matrix (p+4 conditions)
 #' @keywords internal
-LRT_moment_lev_t <- function(y, mdl_out, Amat, rho_type, del = 1e-10) {
+LRT_moment_lev_t <- function(y, mdl_out, Amat, rho_type, del = 0) {
   LRT_moment_lev_t_cpp(as.numeric(y), mdl_out, Amat, rho_type, del)
 }
 
 #' GMM moments for SVL(p)-Student-t with HAC weighting (p+4 conditions)
 #' @keywords internal
-LRT_moment_lev_t_Amat <- function(y, mdl_out, rho_type, del = 1e-10,
+LRT_moment_lev_t_Amat <- function(y, mdl_out, rho_type, del = 0,
                                    Bartlett = TRUE) {
   LRT_moment_lev_t_Amat_cpp(as.numeric(y), mdl_out, rho_type, del,
                               Bartlett, pinv_fn = .pinv)
@@ -1054,7 +1093,7 @@ LRT_moment_lev_t_Amat <- function(y, mdl_out, rho_type, del = 1e-10,
 #' GMM moments for SVL(p)-GED with fixed A matrix (p+4 conditions)
 #' Uses exact GED leverage moment.
 #' @keywords internal
-LRT_moment_lev_ged <- function(y, mdl_out, Amat, rho_type, del = 1e-10) {
+LRT_moment_lev_ged <- function(y, mdl_out, Amat, rho_type, del = 0) {
   gh <- .get_gh(200L)
   LRT_moment_lev_ged_cpp(as.numeric(y), mdl_out, Amat, rho_type, del,
                           gh_nodes = gh$nodes, gh_weights = gh$weights)
@@ -1062,7 +1101,7 @@ LRT_moment_lev_ged <- function(y, mdl_out, Amat, rho_type, del = 1e-10) {
 
 #' GMM moments for SVL(p)-GED with HAC weighting (p+4 conditions)
 #' @keywords internal
-LRT_moment_lev_ged_Amat <- function(y, mdl_out, rho_type, del = 1e-10,
+LRT_moment_lev_ged_Amat <- function(y, mdl_out, rho_type, del = 0,
                                      Bartlett = TRUE) {
   gh <- .get_gh(200L)
   LRT_moment_lev_ged_Amat_cpp(as.numeric(y), mdl_out, rho_type, del,
@@ -1078,7 +1117,7 @@ LRT_moment_lev_ged_Amat <- function(y, mdl_out, rho_type, del = 1e-10,
 
 # Simulate null distribution for AR test
 .simnull_ar <- function(betasim_null, p_null, p_alt, j, Tsize, N, ini,
-                        del = 1e-10, wDecay = FALSE, Bartlett = FALSE,
+                        del = 0, wDecay = FALSE, Bartlett = FALSE,
                         sigvMethod = "factored",
                         errorType = "Gaussian",
                         nu_fixed = NA_real_,
@@ -1204,7 +1243,7 @@ LRT_moment_lev_ged_Amat <- function(y, mdl_out, rho_type, del = 1e-10,
 
 # Simulate null distribution for leverage test (identity Amat)
 .simnull <- function(betasim_null, rho_null, p, j, Tsize, N, ini,
-                     Amat, rho_type, del = 1e-10,
+                     Amat, rho_type, del = 0,
                      wDecay = FALSE, trunc_lev = TRUE,
                      sigvMethod = "factored",
                      innovations = NULL) {
@@ -1282,7 +1321,7 @@ LRT_moment_lev_ged_Amat <- function(y, mdl_out, rho_type, del = 1e-10,
 
 # Simulate null distribution for leverage test (Bartlett kernel Amat)
 .simnull_Amat <- function(betasim_null, rho_null, p, j, Tsize, N, ini,
-                          rho_type, del = 1e-10, Bartlett = TRUE,
+                          rho_type, del = 0, Bartlett = TRUE,
                           wDecay = FALSE, trunc_lev = TRUE,
                           sigvMethod = "factored",
                           innovations = NULL) {
@@ -1373,7 +1412,7 @@ LRT_moment_lev_ged_Amat <- function(y, mdl_out, rho_type, del = 1e-10,
 }
 
 .simnull_t <- function(betasim_null, nu_null, j, Tsize, N, ini,
-                       Amat, del = 1e-10, WAmat = FALSE,
+                       Amat, del = 0, WAmat = FALSE,
                        Bartlett = TRUE, logNu = TRUE,
                        wDecay = FALSE, sigvMethod = "factored",
                        winsorize_eps = 0,
@@ -1469,7 +1508,7 @@ LRT_moment_lev_ged_Amat <- function(y, mdl_out, rho_type, del = 1e-10,
 
 # Simulate null distribution for GED test
 .simnull_ged <- function(betasim_null, nu_null, j, Tsize, N, ini,
-                         Amat, del = 1e-10, WAmat = FALSE,
+                         Amat, del = 0, WAmat = FALSE,
                          Bartlett = TRUE, wDecay = FALSE,
                          sigvMethod = "factored", winsorize_eps = 0,
                          direction = "two-sided",
@@ -1569,7 +1608,7 @@ LRT_moment_lev_ged_Amat <- function(y, mdl_out, rho_type, del = 1e-10,
 # =========================================================================== #
 
 .simnull_lev_t <- function(betasim_null, rho_null, p, j, Tsize, N, ini,
-                            Amat, rho_type, del = 1e-10,
+                            Amat, rho_type, del = 0,
                             wDecay = FALSE, trunc_lev = TRUE,
                             logNu = FALSE, sigvMethod = "factored",
                             winsorize_eps = FALSE,
@@ -1633,7 +1672,7 @@ LRT_moment_lev_ged_Amat <- function(y, mdl_out, rho_type, del = 1e-10,
 }
 
 .simnull_lev_t_Amat <- function(betasim_null, rho_null, p, j, Tsize, N, ini,
-                                 rho_type, del = 1e-10, Bartlett = TRUE,
+                                 rho_type, del = 0, Bartlett = TRUE,
                                  wDecay = FALSE, trunc_lev = TRUE,
                                  logNu = FALSE, sigvMethod = "factored",
                                  winsorize_eps = FALSE,
@@ -1696,7 +1735,7 @@ LRT_moment_lev_ged_Amat <- function(y, mdl_out, rho_type, del = 1e-10,
 }
 
 .simnull_lev_ged <- function(betasim_null, rho_null, p, j, Tsize, N, ini,
-                              Amat, rho_type, del = 1e-10,
+                              Amat, rho_type, del = 0,
                               wDecay = FALSE, trunc_lev = TRUE,
                               sigvMethod = "factored", winsorize_eps = FALSE,
                               innovations = NULL) {
@@ -1757,7 +1796,7 @@ LRT_moment_lev_ged_Amat <- function(y, mdl_out, rho_type, del = 1e-10,
 }
 
 .simnull_lev_ged_Amat <- function(betasim_null, rho_null, p, j, Tsize, N, ini,
-                                   rho_type, del = 1e-10, Bartlett = TRUE,
+                                   rho_type, del = 0, Bartlett = TRUE,
                                    wDecay = FALSE, trunc_lev = TRUE,
                                    sigvMethod = "factored", winsorize_eps = FALSE,
                                    innovations = NULL) {

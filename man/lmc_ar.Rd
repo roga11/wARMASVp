@@ -11,7 +11,7 @@ lmc_ar(
   J = 10,
   N = 99,
   burnin = 500,
-  del = 1e-10,
+  del = 0,
   wDecay = FALSE,
   Bartlett = FALSE,
   Amat = NULL,
@@ -34,7 +34,8 @@ lmc_ar(
 
 \item{burnin}{Integer. Burn-in for simulation. Default 500.}
 
-\item{del}{Numeric. Small constant for log transformation. Default \code{1e-10}.}
+\item{del}{Non-negative offset in \eqn{\log(y_t^2 + \delta)}. Default
+\code{0}; see \code{\link{svp}}.}
 
 \item{wDecay}{Logical. Use decaying weights. Default \code{FALSE}.}
 

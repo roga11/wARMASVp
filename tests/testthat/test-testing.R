@@ -506,3 +506,89 @@ test_that("lmc_ar errorType validation rejects invalid argument", {
     lmc_ar(y, p_null = 1, p_alt = 2, errorType = "Cauchy")
   )
 })
+
+# ---- mmc_* return class ----
+
+test_that("all four mmc_* return svp_test objects that print", {
+  skip_on_cran()
+  set.seed(42)
+  y <- sim_svp(500, phi = 0.95, sigy = 1, sigv = 0.3)$y
+  run <- function(expr) {
+    out <- NULL
+    invisible(capture.output(out <- suppressWarnings(expr)))
+    out
+  }
+  res <- list(
+    ar  = run(mmc_ar(y, p_null = 1, p_alt = 2, N = 9, method = "pso", maxit = 5)),
+    lev = run(mmc_lev(y, N = 9, method = "pso", maxit = 5)),
+    t   = run(mmc_t(y, nu_null = 5, N = 9, method = "pso", maxit = 5)),
+    ged = run(mmc_ged(y, nu_null = 1.5, N = 9, method = "pso", maxit = 5))
+  )
+  for (nm in names(res)) {
+    r <- res[[nm]]
+    expect_s3_class(r, "svp_test")
+    expect_identical(r$pval, r$value, info = nm)
+    expect_true(r$pval >= 0 && r$pval <= 1, info = nm)
+    expect_identical(r$N, 9, info = nm)
+    expect_true(grepl("^MMC", r$test_type), info = nm)
+    expect_null(r$sN)
+    pr <- capture.output(print(r))
+    expect_true(any(grepl("Maximized p-value", pr)), info = nm)
+    expect_true(any(grepl("MC replications: 9", pr)), info = nm)
+  }
+})
+
+# ---- MMC optimizer: fixed (zero half-width) nuisance parameters ----
+
+test_that("GenSA and pso hold zero half-width parameters fixed in all mmc_*", {
+  skip_on_cran()
+  skip_if_not_installed("GenSA")
+  set.seed(42)
+  y <- sim_svp(400, phi = 0.95, sigy = 1, sigv = 0.5)$y
+  run <- function(expr) {
+    out <- NULL
+    invisible(capture.output(out <- suppressWarnings(expr)))
+    out
+  }
+  for (m in c("GenSA", "pso")) {
+    res <- list(
+      ar  = run(mmc_ar(y, p_null = 1, p_alt = 2, N = 9, method = m, maxit = 10)),
+      lev = run(mmc_lev(y, N = 9, method = m, maxit = 10)),
+      t   = run(mmc_t(y, nu_null = 5, N = 9, method = m, maxit = 10)),
+      ged = run(mmc_ged(y, nu_null = 1.5, N = 9, method = m, maxit = 10))
+    )
+    for (nm in names(res)) {
+      r <- res[[nm]]; lab <- paste(m, nm)
+      expect_true(r$pval >= 0 && r$pval <= 1, info = lab)
+      expect_length(r$par, 3L)
+    }
+    # sigma_y (entry p + 1) stays exactly at its estimate
+    expect_identical(res$lev$par[2], svp(y, p = 1, leverage = TRUE)$sigy, info = m)
+    expect_identical(res$ar$par[2], svp(y, p = 1)$sigy, info = m)
+  }
+  # every half-width zero: one evaluation at the estimate, no search
+  r0 <- run(mmc_ar(y, p_null = 1, p_alt = 2, N = 9, method = "GenSA",
+                   eps = c(0, 0, 0)))
+  f <- svp(y, p = 1)
+  expect_identical(r0$par, c(f$phi, f$sigy, f$sigv))
+  expect_true(r0$pval >= 0 && r0$pval <= 1)
+  expect_s3_class(r0, "svp_test")
+})
+
+test_that("mmc_* validate eps", {
+  set.seed(42)
+  y <- sim_svp(400, phi = 0.95, sigy = 1, sigv = 0.5)$y
+  bad <- list(c(-0.1, 0, 0.3), c(NA, 0, 0.3), c(Inf, 0, 0.3), c("a", "b", "c"))
+  for (e in bad) {
+    expect_error(mmc_ar(y, p_null = 1, p_alt = 2, N = 9, eps = e), "non-negative")
+    expect_error(mmc_lev(y, N = 9, eps = e), "non-negative")
+    expect_error(mmc_lev(y, N = 9, errorType = "GED", eps = e), "non-negative")
+    expect_error(mmc_t(y, nu_null = 5, N = 9, eps = e), "non-negative")
+    expect_error(mmc_ged(y, nu_null = 1.5, N = 9, eps = e), "non-negative")
+  }
+  skip_on_cran()
+  out <- NULL
+  invisible(capture.output(out <- suppressWarnings(
+    mmc_t(y, nu_null = 5, N = 9, eps = c(0.2, 0, 0), method = "pso", maxit = 5))))
+  expect_true(out$pval >= 0 && out$pval <= 1)
+})

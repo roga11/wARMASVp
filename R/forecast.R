@@ -23,7 +23,9 @@
 #' @param M Integer. Number of particles for BPF. Default 1000.
 #' @param seed Integer. Random seed for BPF and the \code{mixture = "em"}
 #'   fit. Default 42.
-#' @param del Numeric. Small constant for log transformation. Default \code{1e-10}.
+#' @param del Non-negative offset in \eqn{\log(y_t^2 + \delta)}. Default
+#'   \code{NULL} uses the value the model was estimated with
+#'   (\code{object$del}); see \code{\link{svp}}.
 #'
 #' @details
 #' The forecasts follow Ahsan, Dufour and Rodriguez-Rondon (2026), Section
@@ -75,7 +77,7 @@ forecast_svp <- function(object, H = 1,
                          output = c("log-variance", "variance", "volatility"),
                          filter_method = "corrected",
                          mixture = c("optimal", "ksc", "em"),
-                         K = 7, M = 1000, seed = 42, del = 1e-10) {
+                         K = 7, M = 1000, seed = 42, del = NULL) {
   if (!inherits(object, c("svp", "svp_t", "svp_ged"))) {
     stop("object must be an svp/svp_t/svp_ged model from svp(). ",
          "Usage: fit <- svp(y, ...); fc <- forecast_svp(fit, H = 10)")
@@ -87,8 +89,8 @@ forecast_svp <- function(object, H = 1,
     stop("'K' must be a positive integer (>= 1).")
   if (!is.numeric(M) || length(M) != 1L || M < 1L)
     stop("'M' must be a positive integer (>= 1).")
-  if (!is.numeric(del) || length(del) != 1L || del <= 0)
-    stop("'del' must be a positive number.")
+  if (is.null(del)) del <- object$del
+  .check_del(as.numeric(object$y), del)
   output <- match.arg(output)
   filter_method <- match.arg(filter_method, c("corrected", "mixture", "particle"))
   mixture <- match.arg(mixture)

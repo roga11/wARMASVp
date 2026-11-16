@@ -13,7 +13,7 @@ forecast_svp(
   K = 7,
   M = 1000,
   seed = 42,
-  del = 1e-10
+  del = NULL
 )
 }
 \arguments{
@@ -45,7 +45,9 @@ Under \code{mixture = "optimal"} only 7, 10, 12 or 16 are available.}
 \item{seed}{Integer. Random seed for BPF and the \code{mixture = "em"}
 fit. Default 42.}
 
-\item{del}{Numeric. Small constant for log transformation. Default \code{1e-10}.}
+\item{del}{Non-negative offset in \eqn{\log(y_t^2 + \delta)}. Default
+\code{NULL} uses the value the model was estimated with
+(\code{object$del}); see \code{\link{svp}}.}
 }
 \value{
 An object of class \code{"svp_forecast"}, a list containing:

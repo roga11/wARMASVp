@@ -12,8 +12,7 @@
     stop("'N' must be a positive integer (>= 1).")
   if (!is.numeric(burnin) || length(burnin) != 1L || burnin < 0)
     stop("'burnin' must be a non-negative integer.")
-  if (!is.numeric(del) || length(del) != 1L || del <= 0)
-    stop("'del' must be a positive number.")
+  .check_del(y, del)
 }
 
 
@@ -33,7 +32,8 @@
 #' @param J Integer. Winsorizing parameter. Default 10.
 #' @param N Integer. Number of Monte Carlo replications. Default 99.
 #' @param burnin Integer. Burn-in for simulation. Default 500.
-#' @param del Numeric. Small constant for log transformation. Default \code{1e-10}.
+#' @param del Non-negative offset in \eqn{\log(y_t^2 + \delta)}. Default
+#'   \code{0}; see \code{\link{svp}}.
 #' @param wDecay Logical. Use decaying weights. Default \code{FALSE}.
 #' @param Bartlett Logical. If \code{TRUE}, use Bartlett kernel HAC weighting
 #'   matrix for a GMM-LRT-type test statistic. If \code{FALSE} (default), use
@@ -87,7 +87,7 @@
 #'
 #' @export
 lmc_ar <- function(y, p_null, p_alt, J = 10, N = 99, burnin = 500,
-                   del = 1e-10, wDecay = FALSE, Bartlett = FALSE,
+                   del = 0, wDecay = FALSE, Bartlett = FALSE,
                    Amat = NULL, errorType = "Gaussian",
                    sigvMethod = "factored", logNu = TRUE,
                    winsorize_eps = 0) {
@@ -235,16 +235,23 @@ lmc_ar <- function(y, p_null, p_alt, J = 10, N = 99, burnin = 500,
 #' leverage moment condition directly through the correction factor, not only
 #' at lag zero, and is therefore carried as a varied nuisance.
 
-#' @param eps Numeric vector. Half-width of search region around estimated
-#'   nuisance parameters. Default \code{rep(0.3, p_null+2)}.
+#' @param eps Numeric vector of non-negative half-widths of the search region
+#'   around the estimated nuisance parameters. Must have length
+#'   \code{p_null+2} (one entry per nuisance parameter:
+#'   \eqn{\phi_1,\ldots,\phi_{p_0}, \sigma_y, \sigma_v}). Default: \code{0.3} for
+#'   every parameter except \eqn{\sigma_y}, which gets \code{0}. A zero entry
+#'   holds that parameter at its estimate and leaves it out of the search.
 #' @param threshold Numeric. Target p-value. Default 1.
 #' @param method Character. Optimization method: \code{"pso"} or \code{"GenSA"}.
 #'   Default \code{"pso"}.
 #' @param maxit Integer. Maximum iterations/evaluations. Default depends on method.
 #'
-#' @return A list with optimization output, including \code{value} (maximized
-#'   p-value), \code{par} (nuisance parameters at the maximum), and \code{s0}
-#'   (test statistic from observed data).
+#' @return An object of class \code{"svp_test"}: the optimizer output with
+#'   \code{pval} (maximized p-value; also available as \code{value}),
+#'   \code{par} (nuisance parameters at the maximum), \code{s0} (test
+#'   statistic from the observed data), \code{N}, \code{test_type},
+#'   \code{null_param} and \code{null_value}. Remaining fields depend on the
+#'   optimization method.
 #'
 #' @examples
 #' \donttest{
@@ -257,7 +264,7 @@ lmc_ar <- function(y, p_null, p_alt, J = 10, N = 99, burnin = 500,
 #' @export
 mmc_ar <- function(y, p_null, p_alt, J = 10, N = 99, burnin = 500,
                    eps = NULL, threshold = 1, method = "pso", maxit = NULL,
-                   del = 1e-10, wDecay = FALSE, Bartlett = FALSE,
+                   del = 0, wDecay = FALSE, Bartlett = FALSE,
                    Amat = NULL, errorType = "Gaussian",
                    sigvMethod = "factored", logNu = TRUE,
                    winsorize_eps = 0) {
@@ -303,6 +310,7 @@ mmc_ar <- function(y, p_null, p_alt, J = 10, N = 99, burnin = 500,
     eps <- rep(0.3, n_nuisance)
     eps[p_null + 1] <- 0  # sigma_y: test stat is scale-invariant, fixing avoids spurious optimization
   }
+  .check_eps(eps)
   if (length(eps) != n_nuisance)
     stop("eps must have length ", n_nuisance,
          " (p_null+2: one entry per nuisance parameter phi_1,...,phi_p_null, sigma_y, sigma_v).")
@@ -377,9 +385,20 @@ mmc_ar <- function(y, p_null, p_alt, J = 10, N = 99, burnin = 500,
                             winsorize_eps = winsorize_eps,
                             innovations = innov_ar)
   out$value <- -out$value
+  out$pval <- out$value
   out$s0 <- s0
+  out$N <- N
+  label_dist <- if (errorType == "Gaussian") "" else sprintf(" [%s]", errorType)
+  out$test_type <- if (wt$use_hac) {
+    sprintf("MMC AR Order Bartlett%s (p0=%d vs p=%d)", label_dist, p_null, p_alt)
+  } else {
+    sprintf("MMC AR Order%s (p0=%d vs p=%d)", label_dist, p_null, p_alt)
+  }
+  out$null_param <- paste0("phi_", (p_null + 1):p_alt)
+  out$null_value <- rep(0, p_alt - p_null)
   out$errorType <- errorType
   out$call <- cl
+  class(out) <- "svp_test"
   return(out)
 }
 
@@ -401,7 +420,8 @@ mmc_ar <- function(y, p_null, p_alt, J = 10, N = 99, burnin = 500,
 #' @param rho_null Numeric. Value of \eqn{\rho} under the null. Default 0.
 #' @param burnin Integer. Burn-in for simulation. Default 500.
 #' @param rho_type Character. Correlation type. Default \code{"pearson"}.
-#' @param del Numeric. Small constant for log transformation. Default \code{1e-10}.
+#' @param del Non-negative offset in \eqn{\log(y_t^2 + \delta)}. Default
+#'   \code{0}; see \code{\link{svp}}.
 #' @param trunc_lev Logical. Truncate leverage correlation estimate to
 #'   \code{[-0.99, 0.99]}. Default \code{TRUE}.
 #' @param wDecay Logical. Use decaying weights. Default \code{FALSE}.
@@ -440,7 +460,7 @@ mmc_ar <- function(y, p_null, p_alt, J = 10, N = 99, burnin = 500,
 #'
 #' @export
 lmc_lev <- function(y, p = 1, J = 10, N = 99, rho_null = 0,
-                    burnin = 500, rho_type = "pearson", del = 1e-10,
+                    burnin = 500, rho_type = "pearson", del = 0,
                     trunc_lev = TRUE, wDecay = FALSE,
                     Bartlett = FALSE, Amat = NULL,
                     errorType = "Gaussian",
@@ -574,12 +594,14 @@ lmc_lev <- function(y, p = 1, J = 10, N = 99, rho_null = 0,
 #' parameters (phi, sigma_y, sigma_v).
 #'
 #' @inheritParams lmc_lev
-#' @param eps Numeric vector. Half-width of the search region around the
-#'   estimated nuisance parameters. For Gaussian: length \code{p+2}
+#' @param eps Numeric vector of non-negative half-widths of the search region
+#'   around the estimated nuisance parameters. For Gaussian: length \code{p+2}
 #'   (phi, sigma_y, sigma_v). For Student-t/GED: length \code{p+2}
 #'   (phi, sigma_y, sigma_v; nu bounds set proportionally at +/-30%) or
-#'   length \code{p+3} (phi, sigma_y, sigma_v, nu). Default \code{NULL}
-#'   which uses \code{rep(0.3, p+2)} with proportional nu bounds.
+#'   length \code{p+3} (phi, sigma_y, sigma_v, nu). Default \code{NULL}:
+#'   \code{0.3} for every parameter except \eqn{\sigma_y}, which gets
+#'   \code{0}, with proportional nu bounds. A zero entry holds that parameter
+#'   at its estimate and leaves it out of the search.
 #' @param threshold Numeric. Target p-value (optimization stops if reached).
 #'   Default 1.
 #' @param method Character. Optimization method: \code{"pso"} (particle swarm),
@@ -588,12 +610,12 @@ lmc_lev <- function(y, p = 1, J = 10, N = 99, rho_null = 0,
 #' @param maxit Integer or list. Maximum iterations/evaluations for the
 #'   optimizer. Default depends on method.
 #'
-#' @return A list with the optimization output including:
-#' \describe{
-#'   \item{value}{Maximized p-value.}
-#'   \item{par}{Nuisance parameter values at the maximum.}
-#' }
-#' Additional fields depend on the optimization method used.
+#' @return An object of class \code{"svp_test"}: the optimizer output with
+#'   \code{pval} (maximized p-value; also available as \code{value}),
+#'   \code{par} (nuisance parameters at the maximum), \code{s0} (test
+#'   statistic from the observed data), \code{N}, \code{test_type},
+#'   \code{null_param} and \code{null_value}. Remaining fields depend on the
+#'   optimization method.
 #'
 #' @examples
 #' \donttest{
@@ -606,7 +628,7 @@ lmc_lev <- function(y, p = 1, J = 10, N = 99, rho_null = 0,
 mmc_lev <- function(y, p = 1, J = 10, N = 99, rho_null = 0,
                     burnin = 500, eps = NULL, threshold = 1,
                     method = "pso", maxit = NULL,
-                    rho_type = "pearson", del = 1e-10,
+                    rho_type = "pearson", del = 0,
                     trunc_lev = TRUE, wDecay = FALSE,
                     Bartlett = FALSE, Amat = NULL,
                     errorType = "Gaussian",
@@ -636,6 +658,7 @@ mmc_lev <- function(y, p = 1, J = 10, N = 99, rho_null = 0,
       eps <- rep(0.3, n_nuisance)
       eps[p + 1] <- 0  # sigma_y: test stat is scale-invariant, fixing avoids spurious optimization
     }
+    .check_eps(eps)
     if (length(eps) != n_nuisance)
       stop("eps must have length ", n_nuisance,
            " (p+2: one entry per nuisance parameter phi_1,...,phi_p, sigma_y, sigma_v).")
@@ -655,6 +678,7 @@ mmc_lev <- function(y, p = 1, J = 10, N = 99, rho_null = 0,
       eps <- rep(0.3, p + 2)  # default eps for phi, sigy, sigv only; nu gets proportional bounds
       eps[p + 1] <- 0  # sigma_y: test stat is scale-invariant, fixing avoids spurious optimization
     }
+    .check_eps(eps)
     if (length(eps) == n_nuisance) {
       # User provided eps for all nuisance params including nu
       eps_nu <- eps[n_nuisance]
@@ -766,8 +790,14 @@ mmc_lev <- function(y, p = 1, J = 10, N = 99, rho_null = 0,
   }
   out <- do.call(.run_mmc_optimizer, opt_args)
   out$value <- -out$value
+  out$pval <- out$value
   out$s0 <- s0_tmp
+  out$N <- N
+  out$test_type <- paste0("MMC Leverage (", errorType, ")")
+  out$null_param <- "rho"
+  out$null_value <- rho_null
   out$call <- cl
+  class(out) <- "svp_test"
   return(out)
 }
 
@@ -789,7 +819,8 @@ mmc_lev <- function(y, p = 1, J = 10, N = 99, rho_null = 0,
 #' @param N Integer. Number of Monte Carlo replications. Default 99.
 #' @param nu_null Numeric. Value of \eqn{\nu} under the null hypothesis.
 #' @param burnin Integer. Burn-in for simulation. Default 500.
-#' @param del Numeric. Small constant for log transformation. Default \code{1e-10}.
+#' @param del Non-negative offset in \eqn{\log(y_t^2 + \delta)}. Default
+#'   \code{0}; see \code{\link{svp}}.
 #' @param wDecay Logical. Use decaying weights. Default \code{FALSE}.
 #' @param Bartlett Logical. Use Bartlett kernel HAC for weighting matrix.
 #'   Default \code{FALSE}.
@@ -816,7 +847,7 @@ mmc_lev <- function(y, p = 1, J = 10, N = 99, rho_null = 0,
 #'
 #' @export
 lmc_t <- function(y, p = 1, J = 10, N = 99, nu_null, burnin = 500,
-                  del = 1e-10, wDecay = FALSE, Bartlett = FALSE,
+                  del = 0, wDecay = FALSE, Bartlett = FALSE,
                   Amat = NULL, logNu = TRUE,
                   direction = c("two-sided", "less", "greater"),
                   sigvMethod = "factored", winsorize_eps = 0) {
@@ -905,7 +936,7 @@ lmc_t <- function(y, p = 1, J = 10, N = 99, nu_null, burnin = 500,
 #'
 #' @export
 lmc_ged <- function(y, p = 1, J = 10, N = 99, nu_null, burnin = 500,
-                    del = 1e-10, wDecay = FALSE, Bartlett = FALSE,
+                    del = 0, wDecay = FALSE, Bartlett = FALSE,
                     Amat = NULL,
                     direction = c("two-sided", "less", "greater"),
                     sigvMethod = "factored", winsorize_eps = 0) {
@@ -978,16 +1009,23 @@ lmc_ged <- function(y, p = 1, J = 10, N = 99, nu_null, burnin = 500,
 #' by maximizing the MC p-value over nuisance parameters (phi, sigma_y, sigma_v).
 #'
 #' @inheritParams lmc_t
-#' @param eps Numeric vector. Half-width of search region around estimated nuisance
-#'   parameters. Must have length \code{p+2} (one entry per nuisance parameter:
-#'   \eqn{\phi_1,\ldots,\phi_p, \sigma_y, \sigma_v}). Default \code{rep(0.3, p+2)}.
+#' @param eps Numeric vector of non-negative half-widths of the search region
+#'   around the estimated nuisance parameters. Must have length \code{p+2} (one
+#'   entry per nuisance parameter:
+#'   \eqn{\phi_1,\ldots,\phi_p, \sigma_y, \sigma_v}). Default: \code{0.3} for
+#'   every parameter except \eqn{\sigma_y}, which gets \code{0}. A zero entry
+#'   holds that parameter at its estimate and leaves it out of the search.
 #' @param threshold Numeric. Target p-value. Default 1.
 #' @param method Character. Optimization method: \code{"pso"} or \code{"GenSA"}.
 #'   Default \code{"pso"}.
 #' @param maxit Integer. Maximum iterations/evaluations. Default depends on method.
 #'
-#' @return A list with optimization output including \code{value} (maximized p-value)
-#'   and \code{par} (nuisance parameters at the maximum).
+#' @return An object of class \code{"svp_test"}: the optimizer output with
+#'   \code{pval} (maximized p-value; also available as \code{value}),
+#'   \code{par} (nuisance parameters at the maximum), \code{s0} (test
+#'   statistic from the observed data), \code{N}, \code{test_type},
+#'   \code{null_param} and \code{null_value}. Remaining fields depend on the
+#'   optimization method.
 #'
 #' @examples
 #' \donttest{
@@ -999,7 +1037,7 @@ lmc_ged <- function(y, p = 1, J = 10, N = 99, nu_null, burnin = 500,
 #' @export
 mmc_t <- function(y, p = 1, J = 10, N = 99, nu_null, burnin = 500,
                   eps = NULL, threshold = 1, method = "pso", maxit = NULL,
-                  del = 1e-10, wDecay = FALSE, Bartlett = FALSE,
+                  del = 0, wDecay = FALSE, Bartlett = FALSE,
                   Amat = NULL, logNu = TRUE,
                   direction = c("two-sided", "less", "greater"),
                   sigvMethod = "factored", winsorize_eps = 0) {
@@ -1037,6 +1075,7 @@ mmc_t <- function(y, p = 1, J = 10, N = 99, nu_null, burnin = 500,
     eps <- rep(0.3, length(theta_0))
     eps[p + 1] <- 0  # sigma_y: test stat is scale-invariant, fixing avoids spurious optimization
   }
+  .check_eps(eps)
   if (length(eps) != length(theta_0))
     stop("eps must have length ", length(theta_0),
          " (p+2: one entry per nuisance parameter phi_1,...,phi_p, sigma_y, sigma_v).")
@@ -1075,9 +1114,15 @@ mmc_t <- function(y, p = 1, J = 10, N = 99, nu_null, burnin = 500,
                             winsorize_eps = winsorize_eps,
                             innovations = innov_t)
   out$value <- -out$value
+  out$pval <- out$value
   out$s0 <- s0_tmp
+  out$N <- N
+  out$test_type <- "MMC Student-t"
+  out$null_param <- "nu"
+  out$null_value <- nu_null
   out$direction <- direction
   out$call <- cl
+  class(out) <- "svp_test"
   return(out)
 }
 
@@ -1088,16 +1133,23 @@ mmc_t <- function(y, p = 1, J = 10, N = 99, nu_null, burnin = 500,
 #' for the GED shape parameter.
 #'
 #' @inheritParams lmc_ged
-#' @param eps Numeric vector. Half-width of search region around estimated nuisance
-#'   parameters. Must have length \code{p+2} (one entry per nuisance parameter:
-#'   \eqn{\phi_1,\ldots,\phi_p, \sigma_y, \sigma_v}). Default \code{rep(0.3, p+2)}.
+#' @param eps Numeric vector of non-negative half-widths of the search region
+#'   around the estimated nuisance parameters. Must have length \code{p+2} (one
+#'   entry per nuisance parameter:
+#'   \eqn{\phi_1,\ldots,\phi_p, \sigma_y, \sigma_v}). Default: \code{0.3} for
+#'   every parameter except \eqn{\sigma_y}, which gets \code{0}. A zero entry
+#'   holds that parameter at its estimate and leaves it out of the search.
 #' @param threshold Numeric. Target p-value. Default 1.
 #' @param method Character. Optimization method: \code{"pso"} or \code{"GenSA"}.
 #'   Default \code{"pso"}.
 #' @param maxit Integer. Maximum iterations/evaluations. Default depends on method.
 #'
-#' @return A list with optimization output including \code{value} (maximized p-value)
-#'   and \code{par} (nuisance parameters at the maximum).
+#' @return An object of class \code{"svp_test"}: the optimizer output with
+#'   \code{pval} (maximized p-value; also available as \code{value}),
+#'   \code{par} (nuisance parameters at the maximum), \code{s0} (test
+#'   statistic from the observed data), \code{N}, \code{test_type},
+#'   \code{null_param} and \code{null_value}. Remaining fields depend on the
+#'   optimization method.
 #'
 #' @examples
 #' \donttest{
@@ -1109,7 +1161,7 @@ mmc_t <- function(y, p = 1, J = 10, N = 99, nu_null, burnin = 500,
 #' @export
 mmc_ged <- function(y, p = 1, J = 10, N = 99, nu_null, burnin = 500,
                     eps = NULL, threshold = 1, method = "pso", maxit = NULL,
-                    del = 1e-10, wDecay = FALSE, Bartlett = FALSE,
+                    del = 0, wDecay = FALSE, Bartlett = FALSE,
                     Amat = NULL,
                     direction = c("two-sided", "less", "greater"),
                     sigvMethod = "factored", winsorize_eps = 0) {
@@ -1147,6 +1199,7 @@ mmc_ged <- function(y, p = 1, J = 10, N = 99, nu_null, burnin = 500,
     eps <- rep(0.3, length(theta_0))
     eps[p + 1] <- 0  # sigma_y: test stat is scale-invariant, fixing avoids spurious optimization
   }
+  .check_eps(eps)
   if (length(eps) != length(theta_0))
     stop("eps must have length ", length(theta_0),
          " (p+2: one entry per nuisance parameter phi_1,...,phi_p, sigma_y, sigma_v).")
@@ -1187,9 +1240,15 @@ mmc_ged <- function(y, p = 1, J = 10, N = 99, nu_null, burnin = 500,
                             winsorize_eps = winsorize_eps,
                             innovations = innov_ged)
   out$value <- -out$value
+  out$pval <- out$value
   out$direction <- direction
   out$s0 <- s0_tmp
+  out$N <- N
+  out$test_type <- "MMC GED"
+  out$null_param <- "nu"
+  out$null_value <- nu_null
   out$call <- cl
+  class(out) <- "svp_test"
   return(out)
 }
 

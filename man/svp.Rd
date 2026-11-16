@@ -11,7 +11,7 @@ svp(
   leverage = FALSE,
   errorType = "Gaussian",
   rho_type = "pearson",
-  del = 1e-10,
+  del = 0,
   trunc_lev = TRUE,
   wDecay = FALSE,
   logNu = FALSE,
@@ -37,8 +37,12 @@ autocovariance blocks used. Default is 10.}
 \item{rho_type}{Character. Correlation type for leverage estimation. One of
 \code{"pearson"} (default), \code{"kendall"}, or \code{"both"}.}
 
-\item{del}{Numeric. Small constant for log transformation:
-\eqn{\log(y_t^2 + \delta)}. Default is \code{1e-10}.}
+\item{del}{Non-negative number. Offset in the log transformation
+\eqn{\log(y_t^2 + \delta)}. Default \code{0} (no offset), which requires
+every \eqn{y_t} to be non-zero; if \code{y} contains zeros, an error asks
+for a positive value. A positive \code{del} should be small relative to
+\eqn{y_t^2}: the estimates depend on it and are then no longer invariant
+to the scale of \code{y}.}
 
 \item{trunc_lev}{Logical. If \code{TRUE}, truncate the estimated leverage
 parameter to \code{[-0.99, 0.99]}. Default is \code{TRUE}. At

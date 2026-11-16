@@ -29,8 +29,12 @@
 #'   \code{"Student-t"}, or \code{"GED"}.
 #' @param rho_type Character. Correlation type for leverage estimation. One of
 #'   \code{"pearson"} (default), \code{"kendall"}, or \code{"both"}.
-#' @param del Numeric. Small constant for log transformation:
-#'   \eqn{\log(y_t^2 + \delta)}. Default is \code{1e-10}.
+#' @param del Non-negative number. Offset in the log transformation
+#'   \eqn{\log(y_t^2 + \delta)}. Default \code{0} (no offset), which requires
+#'   every \eqn{y_t} to be non-zero; if \code{y} contains zeros, an error asks
+#'   for a positive value. A positive \code{del} should be small relative to
+#'   \eqn{y_t^2}: the estimates depend on it and are then no longer invariant
+#'   to the scale of \code{y}.
 #' @param trunc_lev Logical. If \code{TRUE}, truncate the estimated leverage
 #'   parameter to \code{[-0.99, 0.99]}. Default is \code{TRUE}. At
 #'   \eqn{|\delta_p| = 1} the model is singular (the volatility innovation
@@ -137,7 +141,7 @@
 #'
 #' @export
 svp <- function(y, p = 1, J = 10, leverage = FALSE, errorType = "Gaussian",
-                rho_type = "pearson", del = 1e-10, trunc_lev = TRUE,
+                rho_type = "pearson", del = 0, trunc_lev = TRUE,
                 wDecay = FALSE, logNu = FALSE,
                 sigvMethod = "factored", winsorize_eps = 0,
                 sigeps = c("theoretical", "estimated")) {
@@ -153,7 +157,7 @@ svp <- function(y, p = 1, J = 10, leverage = FALSE, errorType = "Gaussian",
   if (length(y) < min_length)
     stop("'y' must have length >= 2*p + J = ", min_length,
          " (got ", length(y), ").")
-  if (!is.numeric(del) || del <= 0) stop("'del' must be a positive number.")
+  .check_del(y, del)
   errorType <- match.arg(errorType, c("Gaussian", "Student-t", "GED"))
   sigvMethod <- match.arg(sigvMethod, c("hybrid", "direct", "factored"))
   sigeps <- match.arg(sigeps)

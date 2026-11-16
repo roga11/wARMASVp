@@ -15,7 +15,7 @@ mmc_ar(
   threshold = 1,
   method = "pso",
   maxit = NULL,
-  del = 1e-10,
+  del = 0,
   wDecay = FALSE,
   Bartlett = FALSE,
   Amat = NULL,
@@ -38,8 +38,12 @@ mmc_ar(
 
 \item{burnin}{Integer. Burn-in for simulation. Default 500.}
 
-\item{eps}{Numeric vector. Half-width of search region around estimated
-nuisance parameters. Default \code{rep(0.3, p_null+2)}.}
+\item{eps}{Numeric vector of non-negative half-widths of the search region
+around the estimated nuisance parameters. Must have length
+\code{p_null+2} (one entry per nuisance parameter:
+\eqn{\phi_1,\ldots,\phi_{p_0}, \sigma_y, \sigma_v}). Default: \code{0.3} for
+every parameter except \eqn{\sigma_y}, which gets \code{0}. A zero entry
+holds that parameter at its estimate and leaves it out of the search.}
 
 \item{threshold}{Numeric. Target p-value. Default 1.}
 
@@ -48,7 +52,8 @@ Default \code{"pso"}.}
 
 \item{maxit}{Integer. Maximum iterations/evaluations. Default depends on method.}
 
-\item{del}{Numeric. Small constant for log transformation. Default \code{1e-10}.}
+\item{del}{Non-negative offset in \eqn{\log(y_t^2 + \delta)}. Default
+\code{0}; see \code{\link{svp}}.}
 
 \item{wDecay}{Logical. Use decaying weights. Default \code{FALSE}.}
 
@@ -76,9 +81,12 @@ only). Default \code{TRUE}.}
 (heavy-tail only). Default 0.}
 }
 \value{
-A list with optimization output, including \code{value} (maximized
-  p-value), \code{par} (nuisance parameters at the maximum), and \code{s0}
-  (test statistic from observed data).
+An object of class \code{"svp_test"}: the optimizer output with
+  \code{pval} (maximized p-value; also available as \code{value}),
+  \code{par} (nuisance parameters at the maximum), \code{s0} (test
+  statistic from the observed data), \code{N}, \code{test_type},
+  \code{null_param} and \code{null_value}. Remaining fields depend on the
+  optimization method.
 }
 \description{
 Performs a Maximized Monte Carlo (MMC) test of

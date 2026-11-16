@@ -21,11 +21,11 @@ fit_ksc_em_cpp <- function(eps, init_m, init_s2, init_q, max_iter = 500L, tol = 
     .Call(`_wARMASVp_fit_ksc_em_cpp`, eps, init_m, init_s2, init_q, max_iter, tol)
 }
 
-LRT_moment_lev_svp_cpp <- function(y, mdl_out, Amat, rho_type, del = 1e-10) {
+LRT_moment_lev_svp_cpp <- function(y, mdl_out, Amat, rho_type, del = 0) {
     .Call(`_wARMASVp_LRT_moment_lev_svp_cpp`, y, mdl_out, Amat, rho_type, del)
 }
 
-LRT_moment_lev_t_cpp <- function(y, mdl_out, Amat, rho_type, del = 1e-10) {
+LRT_moment_lev_t_cpp <- function(y, mdl_out, Amat, rho_type, del = 0) {
     .Call(`_wARMASVp_LRT_moment_lev_t_cpp`, y, mdl_out, Amat, rho_type, del)
 }
 
@@ -33,23 +33,23 @@ LRT_moment_lev_ged_cpp <- function(y, mdl_out, Amat, rho_type, del, gh_nodes, gh
     .Call(`_wARMASVp_LRT_moment_lev_ged_cpp`, y, mdl_out, Amat, rho_type, del, gh_nodes, gh_weights)
 }
 
-LRT_moment_t_cpp <- function(y, mdl_out, Amat, WAmat = FALSE, del = 1e-10, Bartlett = TRUE, pinv_fn = NULL) {
+LRT_moment_t_cpp <- function(y, mdl_out, Amat, WAmat = FALSE, del = 0, Bartlett = TRUE, pinv_fn = NULL) {
     .Call(`_wARMASVp_LRT_moment_t_cpp`, y, mdl_out, Amat, WAmat, del, Bartlett, pinv_fn)
 }
 
-LRT_moment_ged_cpp <- function(y, mdl_out, Amat, WAmat = FALSE, del = 1e-10, Bartlett = TRUE, pinv_fn = NULL) {
+LRT_moment_ged_cpp <- function(y, mdl_out, Amat, WAmat = FALSE, del = 0, Bartlett = TRUE, pinv_fn = NULL) {
     .Call(`_wARMASVp_LRT_moment_ged_cpp`, y, mdl_out, Amat, WAmat, del, Bartlett, pinv_fn)
 }
 
-LRT_moment_lev_svp_Amat_cpp <- function(y, mdl_out, rho_type, del = 1e-10, Bartlett = TRUE, pinv_fn = NULL) {
+LRT_moment_lev_svp_Amat_cpp <- function(y, mdl_out, rho_type, del = 0, Bartlett = TRUE, pinv_fn = NULL) {
     .Call(`_wARMASVp_LRT_moment_lev_svp_Amat_cpp`, y, mdl_out, rho_type, del, Bartlett, pinv_fn)
 }
 
-LRT_moment_ar_Amat_cpp <- function(y, mdl_out, del = 1e-10, Bartlett = TRUE, pinv_fn = NULL) {
+LRT_moment_ar_Amat_cpp <- function(y, mdl_out, del = 0, Bartlett = TRUE, pinv_fn = NULL) {
     .Call(`_wARMASVp_LRT_moment_ar_Amat_cpp`, y, mdl_out, del, Bartlett, pinv_fn)
 }
 
-LRT_moment_lev_t_Amat_cpp <- function(y, mdl_out, rho_type, del = 1e-10, Bartlett = TRUE, pinv_fn = NULL) {
+LRT_moment_lev_t_Amat_cpp <- function(y, mdl_out, rho_type, del = 0, Bartlett = TRUE, pinv_fn = NULL) {
     .Call(`_wARMASVp_LRT_moment_lev_t_Amat_cpp`, y, mdl_out, rho_type, del, Bartlett, pinv_fn)
 }
 

@@ -5,7 +5,7 @@
 \title{GMM moments for SVL(p)-GED with fixed A matrix (p+4 conditions)
 Uses exact GED leverage moment.}
 \usage{
-LRT_moment_lev_ged(y, mdl_out, Amat, rho_type, del = 1e-10)
+LRT_moment_lev_ged(y, mdl_out, Amat, rho_type, del = 0)
 }
 \description{
 GMM moments for SVL(p)-GED with fixed A matrix (p+4 conditions)

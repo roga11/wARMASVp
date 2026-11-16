@@ -12,7 +12,7 @@ svp_IC(
   K = 7L,
   M = 1000L,
   seed = 42L,
-  del = 1e-10
+  del = NULL
 )
 }
 \arguments{
@@ -53,8 +53,9 @@ filter methods.}
 the \code{mixture = "em"} fit. Default 42. Has no effect under the
 default \code{mixture = "optimal"}.}
 
-\item{del}{Numeric. Small constant added inside \eqn{\log} to avoid
-\eqn{\log 0}. Default \code{1e-10}.}
+\item{del}{Non-negative offset in \eqn{\log(y_t^2 + \delta)}. Default
+\code{NULL} uses the value the model was estimated with
+(\code{fit$del}); see \code{\link{svp}}.}
 }
 \value{
 Named numeric vector of the requested criteria. Lower is better.

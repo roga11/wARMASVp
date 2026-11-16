@@ -58,7 +58,9 @@ test_that("interpolated mixtures are proper at arbitrary nu and at the clamps", 
   set.seed(seed)
   y <- sim_svp(500, phi = 0.95, sigy = 1, sigv = 0.5, errorType = errorType,
                nu = nu, leverage = leverage, rho = if (leverage) -0.5 else 0)$y
-  suppressWarnings(svp(y, p = 1, errorType = errorType, leverage = leverage))
+  # del = 1e-10: the frozen literals below predate the del = 0 default
+  suppressWarnings(svp(y, p = 1, errorType = errorType, leverage = leverage,
+                       del = 1e-10))
 }
 fitA <- .gmkf_fit(101)                                     # Gaussian
 fitB <- .gmkf_fit(302, "Student-t", nu = 3)                # Student-t, interior nu

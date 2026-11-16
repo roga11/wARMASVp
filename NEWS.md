@@ -24,7 +24,43 @@
   Default `"theoretical"`: all existing results unchanged. `svp_AR_order()`
   gains the same `sigeps` argument.
 
+## Behaviour changes
+
+* **`del` now defaults to `0`** (was `1e-10`) in `svp()`, `svp_AR_order()` and
+  all `lmc_*` / `mmc_*` tests: the log transformation is `log(y^2)` with no
+  offset. A fixed offset competes with the smallest squared observations, so
+  the old default made the estimates depend on the scale of `y`: negligible
+  for percentage returns, but several percent in `sigv` and `sigy` for
+  decimal returns and far more at smaller scales. With `del = 0` the
+  estimates are scale invariant. If `y` contains exact zeros, the functions
+  now stop with a message reporting how many there are and asking for a small
+  positive `del` (small relative to `y^2`). `del = 1e-10` reproduces the
+  output of earlier versions.
+
+* `filter_svp()`, `forecast_svp()` and `svp_IC()` take `del = NULL` by
+  default and then use the value stored in the fitted object, so the offset
+  is set once, in `svp()`. Previously they applied their own `1e-10`
+  regardless of the value the model had been estimated with.
+
 ## Bug fixes
+
+* **`method = "GenSA"` works again in all `mmc_*` tests.** With the default
+  `eps` the half-width of `sigma_y` is zero, and GenSA stopped with "Lower and
+  upper bounds are not consistent". Nuisance parameters with a zero half-width
+  are now held at their estimate and left out of the search for both
+  optimizers; `par` in the result still has one entry per parameter. Because
+  the particle swarm now searches one dimension fewer, maximized p-values from
+  `method = "pso"` can differ slightly from earlier versions under the same
+  seed.
+
+* `mmc_ar()`, `mmc_lev()`, `mmc_t()` and `mmc_ged()` now reject negative or
+  non-finite `eps` entries; previously a negative entry was silently accepted.
+
+* **`mmc_ar()`, `mmc_lev()`, `mmc_t()` and `mmc_ged()` now return `"svp_test"`
+  objects**, like their `lmc_*` counterparts, and print as a test summary
+  (maximized p-value, statistic, nuisance parameters at the maximum). The
+  optimizer output is unchanged and gains `pval` (equal to `value`), `N`,
+  `test_type`, `null_param` and `null_value`.
 
 * **Leverage truncation bound 0.999 -> 0.99.** `svp(..., trunc_lev = TRUE)` now
   truncates the leverage parameter to `[-0.99, 0.99]` (all error types; for

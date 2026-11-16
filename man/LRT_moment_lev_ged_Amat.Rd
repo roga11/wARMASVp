@@ -4,7 +4,7 @@
 \alias{LRT_moment_lev_ged_Amat}
 \title{GMM moments for SVL(p)-GED with HAC weighting (p+4 conditions)}
 \usage{
-LRT_moment_lev_ged_Amat(y, mdl_out, rho_type, del = 1e-10, Bartlett = TRUE)
+LRT_moment_lev_ged_Amat(y, mdl_out, rho_type, del = 0, Bartlett = TRUE)
 }
 \description{
 GMM moments for SVL(p)-GED with HAC weighting (p+4 conditions)

@@ -12,7 +12,7 @@ lmc_lev(
   rho_null = 0,
   burnin = 500,
   rho_type = "pearson",
-  del = 1e-10,
+  del = 0,
   trunc_lev = TRUE,
   wDecay = FALSE,
   Bartlett = FALSE,
@@ -38,7 +38,8 @@ lmc_lev(
 
 \item{rho_type}{Character. Correlation type. Default \code{"pearson"}.}
 
-\item{del}{Numeric. Small constant for log transformation. Default \code{1e-10}.}
+\item{del}{Non-negative offset in \eqn{\log(y_t^2 + \delta)}. Default
+\code{0}; see \code{\link{svp}}.}
 
 \item{trunc_lev}{Logical. Truncate leverage correlation estimate to
 \code{[-0.99, 0.99]}. Default \code{TRUE}.}

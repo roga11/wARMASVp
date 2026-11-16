@@ -11,7 +11,7 @@ svp_AR_order(
   leverage = FALSE,
   errorType = "Gaussian",
   rho_type = "pearson",
-  del = 1e-10,
+  del = 0,
   trunc_lev = TRUE,
   wDecay = FALSE,
   logNu = FALSE,

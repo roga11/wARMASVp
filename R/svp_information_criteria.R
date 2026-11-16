@@ -29,7 +29,7 @@
 # Sample autocovariances of y*_t = log(y^2 + del) - mean
 # Returns numeric vector of length max_lag + 1: gamma_y*(0..max_lag).
 # Divisor 1/T (consistent with FFT periodogram / Whittle convention).
-.svp_acov_ystar <- function(y, max_lag, del = 1e-10) {
+.svp_acov_ystar <- function(y, max_lag, del = 0) {
   ystar <- log(y^2 + del)
   ystar <- ystar - mean(ystar)
   Tn <- length(ystar)
@@ -43,7 +43,7 @@
 # sigma_pred^2 = gamma_y*(0) - phi' gamma_y*(1:p).
 # Diagnostic; consistency in the SV(p) setting is demonstrated by simulation
 # (Ahsan, Dufour & Rodriguez-Rondon, 2026) rather than analytically.
-.svp_residual_var <- function(fit, y, del = 1e-10) {
+.svp_residual_var <- function(fit, y, del = 0) {
   phi <- as.numeric(fit$phi)
   p <- length(phi)
   gv <- .svp_acov_ystar(y, p, del)
@@ -99,7 +99,7 @@
 }
 
 # Hannan-Rissanen ARMA(p,p) residual variance — wrapper.
-.svp_hr_residual_var <- function(fit, y, del = 1e-10, L_const = 1.5) {
+.svp_hr_residual_var <- function(fit, y, del = 0, L_const = 1.5) {
   ystar <- log(y^2 + del); ystar <- ystar - mean(ystar)
   s1 <- .svp_hr_stage1(ystar, L_const)
   if (is.null(s1$eps)) return(list(sigma2 = NA_real_, T_eff = NA_integer_))
@@ -119,7 +119,7 @@
 #   I(omega_j) = |FFT(y*)|^2 / T,   omega_j = 2*pi*j/T
 #   f_y*(omega) = sigma_v^2 / |1 - sum phi_j e^{-i j omega}|^2 + sigma_eps^2(nu)
 #   ell_W = -0.5 * sum_j [log f(omega_j) + I(omega_j) / f(omega_j)]
-.svp_whittle_loglik <- function(fit, y, errorType, del = 1e-10) {
+.svp_whittle_loglik <- function(fit, y, errorType, del = 0) {
   ystar <- log(y^2 + del)
   ystar <- ystar - mean(ystar)
   Tn <- length(ystar)
@@ -267,8 +267,9 @@
 #' @param seed Integer. Random seed for the bootstrap particle filter and
 #'   the \code{mixture = "em"} fit. Default 42. Has no effect under the
 #'   default \code{mixture = "optimal"}.
-#' @param del Numeric. Small constant added inside \eqn{\log} to avoid
-#'   \eqn{\log 0}. Default \code{1e-10}.
+#' @param del Non-negative offset in \eqn{\log(y_t^2 + \delta)}. Default
+#'   \code{NULL} uses the value the model was estimated with
+#'   (\code{fit$del}); see \code{\link{svp}}.
 #'
 #' @return Named numeric vector of the requested criteria. Lower is better.
 #'
@@ -340,7 +341,7 @@ svp_IC <- function(fit,
                    filter_method = c("mixture", "corrected", "particle"),
                    mixture = c("optimal", "ksc", "em"),
                    K = 7L, M = 1000L, seed = 42L,
-                   del = 1e-10) {
+                   del = NULL) {
   if (!inherits(fit, c("svp", "svp_t", "svp_ged")))
     stop("'fit' must be an svp() output (class 'svp', 'svp_t' or 'svp_ged').")
 
@@ -359,6 +360,8 @@ svp_IC <- function(fit,
 
   y <- as.numeric(fit$y)
   if (length(y) < 4L) stop("Series too short for IC computation.")
+  if (is.null(del)) del <- fit$del
+  .check_del(y, del)
 
   Tn <- length(y)
   p  <- length(fit$phi)
@@ -483,7 +486,7 @@ svp_IC <- function(fit,
 #' @export
 svp_AR_order <- function(y, pmax = 6L,
                          J = 10L, leverage = FALSE, errorType = "Gaussian",
-                         rho_type = "pearson", del = 1e-10, trunc_lev = TRUE,
+                         rho_type = "pearson", del = 0, trunc_lev = TRUE,
                          wDecay = FALSE, logNu = FALSE,
                          sigvMethod = "factored", winsorize_eps = 0L,
                          sigeps = c("theoretical", "estimated"),
@@ -494,6 +497,8 @@ svp_AR_order <- function(y, pmax = 6L,
                                       "BIC_HR", "AIC_HR")) {
   pmax <- as.integer(pmax)
   if (pmax < 1L) stop("'pmax' must be a positive integer.")
+  # Checked here: the per-p tryCatch below would turn the error into NA rows.
+  .check_del(as.numeric(y), del)
 
   all_crit <- c("BIC_Kalman", "AIC_Kalman", "AICc_Kalman",
                 "BIC_Whittle",

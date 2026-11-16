@@ -16,7 +16,7 @@ mmc_lev(
   method = "pso",
   maxit = NULL,
   rho_type = "pearson",
-  del = 1e-10,
+  del = 0,
   trunc_lev = TRUE,
   wDecay = FALSE,
   Bartlett = FALSE,
@@ -40,12 +40,14 @@ mmc_lev(
 
 \item{burnin}{Integer. Burn-in for simulation. Default 500.}
 
-\item{eps}{Numeric vector. Half-width of the search region around the
-estimated nuisance parameters. For Gaussian: length \code{p+2}
+\item{eps}{Numeric vector of non-negative half-widths of the search region
+around the estimated nuisance parameters. For Gaussian: length \code{p+2}
 (phi, sigma_y, sigma_v). For Student-t/GED: length \code{p+2}
 (phi, sigma_y, sigma_v; nu bounds set proportionally at +/-30%) or
-length \code{p+3} (phi, sigma_y, sigma_v, nu). Default \code{NULL}
-which uses \code{rep(0.3, p+2)} with proportional nu bounds.}
+length \code{p+3} (phi, sigma_y, sigma_v, nu). Default \code{NULL}:
+\code{0.3} for every parameter except \eqn{\sigma_y}, which gets
+\code{0}, with proportional nu bounds. A zero entry holds that parameter
+at its estimate and leaves it out of the search.}
 
 \item{threshold}{Numeric. Target p-value (optimization stops if reached).
 Default 1.}
@@ -59,7 +61,8 @@ optimizer. Default depends on method.}
 
 \item{rho_type}{Character. Correlation type. Default \code{"pearson"}.}
 
-\item{del}{Numeric. Small constant for log transformation. Default \code{1e-10}.}
+\item{del}{Non-negative offset in \eqn{\log(y_t^2 + \delta)}. Default
+\code{0}; see \code{\link{svp}}.}
 
 \item{trunc_lev}{Logical. Truncate leverage correlation estimate to
 \code{[-0.99, 0.99]}. Default \code{TRUE}.}
@@ -87,12 +90,12 @@ Default \code{FALSE}.}
 (0 = none). Default 0.}
 }
 \value{
-A list with the optimization output including:
-\describe{
-  \item{value}{Maximized p-value.}
-  \item{par}{Nuisance parameter values at the maximum.}
-}
-Additional fields depend on the optimization method used.
+An object of class \code{"svp_test"}: the optimizer output with
+  \code{pval} (maximized p-value; also available as \code{value}),
+  \code{par} (nuisance parameters at the maximum), \code{s0} (test
+  statistic from the observed data), \code{N}, \code{test_type},
+  \code{null_param} and \code{null_value}. Remaining fields depend on the
+  optimization method.
 }
 \description{
 Performs a Maximized Monte Carlo (MMC) test of the null hypothesis
