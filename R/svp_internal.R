@@ -766,7 +766,7 @@ correction_factor_ged_approx <- function(nu, n_nodes = 200L) {
                     errorType = errorType, nu_fixed = nu_fixed,
                     logNu = logNu, winsorize_eps = winsorize_eps,
                     innovations = innovations)
-  pval <- -((N + 1 - sum(s0 >= sN)) / (N + 1))
+  pval <- -((1 + sum(sN >= s0)) / (N + 1))
   return(pval)
 }
 
@@ -789,7 +789,7 @@ correction_factor_ged_approx <- function(nu, n_nodes = 200L) {
                  Amat, rho_type, del, wDecay = wDecay,
                  trunc_lev = trunc_lev, sigvMethod = sigvMethod,
                  innovations = innovations)
-  pval <- -((N + 1 - sum(s0 >= sN)) / (N + 1))
+  pval <- -((1 + sum(sN >= s0)) / (N + 1))
   return(pval)
 }
 
@@ -811,7 +811,7 @@ correction_factor_ged_approx <- function(nu, n_nodes = 200L) {
                       rho_type, del, Bartlett, wDecay = wDecay,
                       trunc_lev = trunc_lev, sigvMethod = sigvMethod,
                       innovations = innovations)
-  pval <- -((N + 1 - sum(s0 >= sN)) / (N + 1))
+  pval <- -((1 + sum(sN >= s0)) / (N + 1))
   return(pval)
 }
 
@@ -849,7 +849,7 @@ correction_factor_ged_approx <- function(nu, n_nodes = 200L) {
                           winsorize_eps = winsorize_eps,
                           innovations = innovations)
   }
-  pval <- -((N + 1 - sum(s0 >= sN)) / (N + 1))
+  pval <- -((1 + sum(sN >= s0)) / (N + 1))
   return(pval)
 }
 
@@ -887,7 +887,7 @@ correction_factor_ged_approx <- function(nu, n_nodes = 200L) {
                             winsorize_eps = winsorize_eps,
                             innovations = innovations)
   }
-  pval <- -((N + 1 - sum(s0 >= sN)) / (N + 1))
+  pval <- -((1 + sum(sN >= s0)) / (N + 1))
   return(pval)
 }
 
@@ -913,7 +913,7 @@ correction_factor_ged_approx <- function(nu, n_nodes = 200L) {
                    direction = direction,
                    innovations = innovations)
   if (direction == "two-sided") {
-    pval <- -((N + 1 - sum(s0 >= sN)) / (N + 1))
+    pval <- -((1 + sum(sN >= s0)) / (N + 1))
   } else {
     S_obs <- .signed_root(s0, mdl_alt$v, nu_null)
     pval <- -.pvalue_directional(S_obs, sN, direction)
@@ -943,7 +943,7 @@ correction_factor_ged_approx <- function(nu, n_nodes = 200L) {
                      direction = direction,
                      innovations = innovations)
   if (direction == "two-sided") {
-    pval <- -((N + 1 - sum(s0 >= sN)) / (N + 1))
+    pval <- -((1 + sum(sN >= s0)) / (N + 1))
   } else {
     S_obs <- .signed_root(s0, mdl_alt$v, nu_null)
     pval <- -.pvalue_directional(S_obs, sN, direction)
@@ -990,9 +990,11 @@ correction_factor_ged_approx <- function(nu, n_nodes = 200L) {
 
 # Generic MMC optimizer dispatch
 .run_mmc_optimizer <- function(method, theta_0, fn, lower, upper,
-                               threshold, maxit, ...) {
+                               threshold, maxit, ..., silence = FALSE) {
   if (!method %in% c("GenSA", "pso"))
     stop("method must be 'pso' or 'GenSA'.")
+  if (!is.logical(silence) || length(silence) != 1L || is.na(silence))
+    stop("'silence' must be TRUE or FALSE.", call. = FALSE)
   if (!requireNamespace(method, quietly = TRUE))
     stop("Package '", method, "' required. Install it or use method='",
          setdiff(c("pso", "GenSA"), method), "'.")
@@ -1014,14 +1016,16 @@ correction_factor_ged_approx <- function(nu, n_nodes = 200L) {
     out <- GenSA::GenSA(theta_0[free], fn_free,
                         lower = lower[free], upper = upper[free],
                         control = list(threshold.stop = -threshold,
-                                       max.call = maxit, verbose = TRUE),
+                                       max.call = maxit,
+                                       verbose = !silence),
                         ...)
   } else {
     out <- pso::psoptim(theta_0[free], fn_free,
                         lower = lower[free], upper = upper[free],
                         control = list(abstol = -threshold,
-                                       maxf = maxit, trace = 1,
-                                       REPORT = 1, trace.stats = TRUE),
+                                       maxf = maxit,
+                                       trace = as.integer(!silence),
+                                       REPORT = 1, trace.stats = !silence),
                         ...)
   }
   theta_full[free] <- out$par
@@ -1031,13 +1035,30 @@ correction_factor_ged_approx <- function(nu, n_nodes = 200L) {
 
 # --- GMM moment functions ---
 
-# Pseudo-inverse via SVD
-.pinv <- function(A, tol = .Machine$double.eps^0.5) {
-  s <- svd(A)
+# Inverse of a (HAC) covariance matrix for use as a GMM weighting matrix.
+# The matrix is scaled to unit diagonal before the SVD and unscaled after, so
+# the result does not depend on the units of the individual moments. For a
+# nonsingular matrix this is the ordinary inverse. Directions that are zero at
+# machine precision (singular value <= n * eps times the largest, in the scaled
+# matrix) are dropped with a warning; the result is then a generalised inverse
+# that is invariant to rescaling the moments (not the Moore-Penrose inverse).
+.pinv <- function(A, tol = nrow(A) * .Machine$double.eps) {
+  if (!is.matrix(A) || nrow(A) != ncol(A))
+    stop("'.pinv' needs a square matrix.", call. = FALSE)
+  n <- nrow(A)
+  dg <- diag(A)
+  D <- rep(1, n)
+  ok <- is.finite(dg) & dg > 0
+  D[ok] <- 1 / sqrt(dg[ok])
+  s <- svd(D * A * rep(D, each = n))
   d <- s$d
-  d[d > tol] <- 1 / d[d > tol]
-  d[d <= tol] <- 0
-  s$v %*% diag(d, nrow = length(d)) %*% t(s$u)
+  keep <- d > tol * max(d)
+  if (!all(keep))
+    warning("The weighting matrix is numerically singular: ", sum(!keep),
+            " direction(s) dropped.", call. = FALSE)
+  d[keep] <- 1 / d[keep]
+  d[!keep] <- 0
+  D * (s$v %*% (d * t(s$u))) * rep(D, each = n)
 }
 
 #' @keywords internal

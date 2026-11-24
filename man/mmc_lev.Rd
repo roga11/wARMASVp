@@ -24,7 +24,8 @@ mmc_lev(
   errorType = "Gaussian",
   logNu = FALSE,
   sigvMethod = "factored",
-  winsorize_eps = 0
+  winsorize_eps = 0,
+  silence = FALSE
 )
 }
 \arguments{
@@ -42,12 +43,15 @@ mmc_lev(
 
 \item{eps}{Numeric vector of non-negative half-widths of the search region
 around the estimated nuisance parameters. For Gaussian: length \code{p+2}
-(phi, sigma_y, sigma_v). For Student-t/GED: length \code{p+2}
-(phi, sigma_y, sigma_v; nu bounds set proportionally at +/-30%) or
-length \code{p+3} (phi, sigma_y, sigma_v, nu). Default \code{NULL}:
-\code{0.3} for every parameter except \eqn{\sigma_y}, which gets
-\code{0}, with proportional nu bounds. A zero entry holds that parameter
-at its estimate and leaves it out of the search.}
+(phi, sigma_y, sigma_v). For Student-t/GED: length \code{p+3}
+(phi, sigma_y, sigma_v, nu), or length \code{p+2} (phi, sigma_y,
+sigma_v), in which case nu gets the half-width \code{0.3}. Default
+\code{NULL}: \code{0.3} for every parameter except \eqn{\sigma_y}, which
+gets \code{0}. A zero entry holds that parameter at its estimate and
+leaves it out of the search. The exception is \code{errorType = "GED"}
+without HAC weighting: the statistic then depends on \eqn{\sigma_y}, so
+its default half-width is \code{0.3} as well; this is in the units of
+\code{y} and should be set to suit the scale of the data.}
 
 \item{threshold}{Numeric. Target p-value (optimization stops if reached).
 Default 1.}
@@ -88,6 +92,9 @@ Default \code{FALSE}.}
 
 \item{winsorize_eps}{Number of extreme autocovariance lags to winsorize
 (0 = none). Default 0.}
+
+\item{silence}{Logical. If \code{TRUE}, the optimizer prints no progress
+output. Default \code{FALSE}.}
 }
 \value{
 An object of class \code{"svp_test"}: the optimizer output with
@@ -95,7 +102,8 @@ An object of class \code{"svp_test"}: the optimizer output with
   \code{par} (nuisance parameters at the maximum), \code{s0} (test
   statistic from the observed data), \code{N}, \code{test_type},
   \code{null_param} and \code{null_value}. Remaining fields depend on the
-  optimization method.
+  optimization method; the per-iteration \code{stats} of
+  \code{method = "pso"} are returned only when \code{silence = FALSE}.
 }
 \description{
 Performs a Maximized Monte Carlo (MMC) test of the null hypothesis

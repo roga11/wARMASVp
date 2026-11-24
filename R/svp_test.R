@@ -78,6 +78,13 @@
 #' may be negative; this indicates evidence in favour of the null, and raises
 #' a warning.
 #'
+#' The null distribution is simulated without leverage, and for Student-t and
+#' GED errors with the shape parameter \eqn{\nu} held at its null estimate.
+#' The moment conditions involve neither in population (the autocovariances
+#' of \eqn{\log y_t^2} at lags \eqn{k \ge 1} do not depend on the leverage
+#' parameter or on \eqn{\nu}); in finite samples, holding them fixed is an
+#' approximation.
+#'
 #' @examples
 #' \donttest{
 #' y <- sim_svp(1000, phi = 0.95, sigy = 1, sigv = 0.2)$y
@@ -164,7 +171,7 @@ lmc_ar <- function(y, p_null, p_alt, J = 10, N = 99, burnin = 500,
                     del, wDecay, wt$use_hac, sigvMethod = sigvMethod,
                     errorType = errorType, nu_fixed = nu_fixed,
                     logNu = logNu, winsorize_eps = winsorize_eps)
-  pval <- (N + 1 - sum(s0 >= sN)) / (N + 1)
+  pval <- (1 + sum(sN >= s0)) / (N + 1)
   label_dist <- if (errorType == "Gaussian") "" else sprintf(" [%s]", errorType)
   test_label <- if (wt$use_hac) {
     sprintf("LMC AR Order Bartlett%s (p0=%d vs p=%d)", label_dist, p_null, p_alt)
@@ -245,13 +252,16 @@ lmc_ar <- function(y, p_null, p_alt, J = 10, N = 99, burnin = 500,
 #' @param method Character. Optimization method: \code{"pso"} or \code{"GenSA"}.
 #'   Default \code{"pso"}.
 #' @param maxit Integer. Maximum iterations/evaluations. Default depends on method.
+#' @param silence Logical. If \code{TRUE}, the optimizer prints no progress
+#'   output. Default \code{FALSE}.
 #'
 #' @return An object of class \code{"svp_test"}: the optimizer output with
 #'   \code{pval} (maximized p-value; also available as \code{value}),
 #'   \code{par} (nuisance parameters at the maximum), \code{s0} (test
 #'   statistic from the observed data), \code{N}, \code{test_type},
 #'   \code{null_param} and \code{null_value}. Remaining fields depend on the
-#'   optimization method.
+#'   optimization method; the per-iteration \code{stats} of
+#'   \code{method = "pso"} are returned only when \code{silence = FALSE}.
 #'
 #' @examples
 #' \donttest{
@@ -267,7 +277,7 @@ mmc_ar <- function(y, p_null, p_alt, J = 10, N = 99, burnin = 500,
                    del = 0, wDecay = FALSE, Bartlett = FALSE,
                    Amat = NULL, errorType = "Gaussian",
                    sigvMethod = "factored", logNu = TRUE,
-                   winsorize_eps = 0) {
+                   winsorize_eps = 0, silence = FALSE) {
   cl <- match.call()
   y_vec <- as.numeric(y)
   .validate_test_common(y_vec, J, N, burnin, del)
@@ -374,7 +384,7 @@ mmc_ar <- function(y, p_null, p_alt, J = 10, N = 99, burnin = 500,
   }
 
   out <- .run_mmc_optimizer(method, theta_0, .mmc_pval_ar, lower, upper,
-                            threshold, maxit,
+                            threshold, maxit, silence = silence,
                             y = y_vec, p_null = p_null, p_alt = p_alt,
                             j = J, N = N, s0 = s0, ini = burnin,
                             del = del, wDecay = wDecay, Bartlett = wt$use_hac,
@@ -576,7 +586,7 @@ lmc_lev <- function(y, p = 1, J = 10, N = 99, rho_null = 0,
     }
   }
   # Compute p-value
-  pval <- (N + 1 - sum(s0 >= sN)) / (N + 1)
+  pval <- (1 + sum(sN >= s0)) / (N + 1)
   test_label <- paste0("LMC Leverage (", errorType, ")")
   out <- list(s0 = s0, sN = as.numeric(sN), pval = pval,
               test_type = test_label,
@@ -596,12 +606,15 @@ lmc_lev <- function(y, p = 1, J = 10, N = 99, rho_null = 0,
 #' @inheritParams lmc_lev
 #' @param eps Numeric vector of non-negative half-widths of the search region
 #'   around the estimated nuisance parameters. For Gaussian: length \code{p+2}
-#'   (phi, sigma_y, sigma_v). For Student-t/GED: length \code{p+2}
-#'   (phi, sigma_y, sigma_v; nu bounds set proportionally at +/-30%) or
-#'   length \code{p+3} (phi, sigma_y, sigma_v, nu). Default \code{NULL}:
-#'   \code{0.3} for every parameter except \eqn{\sigma_y}, which gets
-#'   \code{0}, with proportional nu bounds. A zero entry holds that parameter
-#'   at its estimate and leaves it out of the search.
+#'   (phi, sigma_y, sigma_v). For Student-t/GED: length \code{p+3}
+#'   (phi, sigma_y, sigma_v, nu), or length \code{p+2} (phi, sigma_y,
+#'   sigma_v), in which case nu gets the half-width \code{0.3}. Default
+#'   \code{NULL}: \code{0.3} for every parameter except \eqn{\sigma_y}, which
+#'   gets \code{0}. A zero entry holds that parameter at its estimate and
+#'   leaves it out of the search. The exception is \code{errorType = "GED"}
+#'   without HAC weighting: the statistic then depends on \eqn{\sigma_y}, so
+#'   its default half-width is \code{0.3} as well; this is in the units of
+#'   \code{y} and should be set to suit the scale of the data.
 #' @param threshold Numeric. Target p-value (optimization stops if reached).
 #'   Default 1.
 #' @param method Character. Optimization method: \code{"pso"} (particle swarm),
@@ -609,13 +622,16 @@ lmc_lev <- function(y, p = 1, J = 10, N = 99, rho_null = 0,
 #'   Default \code{"pso"}.
 #' @param maxit Integer or list. Maximum iterations/evaluations for the
 #'   optimizer. Default depends on method.
+#' @param silence Logical. If \code{TRUE}, the optimizer prints no progress
+#'   output. Default \code{FALSE}.
 #'
 #' @return An object of class \code{"svp_test"}: the optimizer output with
 #'   \code{pval} (maximized p-value; also available as \code{value}),
 #'   \code{par} (nuisance parameters at the maximum), \code{s0} (test
 #'   statistic from the observed data), \code{N}, \code{test_type},
 #'   \code{null_param} and \code{null_value}. Remaining fields depend on the
-#'   optimization method.
+#'   optimization method; the per-iteration \code{stats} of
+#'   \code{method = "pso"} are returned only when \code{silence = FALSE}.
 #'
 #' @examples
 #' \donttest{
@@ -633,7 +649,7 @@ mmc_lev <- function(y, p = 1, J = 10, N = 99, rho_null = 0,
                     Bartlett = FALSE, Amat = NULL,
                     errorType = "Gaussian",
                     logNu = FALSE, sigvMethod = "factored",
-                    winsorize_eps = 0) {
+                    winsorize_eps = 0, silence = FALSE) {
   cl <- match.call()
   y_vec <- as.numeric(y)
   .validate_test_common(y_vec, J, N, burnin, del)
@@ -675,33 +691,26 @@ mmc_lev <- function(y, p = 1, J = 10, N = 99, rho_null = 0,
     n_mom <- p + 4
     nu_hat <- mdl_alt$v
     if (is.null(eps)) {
-      eps <- rep(0.3, p + 2)  # default eps for phi, sigy, sigv only; nu gets proportional bounds
-      eps[p + 1] <- 0  # sigma_y: test stat is scale-invariant, fixing avoids spurious optimization
+      eps <- rep(0.3, n_nuisance)
+      # sigma_y is held fixed because the statistic does not depend on it. The
+      # exception is the GED leverage test without HAC weighting: the leverage
+      # moment is in levels, the statistic scales with sigma_y^4, and sigma_y
+      # stays in the search (SVHT, sigma_y-invariance remark, Case 5).
+      if (!(errorType == "GED" && !wt$use_hac)) eps[p + 1] <- 0
     }
     .check_eps(eps)
-    if (length(eps) == n_nuisance) {
-      # User provided eps for all nuisance params including nu
-      eps_nu <- eps[n_nuisance]
-      eps <- eps[1:(p + 2)]
-      if (errorType == "Student-t") {
-        nu_lo <- max(2.01, nu_hat - eps_nu)
-        nu_hi <- min(500, nu_hat + eps_nu)
-      } else {
-        nu_lo <- max(0.1, nu_hat - eps_nu)
-        nu_hi <- min(20, nu_hat + eps_nu)
-      }
-    } else if (length(eps) == p + 2) {
-      # eps for phi, sigy, sigv only; nu bounds set proportionally
-      if (errorType == "Student-t") {
-        nu_lo <- max(2.01, nu_hat * 0.7)
-        nu_hi <- min(500, nu_hat * 1.3)
-      } else {
-        nu_lo <- max(0.1, nu_hat * 0.7)
-        nu_hi <- min(20, nu_hat * 1.3)
-      }
-    } else {
+    # A length p+2 eps covers phi, sigma_y, sigma_v; nu gets the default 0.3
+    if (length(eps) == p + 2) eps <- c(eps, 0.3)
+    if (length(eps) != n_nuisance)
       stop("eps must have length ", p + 2, " (phi, sigy, sigv) or ", n_nuisance,
            " (phi, sigy, sigv, nu) for heavy-tail leverage tests.")
+    eps_nu <- eps[n_nuisance]
+    if (errorType == "Student-t") {
+      nu_lo <- max(2.01, nu_hat - eps_nu)
+      nu_hi <- min(500, nu_hat + eps_nu)
+    } else {
+      nu_lo <- max(0.1, nu_hat - eps_nu)
+      nu_hi <- min(20, nu_hat + eps_nu)
     }
     lower <- c(pmax(theta_0[1:p] - eps[1:p], rep(-0.999, p)),
                max(theta_0[p + 1] - eps[p + 1], 0.01),
@@ -773,6 +782,7 @@ mmc_lev <- function(y, p = 1, J = 10, N = 99, rho_null = 0,
   opt_args <- list(method = method, theta_0 = theta_0, fn = pval_fn,
                    lower = lower, upper = upper,
                    threshold = threshold, maxit = maxit,
+                   silence = silence,
                    y = y_mat, j = J, N = N, s0 = s0_tmp,
                    mdl_alt = mdl_alt,
                    rho_null = rho_null, ini = burnin,
@@ -896,7 +906,7 @@ lmc_t <- function(y, p = 1, J = 10, N = 99, nu_null, burnin = 500,
                      Amat_mat, del, WAmat, Bartlett, logNu,
                      wDecay = wDecay, direction = "two-sided",
                      sigvMethod = sigvMethod, winsorize_eps = winsorize_eps)
-    pval <- (N + 1 - sum(s0 >= sN)) / (N + 1)
+    pval <- (1 + sum(sN >= s0)) / (N + 1)
     S_T <- NULL
   } else {
     S_T <- .signed_root(s0, mdl_alt$v, nu_null)
@@ -982,7 +992,7 @@ lmc_ged <- function(y, p = 1, J = 10, N = 99, nu_null, burnin = 500,
                        Amat_mat, del, WAmat, Bartlett, wDecay = wDecay,
                        direction = "two-sided",
                        sigvMethod = sigvMethod, winsorize_eps = winsorize_eps)
-    pval <- (N + 1 - sum(s0 >= sN)) / (N + 1)
+    pval <- (1 + sum(sN >= s0)) / (N + 1)
     S_T <- NULL
   } else {
     S_T <- .signed_root(s0, mdl_alt$v, nu_null)
@@ -1019,13 +1029,16 @@ lmc_ged <- function(y, p = 1, J = 10, N = 99, nu_null, burnin = 500,
 #' @param method Character. Optimization method: \code{"pso"} or \code{"GenSA"}.
 #'   Default \code{"pso"}.
 #' @param maxit Integer. Maximum iterations/evaluations. Default depends on method.
+#' @param silence Logical. If \code{TRUE}, the optimizer prints no progress
+#'   output. Default \code{FALSE}.
 #'
 #' @return An object of class \code{"svp_test"}: the optimizer output with
 #'   \code{pval} (maximized p-value; also available as \code{value}),
 #'   \code{par} (nuisance parameters at the maximum), \code{s0} (test
 #'   statistic from the observed data), \code{N}, \code{test_type},
 #'   \code{null_param} and \code{null_value}. Remaining fields depend on the
-#'   optimization method.
+#'   optimization method; the per-iteration \code{stats} of
+#'   \code{method = "pso"} are returned only when \code{silence = FALSE}.
 #'
 #' @examples
 #' \donttest{
@@ -1040,7 +1053,7 @@ mmc_t <- function(y, p = 1, J = 10, N = 99, nu_null, burnin = 500,
                   del = 0, wDecay = FALSE, Bartlett = FALSE,
                   Amat = NULL, logNu = TRUE,
                   direction = c("two-sided", "less", "greater"),
-                  sigvMethod = "factored", winsorize_eps = 0) {
+                  sigvMethod = "factored", winsorize_eps = 0, silence = FALSE) {
   direction <- match.arg(direction)
   cl <- match.call()
   y_vec <- as.numeric(y)
@@ -1103,7 +1116,7 @@ mmc_t <- function(y, p = 1, J = 10, N = 99, nu_null, burnin = 500,
     innov_t$eps[, b] <- rt(n_total, df = nu_null)
   }
   out <- .run_mmc_optimizer(method, theta_0, .mmc_pval_t, lower, upper,
-                            threshold, maxit,
+                            threshold, maxit, silence = silence,
                             y = y_mat, j = J, N = N, s0 = s0_tmp,
                             mdl_alt = mdl_alt,
                             nu_null = nu_null, ini = burnin, Amat = Amat_mat,
@@ -1143,13 +1156,16 @@ mmc_t <- function(y, p = 1, J = 10, N = 99, nu_null, burnin = 500,
 #' @param method Character. Optimization method: \code{"pso"} or \code{"GenSA"}.
 #'   Default \code{"pso"}.
 #' @param maxit Integer. Maximum iterations/evaluations. Default depends on method.
+#' @param silence Logical. If \code{TRUE}, the optimizer prints no progress
+#'   output. Default \code{FALSE}.
 #'
 #' @return An object of class \code{"svp_test"}: the optimizer output with
 #'   \code{pval} (maximized p-value; also available as \code{value}),
 #'   \code{par} (nuisance parameters at the maximum), \code{s0} (test
 #'   statistic from the observed data), \code{N}, \code{test_type},
 #'   \code{null_param} and \code{null_value}. Remaining fields depend on the
-#'   optimization method.
+#'   optimization method; the per-iteration \code{stats} of
+#'   \code{method = "pso"} are returned only when \code{silence = FALSE}.
 #'
 #' @examples
 #' \donttest{
@@ -1164,7 +1180,8 @@ mmc_ged <- function(y, p = 1, J = 10, N = 99, nu_null, burnin = 500,
                     del = 0, wDecay = FALSE, Bartlett = FALSE,
                     Amat = NULL,
                     direction = c("two-sided", "less", "greater"),
-                    sigvMethod = "factored", winsorize_eps = 0) {
+                    sigvMethod = "factored", winsorize_eps = 0,
+                    silence = FALSE) {
   direction <- match.arg(direction)
   cl <- match.call()
   y_vec <- as.numeric(y)
@@ -1229,7 +1246,7 @@ mmc_ged <- function(y, p = 1, J = 10, N = 99, nu_null, burnin = 500,
     innov_ged$eps[, b] <- sign(runif(n_total) - 0.5) * a_ged * x_gam^(1 / nu_null)
   }
   out <- .run_mmc_optimizer(method, theta_0, .mmc_pval_ged, lower, upper,
-                            threshold, maxit,
+                            threshold, maxit, silence = silence,
                             y = y_mat, j = J, N = N, s0 = s0_tmp,
                             mdl_alt = mdl_alt,
                             nu_null = nu_null, ini = burnin, Amat = Amat_mat,

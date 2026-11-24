@@ -22,7 +22,8 @@ mmc_t(
   logNu = TRUE,
   direction = c("two-sided", "less", "greater"),
   sigvMethod = "factored",
-  winsorize_eps = 0
+  winsorize_eps = 0,
+  silence = FALSE
 )
 }
 \arguments{
@@ -75,6 +76,9 @@ Uses signed root of the LR statistic for one-sided tests.}
 
 \item{winsorize_eps}{Numeric. Winsorization threshold for moment conditions.
 Default 0 (no winsorization).}
+
+\item{silence}{Logical. If \code{TRUE}, the optimizer prints no progress
+output. Default \code{FALSE}.}
 }
 \value{
 An object of class \code{"svp_test"}: the optimizer output with
@@ -82,7 +86,8 @@ An object of class \code{"svp_test"}: the optimizer output with
   \code{par} (nuisance parameters at the maximum), \code{s0} (test
   statistic from the observed data), \code{N}, \code{test_type},
   \code{null_param} and \code{null_value}. Remaining fields depend on the
-  optimization method.
+  optimization method; the per-iteration \code{stats} of
+  \code{method = "pso"} are returned only when \code{silence = FALSE}.
 }
 \description{
 Performs a Maximized Monte Carlo (MMC) test of \eqn{H_0: \nu = \nu_0}

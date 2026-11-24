@@ -22,7 +22,8 @@ mmc_ar(
   errorType = "Gaussian",
   sigvMethod = "factored",
   logNu = TRUE,
-  winsorize_eps = 0
+  winsorize_eps = 0,
+  silence = FALSE
 )
 }
 \arguments{
@@ -79,6 +80,9 @@ only). Default \code{TRUE}.}
 
 \item{winsorize_eps}{Number of extreme autocovariance lags to winsorize
 (heavy-tail only). Default 0.}
+
+\item{silence}{Logical. If \code{TRUE}, the optimizer prints no progress
+output. Default \code{FALSE}.}
 }
 \value{
 An object of class \code{"svp_test"}: the optimizer output with
@@ -86,7 +90,8 @@ An object of class \code{"svp_test"}: the optimizer output with
   \code{par} (nuisance parameters at the maximum), \code{s0} (test
   statistic from the observed data), \code{N}, \code{test_type},
   \code{null_param} and \code{null_value}. Remaining fields depend on the
-  optimization method.
+  optimization method; the per-iteration \code{stats} of
+  \code{method = "pso"} are returned only when \code{silence = FALSE}.
 }
 \description{
 Performs a Maximized Monte Carlo (MMC) test of
@@ -106,6 +111,13 @@ GMM criterion evaluated at the null and alternative estimates. Because the
 criteria are moment-based rather than maximized likelihoods, the statistic
 may be negative; this indicates evidence in favour of the null, and raises
 a warning.
+
+The null distribution is simulated without leverage, and for Student-t and
+GED errors with the shape parameter \eqn{\nu} held at its null estimate.
+The moment conditions involve neither in population (the autocovariances
+of \eqn{\log y_t^2} at lags \eqn{k \ge 1} do not depend on the leverage
+parameter or on \eqn{\nu}); in finite samples, holding them fixed is an
+approximation.
 }
 \section{Nuisance parameters and the role of nu}{
 

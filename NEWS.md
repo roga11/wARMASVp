@@ -44,6 +44,46 @@
 
 ## Bug fixes
 
+* **Inverse of the HAC weighting matrix (`Amat = "Weighted"` / `Bartlett =
+  TRUE`).** The internal inverse had two faults. Singular values were
+  inverted before the truncation rule was applied, so any direction with a
+  singular value above about `6.7e7` was set to zero instead of inverted; and
+  the truncation threshold was an absolute `1.5e-8`, so directions of a
+  well-conditioned matrix were discarded whenever its entries were small. Both
+  depend on the units of the moment conditions, and therefore on the scale of
+  `y`: the weighted GED leverage statistic of `lmc_lev()` / `mmc_lev()` was
+  wrong for data on a small or a large scale, and weighted statistics
+  could lose an informative direction at high persistence. The matrix is now
+  scaled to unit diagonal before the decomposition and unscaled afterwards,
+  and only directions that are zero at machine precision relative to the
+  largest are dropped, with a warning. Weighted statistics are now invariant
+  to the scale of `y`.
+
+* **Monte Carlo p-value with ties.** The right-tailed p-value of all `lmc_*`
+  and `mmc_*` tests is now `(1 + #{S_i >= S_0}) / (N + 1)` (Dufour, 2006,
+  eq. 2.16). The previous form counted only `S_i > S_0`, so simulated
+  statistics equal to the observed one lowered the p-value. Ties occur when
+  the observed statistic is at the `1e-10` floor or when `nu_null` is at the
+  bound of the estimator; the two forms are identical otherwise. The
+  directional (`"less"` / `"greater"`) p-values already included ties.
+
+* **`mmc_lev()` search region for Student-t and GED.** Two faults in the
+  default region. (i) The bounds on `nu` were set as a proportion of the
+  estimate (plus or minus 30%) whenever `eps` was `NULL` or of length `p+2`,
+  instead of a fixed half-width as for the other parameters; `nu` now gets the
+  fixed half-width `0.3` in those cases (a length `p+3` `eps` sets it
+  explicitly, as before). (ii) `sigma_y` was held fixed for every error type
+  and weighting, but the GED leverage statistic without HAC weighting depends
+  on `sigma_y`; in that case its default half-width is now `0.3`. That value
+  is in the units of `y` and should be set through `eps` to suit the scale of
+  the data.
+
+* **`mmc_ar()`, `mmc_lev()`, `mmc_t()` and `mmc_ged()` gain `silence`.** The
+  optimizer's progress output could not be turned off. `silence = TRUE`
+  suppresses it for both `"pso"` and `"GenSA"`; the default `FALSE` prints as
+  before. With `method = "pso"` the per-iteration `stats` element is returned
+  only when `silence = FALSE`.
+
 * **`method = "GenSA"` works again in all `mmc_*` tests.** With the default
   `eps` the half-width of `sigma_y` is zero, and GenSA stopped with "Lower and
   upper bounds are not consistent". Nuisance parameters with a zero half-width
@@ -227,9 +267,9 @@
 
   Capping was also mildly anti-conservative. It placed a point mass at
   `1e-10` (measured: 71% of draws on a Gaussian SV(1) DGP with `T = 1000`,
-  `p_null = 1` vs `p_alt = 2`), and the right-tailed Monte Carlo p-value
-  `(N + 1 - #{s0 >= sN})/(N + 1)` is algebraically `(1 + #{sN > s0})/(N + 1)`,
-  which *excludes* ties from the numerator. When the observed statistic also
+  `p_null = 1` vs `p_alt = 2`), and the right-tailed Monte Carlo p-value then in
+  use, `(1 + #{sN > s0})/(N + 1)`, *excluded* ties from the numerator (see the
+  p-value entry above). When the observed statistic also
   sat at the cap, the p-value was pulled down. On the example above the same
   simulated draws give `p = 0.24` capped versus `p = 0.79` uncapped; the latter
   is correct, since a negative observed statistic is evidence *for* the null.

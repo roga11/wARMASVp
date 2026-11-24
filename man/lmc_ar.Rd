@@ -92,6 +92,13 @@ GMM criterion evaluated at the null and alternative estimates. Because the
 criteria are moment-based rather than maximized likelihoods, the statistic
 may be negative; this indicates evidence in favour of the null, and raises
 a warning.
+
+The null distribution is simulated without leverage, and for Student-t and
+GED errors with the shape parameter \eqn{\nu} held at its null estimate.
+The moment conditions involve neither in population (the autocovariances
+of \eqn{\log y_t^2} at lags \eqn{k \ge 1} do not depend on the leverage
+parameter or on \eqn{\nu}); in finite samples, holding them fixed is an
+approximation.
 }
 \examples{
 \donttest{
