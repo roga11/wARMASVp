@@ -78,12 +78,12 @@
 #' may be negative; this indicates evidence in favour of the null, and raises
 #' a warning.
 #'
-#' The null distribution is simulated without leverage, and for Student-t and
-#' GED errors with the shape parameter \eqn{\nu} held at its null estimate.
-#' The moment conditions involve neither in population (the autocovariances
-#' of \eqn{\log y_t^2} at lags \eqn{k \ge 1} do not depend on the leverage
-#' parameter or on \eqn{\nu}); in finite samples, holding them fixed is an
-#' approximation.
+#' The null distribution is simulated without leverage. The moment conditions
+#' do not involve the leverage parameter in population (the autocovariances
+#' of \eqn{\log y_t^2} at lags \eqn{k \ge 1} do not depend on it); in finite
+#' samples this is an approximation. For Student-t and GED errors,
+#' \code{lmc_ar} simulates at the null estimate of the shape parameter
+#' \eqn{\nu}, and \code{mmc_ar} searches over \eqn{\nu}.
 #'
 #' @examples
 #' \donttest{
@@ -165,11 +165,11 @@ lmc_ar <- function(y, p_null, p_alt, J = 10, N = 99, burnin = 500,
                       mdl_null_est$v)
   }
 
-  # Simulate null distribution (nu fixed at null MLE for heavy-tail innovation draws)
-  nu_fixed <- if (errorType == "Gaussian") NA_real_ else mdl_null_est$v
+  # Simulate null distribution (heavy-tail innovations drawn at the null estimate of nu)
+  nu_sim <- if (errorType == "Gaussian") NA_real_ else mdl_null_est$v
   sN <- .simnull_ar(betasim_null, p_null, p_alt, J, Tsize, N, burnin,
                     del, wDecay, wt$use_hac, sigvMethod = sigvMethod,
-                    errorType = errorType, nu_fixed = nu_fixed,
+                    errorType = errorType, nu_sim = nu_sim,
                     logNu = logNu, winsorize_eps = winsorize_eps)
   pval <- (1 + sum(sN >= s0)) / (N + 1)
   label_dist <- if (errorType == "Gaussian") "" else sprintf(" [%s]", errorType)
@@ -194,60 +194,44 @@ lmc_ar <- function(y, p_null, p_alt, J = 10, N = 99, burnin = 500,
 #' Performs a Maximized Monte Carlo (MMC) test of
 #' \eqn{H_0: \phi_{p_0+1} = \cdots = \phi_p = 0}
 #' by maximizing the MC p-value over nuisance parameters
-#' (\eqn{\phi_1, \ldots, \phi_{p_0}, \sigma_y, \sigma_v}).
+#' (\eqn{\phi_1, \ldots, \phi_{p_0}, \sigma_y, \sigma_v}, and \eqn{\nu} for
+#' Student-t and GED errors).
 #'
 #' @inheritParams lmc_ar
 #' @inherit lmc_ar details
 #'
-#' @section Nuisance parameters and the role of nu:
-#' For \code{mmc_ar}, the maximization runs over
-#' \eqn{(\phi_1,\ldots,\phi_{p_0}, \sigma_y, \sigma_v)}. The shape parameter
-#' \eqn{\nu} is held fixed at its null estimate and is not varied, and
-#' \eqn{\sigma_y} is present but given a zero half-width by default.
+#' @section Nuisance parameters:
+#' The maximization runs over
+#' \eqn{(\phi_1,\ldots,\phi_{p_0}, \sigma_y, \sigma_v)}, and for Student-t and
+#' GED errors also over the shape parameter \eqn{\nu}. \eqn{\sigma_y} is given
+#' a zero half-width by default because the statistic does not depend on the
+#' scale of the data.
 #'
-#' The reason for excluding \eqn{\nu} is a property of the moment conditions
-#' rather than a computational shortcut. Writing the linearized model as
-#' \eqn{y^*_t = \log(y_t^2) - \mu = h_t + x_t}, with \eqn{h_t} the AR(\eqn{p})
-#' log-volatility state and \eqn{x_t} an i.i.d. measurement error independent
-#' of \eqn{h}, the autocovariances separate as
+#' In population the moment conditions do not involve \eqn{\nu}. Writing the
+#' linearized model as \eqn{y^*_t = \log(y_t^2) - \mu = h_t + x_t}, with
+#' \eqn{h_t} the AR(\eqn{p}) log-volatility state and \eqn{x_t} an i.i.d.
+#' measurement error independent of \eqn{h}, the autocovariances separate as
 #' \deqn{\gamma_{y^*}(0) = \gamma_h(0) + \sigma_\varepsilon^2(\nu), \qquad
-#'       \gamma_{y^*}(k) = \gamma_h(k) \;\; (k \ge 1).}
-#' The error distribution enters only through \eqn{\sigma_\varepsilon^2(\nu)}
-#' (\eqn{\pi^2/2} for Gaussian, \eqn{\psi'(1/2) + \psi'(\nu/2)} for
-#' Student-t, \eqn{(2/\nu)^2 \psi'(1/\nu)} for GED), and that term appears at
-#' lag zero only.
-#'
-#' The AR-order moment conditions are the Yule-Walker equations
+#'       \gamma_{y^*}(k) = \gamma_h(k) \;\; (k \ge 1),}
+#' and the Yule-Walker conditions
 #' \deqn{m_j = \gamma_{y^*}(p+j) - \sum_{i=1}^{p} \phi_i\,\gamma_{y^*}(p+j-i),
 #'       \qquad j = 1,\ldots,p,}
-#' whose smallest lag is \eqn{p+j-p = j \ge 1}. Lag zero never appears, so the
-#' conditions do not involve \eqn{\nu}. Since \eqn{\gamma_h(k) = \sigma_v^2
-#' c_k(\boldsymbol\phi)}, they are also homogeneous in \eqn{\sigma_v^2}, which
-#' cancels; in population they depend on \eqn{\boldsymbol\phi} alone.
+#' use lags \eqn{k \ge 1} only. In finite samples the distribution of the
+#' statistic can still depend on \eqn{\nu}, through the sampling variability
+#' of the estimated autocovariances, so \eqn{\nu} is searched over. Setting its
+#' half-width to zero holds it at the null estimate.
 #'
-#' What \eqn{\nu} still influences is the sampling variability of the estimated
-#' autocovariances, through the signal-to-noise ratio
-#' \eqn{\gamma_h(0)/\sigma_\varepsilon^2(\nu)}. In that ratio \eqn{\sigma_v}
-#' and \eqn{\nu} appear only as \eqn{\sigma_v^2/\sigma_\varepsilon^2(\nu)}, so
-#' varying \eqn{\sigma_v} over its interval already traverses the same family
-#' of null distributions that varying \eqn{\nu} would; the two are redundant.
-#' This covers the second-moment behaviour exactly. It does not cover the
-#' fourth moment of \eqn{x_t}, which depends on \eqn{\nu} beyond
-#' \eqn{\sigma_\varepsilon^2}, so the redundancy is exact in population and
-#' approximate in finite samples.
-#'
-#' This reasoning is specific to the AR-order test. In \code{mmc_t} and
-#' \code{mmc_ged}, \eqn{\nu} is the parameter under test and is fixed at the
-#' hypothesized value by construction. In \code{mmc_lev}, \eqn{\nu} enters the
-#' leverage moment condition directly through the correction factor, not only
-#' at lag zero, and is therefore carried as a varied nuisance.
-
 #' @param eps Numeric vector of non-negative half-widths of the search region
-#'   around the estimated nuisance parameters. Must have length
-#'   \code{p_null+2} (one entry per nuisance parameter:
-#'   \eqn{\phi_1,\ldots,\phi_{p_0}, \sigma_y, \sigma_v}). Default: \code{0.3} for
-#'   every parameter except \eqn{\sigma_y}, which gets \code{0}. A zero entry
-#'   holds that parameter at its estimate and leaves it out of the search.
+#'   around the estimated nuisance parameters. For Gaussian errors it must
+#'   have length \code{p_null+2} (one entry per nuisance parameter:
+#'   \eqn{\phi_1,\ldots,\phi_{p_0}, \sigma_y, \sigma_v}). For Student-t and GED
+#'   errors it may have length \code{p_null+2}, in which case \eqn{\nu} gets
+#'   half-width \code{0.3}, or \code{p_null+3}, with the last entry the
+#'   half-width for \eqn{\nu}. The bounds for \eqn{\nu} are truncated to
+#'   \eqn{[2.01, 500]} (Student-t) or \eqn{[0.1, 20]} (GED). Default:
+#'   \code{0.3} for every parameter except \eqn{\sigma_y}, which gets \code{0}.
+#'   A zero entry holds that parameter at its estimate and leaves it out of
+#'   the search.
 #' @param threshold Numeric. Target p-value. Default 1.
 #' @param method Character. Optimization method: \code{"pso"} or \code{"GenSA"}.
 #'   Default \code{"pso"}.
@@ -296,7 +280,7 @@ mmc_ar <- function(y, p_null, p_alt, J = 10, N = 99, burnin = 500,
                    wDecay = wDecay, sigvMethod = sigvMethod)
     mdl_null_est <- svp(y_vec, p = p_null, J = J, leverage = FALSE, del = del,
                         wDecay = wDecay, sigvMethod = sigvMethod)
-    nu_fixed <- NA_real_
+    nu_hat <- NULL
   } else {
     mdl_alt <- svp(y_vec, p = p_alt, J = J, leverage = FALSE,
                    errorType = errorType, del = del, wDecay = wDecay,
@@ -306,24 +290,26 @@ mmc_ar <- function(y, p_null, p_alt, J = 10, N = 99, burnin = 500,
                         errorType = errorType, del = del, wDecay = wDecay,
                         logNu = logNu, sigvMethod = sigvMethod,
                         winsorize_eps = winsorize_eps)
-    # nu held fixed at null MLE during optimization (not a varied nuisance for AR test)
-    # The AR-order moment conditions use only autocovariances of log(y^2) at
-    # lags >= 1, and nu enters the model solely through sigma_eps^2(nu), which
-    # affects lag 0 alone. The conditions are therefore free of nu. See the
-    # Details section of lmc_ar() for the argument.
-    nu_fixed <- mdl_null_est$v
+    nu_hat <- mdl_null_est$v
   }
 
-  theta_0 <- c(mdl_null_est$phi, mdl_null_est$sigy, mdl_null_est$sigv)
-  n_nuisance <- p_null + 2
+  # Nuisance parameters: phi_1,...,phi_p_null, sigma_y, sigma_v, and nu for
+  # Student-t and GED errors
+  heavy <- errorType != "Gaussian"
+  theta_0 <- c(mdl_null_est$phi, mdl_null_est$sigy, mdl_null_est$sigv, nu_hat)
+  n_nuisance <- length(theta_0)
   if (is.null(eps)) {
     eps <- rep(0.3, n_nuisance)
     eps[p_null + 1] <- 0  # sigma_y: test stat is scale-invariant, fixing avoids spurious optimization
   }
   .check_eps(eps)
+  # A length p_null+2 eps covers phi, sigma_y, sigma_v; nu gets the default 0.3
+  if (heavy && length(eps) == p_null + 2) eps <- c(eps, 0.3)
   if (length(eps) != n_nuisance)
-    stop("eps must have length ", n_nuisance,
-         " (p_null+2: one entry per nuisance parameter phi_1,...,phi_p_null, sigma_y, sigma_v).")
+    stop("eps must have length p_null+2",
+         if (heavy) " or p_null+3" else "",
+         " (one entry per nuisance parameter phi_1,...,phi_p_null, sigma_y, sigma_v",
+         if (heavy) ", and optionally nu" else "", ").")
   # Bounds for nuisance parameters
   lower <- c(pmax(theta_0[1:p_null] - eps[1:p_null], rep(-0.999, p_null)),
              max(theta_0[p_null + 1] - eps[p_null + 1], 0.01),
@@ -331,6 +317,12 @@ mmc_ar <- function(y, p_null, p_alt, J = 10, N = 99, burnin = 500,
   upper <- c(pmin(theta_0[1:p_null] + eps[1:p_null], rep(0.999, p_null)),
              theta_0[p_null + 1] + eps[p_null + 1],
              theta_0[p_null + 2] + eps[p_null + 2])
+  if (heavy) {
+    eps_nu <- eps[p_null + 3]
+    nu_range <- if (errorType == "Student-t") c(2.01, 500) else c(0.1, 20)
+    lower <- c(lower, max(nu_range[1], nu_hat - eps_nu))
+    upper <- c(upper, min(nu_range[2], nu_hat + eps_nu))
+  }
 
   # Observed test statistic (computed once, kept fixed during optimization per Dufour 2006 eq 4.22)
   y_mat <- as.matrix(y_vec)
@@ -370,16 +362,16 @@ mmc_ar <- function(y, p_null, p_alt, J = 10, N = 99, burnin = 500,
       eps = matrix(rnorm(n_total * N_draw), nrow = n_total, ncol = N_draw)
     )
   } else if (errorType == "Student-t") {
+    # nu is searched over: draws that do not depend on nu (as in mmc_lev)
     innov_ar <- list(
-      eta = matrix(rnorm(n_total * N_draw), nrow = n_total, ncol = N_draw),
-      eps = matrix(rt(n_total * N_draw, df = nu_fixed),
-                   nrow = n_total, ncol = N_draw)
+      zeta   = matrix(rnorm(n_total * N_draw), nrow = n_total, ncol = N_draw),
+      aux    = matrix(rnorm(n_total * N_draw), nrow = n_total, ncol = N_draw),
+      U_chi2 = matrix(runif(n_total * N_draw), nrow = n_total, ncol = N_draw)
     )
   } else {  # GED
     innov_ar <- list(
-      eta = matrix(rnorm(n_total * N_draw), nrow = n_total, ncol = N_draw),
-      eps = matrix(rged_cpp(n_total * N_draw, 0, 1, nu_fixed),
-                   nrow = n_total, ncol = N_draw)
+      zeta = matrix(rnorm(n_total * N_draw), nrow = n_total, ncol = N_draw),
+      aux  = matrix(rnorm(n_total * N_draw), nrow = n_total, ncol = N_draw)
     )
   }
 
@@ -390,7 +382,6 @@ mmc_ar <- function(y, p_null, p_alt, J = 10, N = 99, burnin = 500,
                             del = del, wDecay = wDecay, Bartlett = wt$use_hac,
                             sigvMethod = sigvMethod,
                             errorType = errorType,
-                            nu_fixed = nu_fixed,
                             logNu = logNu,
                             winsorize_eps = winsorize_eps,
                             innovations = innov_ar)

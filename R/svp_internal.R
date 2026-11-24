@@ -748,7 +748,6 @@ correction_factor_ged_approx <- function(nu, n_nodes = 200L) {
                          del = 0, wDecay = FALSE, Bartlett = FALSE,
                          sigvMethod = "factored",
                          errorType = "Gaussian",
-                         nu_fixed = NA_real_,
                          logNu = TRUE,
                          winsorize_eps = 0,
                          innovations = NULL) {
@@ -756,14 +755,19 @@ correction_factor_ged_approx <- function(nu, n_nodes = 200L) {
   phi_null <- theta[1:p_null]
   sigy_null <- theta[p_null + 1]
   sigv_null <- theta[p_null + 2]
+  # theta = (phi_1,...,phi_p_null, sigy, sigv) for Gaussian errors, with nu
+  # appended for Student-t and GED
+  nu_null <- if (errorType == "Gaussian") NA_real_ else theta[p_null + 3]
+  nu_ok <- switch(errorType, "Gaussian" = TRUE,
+                  "Student-t" = nu_null > 2, "GED" = nu_null > 0)
   stationary <- all(Mod(polyroot(c(1, -phi_null))) > 1)
-  if (!stationary || sigy_null <= 0 || sigv_null <= 0) {
+  if (!stationary || sigy_null <= 0 || sigv_null <= 0 || !nu_ok) {
     return(9999999999999)
   }
   betasim_null <- c(phi_null, sigy_null, sigv_null)
   sN <- .simnull_ar(betasim_null, p_null, p_alt, j, Tsize, N, ini,
                     del, wDecay, Bartlett, sigvMethod = sigvMethod,
-                    errorType = errorType, nu_fixed = nu_fixed,
+                    errorType = errorType, nu_sim = nu_null,
                     logNu = logNu, winsorize_eps = winsorize_eps,
                     innovations = innovations)
   pval <- -((1 + sum(sN >= s0)) / (N + 1))
@@ -1141,7 +1145,7 @@ LRT_moment_lev_ged_Amat <- function(y, mdl_out, rho_type, del = 0,
                         del = 0, wDecay = FALSE, Bartlett = FALSE,
                         sigvMethod = "factored",
                         errorType = "Gaussian",
-                        nu_fixed = NA_real_,
+                        nu_sim = NA_real_,
                         logNu = TRUE,
                         winsorize_eps = 0,
                         innovations = NULL) {
@@ -1158,30 +1162,61 @@ LRT_moment_lev_ged_Amat <- function(y, mdl_out, rho_type, del = 0,
       eps = if (errorType == "Gaussian") {
         matrix(rnorm(n_total * N_draw), nrow = n_total, ncol = N_draw)
       } else if (errorType == "Student-t") {
-        matrix(rt(n_total * N_draw, df = nu_fixed), nrow = n_total, ncol = N_draw)
+        matrix(rt(n_total * N_draw, df = nu_sim), nrow = n_total, ncol = N_draw)
       } else {  # GED
-        matrix(rged_cpp(n_total * N_draw, 0, 1, nu_fixed), nrow = n_total, ncol = N_draw)
+        matrix(rged_cpp(n_total * N_draw, 0, 1, nu_sim), nrow = n_total, ncol = N_draw)
       }
     )
   }
+  # The innovations come in one of two forms.
+  #   (eta, eps): eps is already drawn from the error distribution. Used by
+  #     lmc_ar, and by mmc_ar for Gaussian errors.
+  #   (zeta, aux[, U_chi2]): standard normal (and uniform) draws from which the
+  #     errors are built at nu_sim. Used by mmc_ar for Student-t and GED errors,
+  #     where nu is searched over and the same draws must serve every nu.
+  nu_free <- !is.null(innovations$zeta)
 
   # Helper closures for distribution-specific simulation, fitting, and stat computation
-  sim_one <- function(eta_vec, eps_vec) {
-    if (errorType == "Gaussian") {
+  sim_one <- function(d) {
+    if (nu_free && errorType == "Student-t") {
+      sim_from_innov_t_lev_cpp(phi = phi_sim, sigma_y = sigy_sim,
+                               sigma_v = sigv_sim, nu = nu_sim, rho = 0,
+                               zeta_vec = d$zeta, aux_vec = d$aux,
+                               U_chi2_vec = d$U_chi2,
+                               p = p_null, T_out = Tsize, burnin = ini)
+    } else if (nu_free) {  # GED
+      sim_from_innov_ged_lev_cpp(phi = phi_sim, sigma_y = sigy_sim,
+                                 sigma_v = sigv_sim, nu = nu_sim, rho = 0,
+                                 zeta_vec = d$zeta, aux_vec = d$aux,
+                                 p = p_null, T_out = Tsize, burnin = ini)
+    } else if (errorType == "Gaussian") {
       sim_from_innov_gaussian_cpp(phi = phi_sim, sigma_y = sigy_sim,
                                   sigma_v = sigv_sim,
-                                  eta_vec = eta_vec, eps_vec = eps_vec,
+                                  eta_vec = d$eta, eps_vec = d$eps,
                                   p = p_null, T_out = Tsize, burnin = ini)
     } else if (errorType == "Student-t") {
       sim_from_innov_t_cpp(phi = phi_sim, sigma_y = sigy_sim,
                            sigma_v = sigv_sim,
-                           eta_vec = eta_vec, eps_vec = eps_vec,
+                           eta_vec = d$eta, eps_vec = d$eps,
                            p = p_null, T_out = Tsize, burnin = ini)
     } else {
       sim_from_innov_ged_cpp(phi = phi_sim, sigma_y = sigy_sim,
                              sigma_v = sigv_sim,
-                             eta_vec = eta_vec, eps_vec = eps_vec,
+                             eta_vec = d$eta, eps_vec = d$eps,
                              p = p_null, T_out = Tsize, burnin = ini)
+    }
+  }
+  # One fresh set of draws, in the same form as `innovations`
+  draw_one <- function() {
+    if (nu_free) {
+      d <- list(zeta = rnorm(n_total), aux = rnorm(n_total))
+      if (errorType == "Student-t") d$U_chi2 <- runif(n_total)
+      d
+    } else {
+      list(eta = rnorm(n_total),
+           eps = if (errorType == "Gaussian") rnorm(n_total)
+                 else if (errorType == "Student-t") rt(n_total, df = nu_sim)
+                 else rged_cpp(n_total, 0, 1, nu_sim))
     }
   }
   fit_one <- function(u, p_use) {
@@ -1216,32 +1251,12 @@ LRT_moment_lev_ged_Amat <- function(y, mdl_out, rho_type, del = 0,
   sN <- numeric(N)
   xn <- 1
   b <- 1
-  while (xn <= N && b <= ncol(innovations$eta)) {
-    u <- as.numeric(sim_one(innovations$eta[, b], innovations$eps[, b]))
-    mdl_alt_tmp <- tryCatch(fit_one(u, p_alt), error = function(e) NULL)
-    b <- b + 1
-    if (is.null(mdl_alt_tmp) || isTRUE(mdl_alt_tmp$nonstationary_ind)) next
-    if (isTRUE(Bartlett)) {
-      mdl_null_tmp <- tryCatch(fit_one(u, p_null), error = function(e) NULL)
-      if (is.null(mdl_null_tmp) || isTRUE(mdl_null_tmp$nonstationary_ind)) next
-      stat <- tryCatch(stat_bartlett(u, mdl_null_tmp, mdl_alt_tmp),
-                       error = function(e) NA_real_)
-      if (is.na(stat)) next
-      # Not capped -- see lmc_ar.
-      sN[xn] <- stat
-    } else {
-      phi_extra <- mdl_alt_tmp$phi[(p_null + 1):p_alt]
-      sN[xn] <- Tsize * sum(phi_extra^2)
-    }
-    xn <- xn + 1
-  }
-  # Fallback: draw fresh innovations if pre-drawn pool exhausted
+  n_pool <- ncol(innovations[[1]])
+  # Pre-drawn pool first; fresh draws only if the pool is exhausted
   while (xn <= N) {
-    eta_extra <- rnorm(n_total)
-    eps_extra <- if (errorType == "Gaussian") rnorm(n_total)
-                 else if (errorType == "Student-t") rt(n_total, df = nu_fixed)
-                 else rged_cpp(n_total, 0, 1, nu_fixed)
-    u <- as.numeric(sim_one(eta_extra, eps_extra))
+    d <- if (b <= n_pool) lapply(innovations, function(m) m[, b]) else draw_one()
+    b <- b + 1
+    u <- as.numeric(sim_one(d))
     mdl_alt_tmp <- tryCatch(fit_one(u, p_alt), error = function(e) NULL)
     if (is.null(mdl_alt_tmp) || isTRUE(mdl_alt_tmp$nonstationary_ind)) next
     if (isTRUE(Bartlett)) {

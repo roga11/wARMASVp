@@ -78,6 +78,15 @@
   is in the units of `y` and should be set through `eps` to suit the scale of
   the data.
 
+* **`mmc_ar()` with Student-t or GED errors now maximizes over the shape
+  parameter.** The p-value was maximized over the AR coefficients and
+  `sigma_v` only, with `nu` held at its null estimate. `nu` is now part of the
+  search, as in `mmc_lev()`. `eps` may have length `p_null+2` (`nu` gets
+  half-width 0.3) or `p_null+3` (last entry is the half-width for `nu`); a
+  zero entry holds `nu` at its estimate. Maximized p-values for these two
+  error types can differ from earlier versions. Gaussian `mmc_ar()` and all of
+  `lmc_ar()` are unchanged.
+
 * **`mmc_ar()`, `mmc_lev()`, `mmc_t()` and `mmc_ged()` gain `silence`.** The
   optimizer's progress output could not be turned off. `silence = TRUE`
   suppresses it for both `"pso"` and `"GenSA"`; the default `FALSE` prints as

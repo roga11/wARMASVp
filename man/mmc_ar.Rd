@@ -40,11 +40,16 @@ mmc_ar(
 \item{burnin}{Integer. Burn-in for simulation. Default 500.}
 
 \item{eps}{Numeric vector of non-negative half-widths of the search region
-around the estimated nuisance parameters. Must have length
-\code{p_null+2} (one entry per nuisance parameter:
-\eqn{\phi_1,\ldots,\phi_{p_0}, \sigma_y, \sigma_v}). Default: \code{0.3} for
-every parameter except \eqn{\sigma_y}, which gets \code{0}. A zero entry
-holds that parameter at its estimate and leaves it out of the search.}
+around the estimated nuisance parameters. For Gaussian errors it must
+have length \code{p_null+2} (one entry per nuisance parameter:
+\eqn{\phi_1,\ldots,\phi_{p_0}, \sigma_y, \sigma_v}). For Student-t and GED
+errors it may have length \code{p_null+2}, in which case \eqn{\nu} gets
+half-width \code{0.3}, or \code{p_null+3}, with the last entry the
+half-width for \eqn{\nu}. The bounds for \eqn{\nu} are truncated to
+\eqn{[2.01, 500]} (Student-t) or \eqn{[0.1, 20]} (GED). Default:
+\code{0.3} for every parameter except \eqn{\sigma_y}, which gets \code{0}.
+A zero entry holds that parameter at its estimate and leaves it out of
+the search.}
 
 \item{threshold}{Numeric. Target p-value. Default 1.}
 
@@ -97,7 +102,8 @@ An object of class \code{"svp_test"}: the optimizer output with
 Performs a Maximized Monte Carlo (MMC) test of
 \eqn{H_0: \phi_{p_0+1} = \cdots = \phi_p = 0}
 by maximizing the MC p-value over nuisance parameters
-(\eqn{\phi_1, \ldots, \phi_{p_0}, \sigma_y, \sigma_v}).
+(\eqn{\phi_1, \ldots, \phi_{p_0}, \sigma_y, \sigma_v}, and \eqn{\nu} for
+Student-t and GED errors).
 }
 \details{
 When \code{Bartlett = FALSE} (default), the test statistic is
@@ -112,56 +118,34 @@ criteria are moment-based rather than maximized likelihoods, the statistic
 may be negative; this indicates evidence in favour of the null, and raises
 a warning.
 
-The null distribution is simulated without leverage, and for Student-t and
-GED errors with the shape parameter \eqn{\nu} held at its null estimate.
-The moment conditions involve neither in population (the autocovariances
-of \eqn{\log y_t^2} at lags \eqn{k \ge 1} do not depend on the leverage
-parameter or on \eqn{\nu}); in finite samples, holding them fixed is an
-approximation.
+The null distribution is simulated without leverage. The moment conditions
+do not involve the leverage parameter in population (the autocovariances
+of \eqn{\log y_t^2} at lags \eqn{k \ge 1} do not depend on it); in finite
+samples this is an approximation. For Student-t and GED errors,
+\code{lmc_ar} simulates at the null estimate of the shape parameter
+\eqn{\nu}, and \code{mmc_ar} searches over \eqn{\nu}.
 }
-\section{Nuisance parameters and the role of nu}{
+\section{Nuisance parameters}{
 
-For \code{mmc_ar}, the maximization runs over
-\eqn{(\phi_1,\ldots,\phi_{p_0}, \sigma_y, \sigma_v)}. The shape parameter
-\eqn{\nu} is held fixed at its null estimate and is not varied, and
-\eqn{\sigma_y} is present but given a zero half-width by default.
+The maximization runs over
+\eqn{(\phi_1,\ldots,\phi_{p_0}, \sigma_y, \sigma_v)}, and for Student-t and
+GED errors also over the shape parameter \eqn{\nu}. \eqn{\sigma_y} is given
+a zero half-width by default because the statistic does not depend on the
+scale of the data.
 
-The reason for excluding \eqn{\nu} is a property of the moment conditions
-rather than a computational shortcut. Writing the linearized model as
-\eqn{y^*_t = \log(y_t^2) - \mu = h_t + x_t}, with \eqn{h_t} the AR(\eqn{p})
-log-volatility state and \eqn{x_t} an i.i.d. measurement error independent
-of \eqn{h}, the autocovariances separate as
+In population the moment conditions do not involve \eqn{\nu}. Writing the
+linearized model as \eqn{y^*_t = \log(y_t^2) - \mu = h_t + x_t}, with
+\eqn{h_t} the AR(\eqn{p}) log-volatility state and \eqn{x_t} an i.i.d.
+measurement error independent of \eqn{h}, the autocovariances separate as
 \deqn{\gamma_{y^*}(0) = \gamma_h(0) + \sigma_\varepsilon^2(\nu), \qquad
-      \gamma_{y^*}(k) = \gamma_h(k) \;\; (k \ge 1).}
-The error distribution enters only through \eqn{\sigma_\varepsilon^2(\nu)}
-(\eqn{\pi^2/2} for Gaussian, \eqn{\psi'(1/2) + \psi'(\nu/2)} for
-Student-t, \eqn{(2/\nu)^2 \psi'(1/\nu)} for GED), and that term appears at
-lag zero only.
-
-The AR-order moment conditions are the Yule-Walker equations
+      \gamma_{y^*}(k) = \gamma_h(k) \;\; (k \ge 1),}
+and the Yule-Walker conditions
 \deqn{m_j = \gamma_{y^*}(p+j) - \sum_{i=1}^{p} \phi_i\,\gamma_{y^*}(p+j-i),
       \qquad j = 1,\ldots,p,}
-whose smallest lag is \eqn{p+j-p = j \ge 1}. Lag zero never appears, so the
-conditions do not involve \eqn{\nu}. Since \eqn{\gamma_h(k) = \sigma_v^2
-c_k(\boldsymbol\phi)}, they are also homogeneous in \eqn{\sigma_v^2}, which
-cancels; in population they depend on \eqn{\boldsymbol\phi} alone.
-
-What \eqn{\nu} still influences is the sampling variability of the estimated
-autocovariances, through the signal-to-noise ratio
-\eqn{\gamma_h(0)/\sigma_\varepsilon^2(\nu)}. In that ratio \eqn{\sigma_v}
-and \eqn{\nu} appear only as \eqn{\sigma_v^2/\sigma_\varepsilon^2(\nu)}, so
-varying \eqn{\sigma_v} over its interval already traverses the same family
-of null distributions that varying \eqn{\nu} would; the two are redundant.
-This covers the second-moment behaviour exactly. It does not cover the
-fourth moment of \eqn{x_t}, which depends on \eqn{\nu} beyond
-\eqn{\sigma_\varepsilon^2}, so the redundancy is exact in population and
-approximate in finite samples.
-
-This reasoning is specific to the AR-order test. In \code{mmc_t} and
-\code{mmc_ged}, \eqn{\nu} is the parameter under test and is fixed at the
-hypothesized value by construction. In \code{mmc_lev}, \eqn{\nu} enters the
-leverage moment condition directly through the correction factor, not only
-at lag zero, and is therefore carried as a varied nuisance.
+use lags \eqn{k \ge 1} only. In finite samples the distribution of the
+statistic can still depend on \eqn{\nu}, through the sampling variability
+of the estimated autocovariances, so \eqn{\nu} is searched over. Setting its
+half-width to zero holds it at the null estimate.
 }
 
 \examples{
