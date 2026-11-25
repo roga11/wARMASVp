@@ -1,26 +1,30 @@
 ## Submission
 
-This is a version update (0.1.0 -> 0.2.0). It adds information-criterion
-AR-order selection (`svp_IC()`, `svp_AR_order()`), extends the AR-order tests
-to Student-t and GED innovations, fixes some filtering/forecasting bugs
-under leverage, and ports the mixture-filter EM step to C++ for speed. See
-NEWS.md for the full list. `sim_svp()` now always returns a named list (a
-documented breaking change).
+This is a version update (0.2.0 -> 0.3.0). It adds precomputed mixture tables
+for the Gaussian-mixture Kalman filter (new `mixture` argument, new
+`gmkf_table()` accessor), an estimated measurement-noise variance for Gaussian
+fits (`svp(..., sigeps = "estimated")`), and a number of fixes to filtering
+under leverage and to the Monte Carlo tests. See NEWS.md for the full list.
+
+User-visible changes that can alter existing results or calls:
+
+* The `proxy` argument of `filter_svp()`, `forecast_svp()`, `svp_IC()` and
+  `svp_AR_order()` has been removed.
+* `del` now defaults to `0` (was `1e-10`); series containing exact zeros
+  require an explicit positive `del`.
+* The mixture filter defaults to the precomputed tables (`mixture =
+  "optimal"`); `mixture = "em"` gives the previous behaviour.
+* The `mmc_*` functions now return objects of class `"svp_test"`.
 
 ## R CMD check results
 
-0 errors | 0 warnings | 1 note
-
-* The NOTE is the expected "New maintainer" message. The maintainer name has
-  changed from "Gabriel Rodriguez Rondon" to "Gabriel Rodriguez-Rondon"
-  (hyphenated form). The email address and ORCID are unchanged; this is the
-  same person, with the correct spelling of the surname.
+0 errors | 0 warnings | 0 notes
 
 ## Test environments
 
 * macOS Sonoma 14.2.1, R 4.4.0 (local)
-* Windows Server 2022, R release (win-builder)
-* Windows Server 2022, R devel (win-builder)
+* Windows Server 2022, R release (win-builder) -- TO BE RUN BEFORE SUBMISSION
+* Windows Server 2022, R devel (win-builder) -- TO BE RUN BEFORE SUBMISSION
 
 ## Reverse dependencies
 

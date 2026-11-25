@@ -50,7 +50,9 @@ holds that parameter at its estimate and leaves it out of the search.}
 \item{method}{Character. Optimization method: \code{"pso"} or \code{"GenSA"}.
 Default \code{"pso"}.}
 
-\item{maxit}{Integer. Maximum iterations/evaluations. Default depends on method.}
+\item{maxit}{Integer. Maximum number of evaluations of the p-value
+function by the optimizer (passed as \code{maxf} to \code{"pso"} and as
+\code{max.call} to \code{"GenSA"}). Default \code{NULL}, which uses 100.}
 
 \item{del}{Non-negative offset in \eqn{\log(y_t^2 + \delta)}. Default
 \code{0}; see \code{\link{svp}}.}

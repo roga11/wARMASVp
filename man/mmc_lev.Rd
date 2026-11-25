@@ -60,8 +60,9 @@ Default 1.}
 \code{"GenSA"} (generalized simulated annealing).
 Default \code{"pso"}.}
 
-\item{maxit}{Integer or list. Maximum iterations/evaluations for the
-optimizer. Default depends on method.}
+\item{maxit}{Integer. Maximum number of evaluations of the p-value
+function by the optimizer (passed as \code{maxf} to \code{"pso"} and as
+\code{max.call} to \code{"GenSA"}). Default \code{NULL}, which uses 100.}
 
 \item{rho_type}{Character. Correlation type, \code{"pearson"} (default) or
 \code{"kendall"}. \code{"kendall"} is not supported with HAC weighting

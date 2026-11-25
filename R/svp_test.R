@@ -245,7 +245,9 @@ lmc_ar <- function(y, p_null, p_alt, J = 10, N = 99, burnin = 500,
 #' @param threshold Numeric. Target p-value. Default 1.
 #' @param method Character. Optimization method: \code{"pso"} or \code{"GenSA"}.
 #'   Default \code{"pso"}.
-#' @param maxit Integer. Maximum iterations/evaluations. Default depends on method.
+#' @param maxit Integer. Maximum number of evaluations of the p-value
+#'   function by the optimizer (passed as \code{maxf} to \code{"pso"} and as
+#'   \code{max.call} to \code{"GenSA"}). Default \code{NULL}, which uses 100.
 #' @param silence Logical. If \code{TRUE}, the optimizer prints no progress
 #'   output. Default \code{FALSE}.
 #'
@@ -625,8 +627,9 @@ lmc_lev <- function(y, p = 1, J = 10, N = 99, rho_null = 0,
 #' @param method Character. Optimization method: \code{"pso"} (particle swarm),
 #'   \code{"GenSA"} (generalized simulated annealing).
 #'   Default \code{"pso"}.
-#' @param maxit Integer or list. Maximum iterations/evaluations for the
-#'   optimizer. Default depends on method.
+#' @param maxit Integer. Maximum number of evaluations of the p-value
+#'   function by the optimizer (passed as \code{maxf} to \code{"pso"} and as
+#'   \code{max.call} to \code{"GenSA"}). Default \code{NULL}, which uses 100.
 #' @param silence Logical. If \code{TRUE}, the optimizer prints no progress
 #'   output. Default \code{FALSE}.
 #'
@@ -1034,7 +1037,9 @@ lmc_ged <- function(y, p = 1, J = 10, N = 99, nu_null, burnin = 500,
 #' @param threshold Numeric. Target p-value. Default 1.
 #' @param method Character. Optimization method: \code{"pso"} or \code{"GenSA"}.
 #'   Default \code{"pso"}.
-#' @param maxit Integer. Maximum iterations/evaluations. Default depends on method.
+#' @param maxit Integer. Maximum number of evaluations of the p-value
+#'   function by the optimizer (passed as \code{maxf} to \code{"pso"} and as
+#'   \code{max.call} to \code{"GenSA"}). Default \code{NULL}, which uses 100.
 #' @param silence Logical. If \code{TRUE}, the optimizer prints no progress
 #'   output. Default \code{FALSE}.
 #'
@@ -1161,7 +1166,9 @@ mmc_t <- function(y, p = 1, J = 10, N = 99, nu_null, burnin = 500,
 #' @param threshold Numeric. Target p-value. Default 1.
 #' @param method Character. Optimization method: \code{"pso"} or \code{"GenSA"}.
 #'   Default \code{"pso"}.
-#' @param maxit Integer. Maximum iterations/evaluations. Default depends on method.
+#' @param maxit Integer. Maximum number of evaluations of the p-value
+#'   function by the optimizer (passed as \code{maxf} to \code{"pso"} and as
+#'   \code{max.call} to \code{"GenSA"}). Default \code{NULL}, which uses 100.
 #' @param silence Logical. If \code{TRUE}, the optimizer prints no progress
 #'   output. Default \code{FALSE}.
 #'
