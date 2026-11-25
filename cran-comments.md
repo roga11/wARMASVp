@@ -18,13 +18,18 @@ User-visible changes that can alter existing results or calls:
 
 ## R CMD check results
 
-0 errors | 0 warnings | 0 notes
+0 errors | 0 warnings | 1 note
+
+* The NOTE lists "Chib" and "Shephard" as possibly misspelled words in
+  DESCRIPTION. These are author surnames (Kim, Shephard and Chib, 1998) and
+  are spelled correctly.
 
 ## Test environments
 
 * macOS Sonoma 14.2.1, R 4.4.0 (local)
-* Windows Server 2022, R release (win-builder) -- TO BE RUN BEFORE SUBMISSION
-* Windows Server 2022, R devel (win-builder) -- TO BE RUN BEFORE SUBMISSION
+* Windows Server 2022, R oldrelease 4.5.3 (win-builder)
+* Windows Server 2022, R release 4.6.2 (win-builder)
+* Windows Server 2022, R devel (win-builder)
 
 ## Reverse dependencies
 
