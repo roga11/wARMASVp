@@ -152,3 +152,18 @@ test_that("mmc_lev default search region: fixed nu half-width, sigma_y rule", {
   # a user-supplied zero is respected
   expect_identical(run(yg, "GED", c(0.3, 0, 0.3, 0.3))$par[2], fg$sigy)
 })
+
+test_that("Kendall leverage test refuses HAC weighting, allows the others", {
+  set.seed(11)
+  y <- sim_svp(400, phi = 0.9, sigy = 1, sigv = 1, leverage = TRUE, rho = -0.5)$y
+  msg <- "not supported with HAC weighting"
+  expect_error(lmc_lev(y, N = 9, rho_type = "kendall", Amat = "Weighted"), msg)
+  expect_error(lmc_lev(y, N = 9, rho_type = "kendall", Bartlett = TRUE), msg)
+  expect_error(mmc_lev(y, N = 9, rho_type = "kendall", Amat = "Weighted"), msg)
+  expect_error(mmc_lev(y, N = 9, rho_type = "kendall", Bartlett = TRUE), msg)
+  expect_s3_class(suppressWarnings(lmc_lev(y, N = 9, rho_type = "kendall")), "svp_test")
+  expect_s3_class(suppressWarnings(
+    lmc_lev(y, N = 9, rho_type = "kendall", Amat = diag(4))), "svp_test")
+  expect_s3_class(suppressWarnings(
+    lmc_lev(y, N = 9, rho_type = "pearson", Amat = "Weighted")), "svp_test")
+})

@@ -28,6 +28,19 @@
   invisible(NULL)
 }
 
+# The HAC weighting matrix is built from the per-observation Pearson cross
+# product, so it does not match the Kendall leverage moment.
+.check_kendall_hac <- function(rho_type, use_hac) {
+  if (identical(rho_type, "kendall") && use_hac)
+    stop("rho_type = \"kendall\" is not supported with HAC weighting ",
+         "(Amat = \"Weighted\" or Bartlett = TRUE). The HAC weighting matrix ",
+         "is designed for the Pearson estimate, so testing with it under ",
+         "Kendall is not supported at this time. Use rho_type = \"pearson\", ",
+         "or the identity weighting with rho_type = \"kendall\".",
+         call. = FALSE)
+  invisible(NULL)
+}
+
 
 # =========================================================================== #
 # Correction factors and helper functions for leverage under heavy tails

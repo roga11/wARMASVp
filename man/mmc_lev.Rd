@@ -63,7 +63,10 @@ Default \code{"pso"}.}
 \item{maxit}{Integer or list. Maximum iterations/evaluations for the
 optimizer. Default depends on method.}
 
-\item{rho_type}{Character. Correlation type. Default \code{"pearson"}.}
+\item{rho_type}{Character. Correlation type, \code{"pearson"} (default) or
+\code{"kendall"}. \code{"kendall"} is not supported with HAC weighting
+(\code{Amat = "Weighted"} or \code{Bartlett = TRUE}): the HAC weighting
+matrix is designed for the Pearson estimate.}
 
 \item{del}{Non-negative offset in \eqn{\log(y_t^2 + \delta)}. Default
 \code{0}; see \code{\link{svp}}.}

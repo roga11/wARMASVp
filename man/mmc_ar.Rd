@@ -63,19 +63,21 @@ Default \code{"pso"}.}
 
 \item{wDecay}{Logical. Use decaying weights. Default \code{FALSE}.}
 
-\item{Bartlett}{Logical. If \code{TRUE}, use Bartlett kernel HAC weighting
-matrix for a GMM-LRT-type test statistic. If \code{FALSE} (default), use
-the sum of squared extra AR coefficients.}
+\item{Bartlett}{Logical. \code{TRUE} is equivalent to
+\code{Amat = "Weighted"}. Default \code{FALSE}. See \code{Amat} and
+Details.}
 
-\item{Amat}{Weighting matrix specification. \code{NULL} (default) for identity
-weighting, or \code{"Weighted"} for data-driven HAC. Takes precedence over
-\code{Bartlett}. User-supplied matrices are not supported for AR order tests.}
+\item{Amat}{Selects the test statistic. \code{NULL} (default) gives the
+Wald-type statistic based on the extra AR coefficients; \code{"Weighted"}
+gives the LR-type statistic with a Bartlett kernel HAC weighting matrix.
+See Details. Takes precedence over \code{Bartlett}. User-supplied
+matrices are not supported for AR order tests.}
 
 \item{errorType}{Character. Error distribution of the return innovations:
 \code{"Gaussian"} (default), \code{"Student-t"}, or \code{"GED"}. Heavy-tail
 options reuse the same moment-based GMM-LRT machinery as \code{lmc_t}/
-\code{lmc_ged}; \eqn{\nu} is held at the null MLE during the simulation
-(it is not a varied nuisance for the AR-order test).}
+\code{lmc_ged}. See Details for how \eqn{\nu} is treated in the
+simulation.}
 
 \item{sigvMethod}{Character. Method for \eqn{\sigma_v} estimation:
 \code{"factored"} (default), \code{"hybrid"}, or \code{"direct"}.}
@@ -106,17 +108,25 @@ by maximizing the MC p-value over nuisance parameters
 Student-t and GED errors).
 }
 \details{
-When \code{Bartlett = FALSE} (default), the test statistic is
-\eqn{T \sum_{j=p_0+1}^{p} \hat\phi_j^2}, i.e., the sum of squared extra
-AR coefficients scaled by sample size.
+Two test statistics are available.
 
-When \code{Bartlett = TRUE}, the test statistic is based on the GMM-LRT
-approach with a Bartlett kernel HAC weighting matrix:
+By default (\code{Amat = NULL} and \code{Bartlett = FALSE}), the statistic
+is Wald-type: \eqn{S = T \sum_{j=p_0+1}^{p} \hat\phi_j^2}, the sum of
+squared extra AR coefficients from the fit under the alternative, scaled
+by the sample size. The coefficients are not weighted by an estimate of
+their covariance matrix. This statistic is non-negative.
+
+With \code{Amat = "Weighted"} (or, equivalently, \code{Bartlett = TRUE}),
+the statistic is LR-type:
 \eqn{S = T \times (M_{H_0} - M_{H_1})}, where \eqn{M} denotes the
-GMM criterion evaluated at the null and alternative estimates. Because the
+GMM criterion evaluated at the null and alternative estimates, each with
+its own Bartlett kernel HAC weighting matrix. Because the
 criteria are moment-based rather than maximized likelihoods, the statistic
 may be negative; this indicates evidence in favour of the null, and raises
 a warning.
+
+In both cases the p-value is obtained by Monte Carlo simulation under the
+null.
 
 The null distribution is simulated without leverage. The moment conditions
 do not involve the leverage parameter in population (the autocovariances

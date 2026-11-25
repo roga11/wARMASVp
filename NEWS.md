@@ -328,6 +328,14 @@
   coefficients are unaffected. Boundary classification and rates are
   preserved. Added regression tests (`test-ged-nu-bracket.R`).
 
+* **`lmc_lev()` and `mmc_lev()` no longer accept `rho_type = "kendall"` with
+  HAC weighting** (`Amat = "Weighted"` or `Bartlett = TRUE`); they stop with an
+  error. The HAC weighting matrix is designed for the Pearson estimate, and
+  with the Kendall estimate the weighted statistic did not respond to
+  leverage, so the test had no power. `rho_type = "kendall"` with the identity
+  weighting or a user-supplied matrix is unchanged, as is `rho_type =
+  "pearson"`.
+
 ## Documentation
 
 * `filter_svp()`, `forecast_svp()`, `svp_IC()`, `svp_AR_order()`: corrected
